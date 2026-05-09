@@ -95,11 +95,11 @@ class OutlineLLMClient:
                 kwargs["base_url"] = self._base_url
             self._client = OpenAI(**kwargs)
 
-    def generate_outline(self, topic: str, num_slides: int) -> Outline:
+    def generate_outline(self, topic: str, num_slides: int, reference_text: str = "") -> Outline:
         if not self._client:
             return _mock_outline(topic, num_slides)
 
-        user_msg = outline_user_message(topic, num_slides)
+        user_msg = outline_user_message(topic, num_slides, reference_text)
         resp = self._client.chat.completions.create(
             model=self._model,
             messages=[

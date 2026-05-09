@@ -17,9 +17,15 @@ OUTLINE_SYSTEM = """你是专业的演示文稿结构与叙事设计助手。
 - 只输出 JSON，不要有其它文字。"""
 
 
-def outline_user_message(topic: str, num_slides: int) -> str:
-    return (
-        f"主题：{topic}\n"
-        f"幻灯片总页数（必须刚好）：{num_slides}\n"
-        "请生成完整 slides JSON。"
-    )
+def outline_user_message(topic: str, num_slides: int, reference_text: str = "") -> str:
+    parts = [
+        f"主题：{topic}",
+        f"幻灯片总页数（必须刚好）：{num_slides}",
+    ]
+    if reference_text.strip():
+        parts.append(
+            "=== 以下为参考材料（请严格以此为准，不要编造数据） ===\n"
+            + reference_text.strip()
+        )
+    parts.append("请生成完整 slides JSON，所有数据必须以参考材料中的实际数据为准，不得编造。")
+    return "\n\n".join(parts)

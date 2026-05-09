@@ -58,9 +58,18 @@ class PPTGenerator:
         if extra_documents:
             chunks.extend(BM25Retriever.from_text_documents(extra_documents).chunks)
         self._retriever = BM25Retriever(chunks) if chunks else None
+        self._extra_documents = extra_documents or []
 
     def generate_outline(self, topic: str, num_slides: int = 10) -> Outline:
-        return self._llm.generate_outline(topic=topic, num_slides=num_slides)
+        ref_parts = []
+        char_limit = 8000
+        for fname, text in self._extra_documents:
+            remaining = char_limit - sum(len(p) for p in ref_parts)
+            if remaining <= 0:
+                break
+            ref_parts.append(f"--- {fname} ---\n{text[:remaining]}")
+        reference_text = "\n\n".join(ref_parts)
+        return self._llm.generate_outline(topic=topic, num_slides=num_slides, reference_text=reference_text)
 
     def enhance_with_rag(self, outline: Outline, top_k_per_slide: int = 10) -> EnhancedPresentation:
         enriched_outline = self._llm.enrich_with_materials(
