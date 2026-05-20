@@ -1,0 +1,33 @@
+# ide related
+.idea/
+.vscode/
+*.code-workspace
+
+# data
+data/
+resources/
+
+# secrets
+*.env
+
+# pyton
+__pycache__/
+*.pyc
+
+# npm
+node_modules/
+dist/
+dist_electron/
+
+# logs
+logs/
+log/
+*.log
+
+# claude
+.claude/
+
+# dist
+dist/
+build/
+release/
