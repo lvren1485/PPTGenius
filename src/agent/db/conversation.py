@@ -4,9 +4,10 @@ from datetime import datetime, timezone
 from .engine import get_connection
 
 
-def create_session(topic: str) -> str:
+def create_session(topic: str, session_id: str | None = None) -> str:
     """Create a new session and return its ID."""
-    session_id = uuid.uuid4().hex
+    if session_id is None:
+        session_id = uuid.uuid4().hex
     now = datetime.now(timezone.utc).isoformat()
     conn = get_connection()
     try:

@@ -1,8 +1,8 @@
-import sys
 import argparse
 
 from . import __app_name__, __version__
 from .config import config
+from .agents.orchestrator import Orchestrator
 
 
 def main():
@@ -39,11 +39,23 @@ def main():
     # Ensure directories exist
     config.ensure_dirs()
 
-    # TODO: Route to orchestrator in later commits
-    print(f"{__app_name__} v{__version__}")
-    print(f"Topic: {args.topic}")
-    print(f"Session ID: {args.session_id or '(will be generated)'}")
-    print("Orchestrator not yet implemented — this is a stub.")
+    # Override output dir if specified
+    if args.output_dir:
+        config.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Run orchestrator
+    orchestrator = Orchestrator()
+    result = orchestrator.run(
+        topic=args.topic,
+        session_id=args.session_id,
+    )
+
+    if result.get("error"):
+        print(f"Error: {result['error']}")
+        exit(1)
+
+    print(f"\nDone! Session: {result['session_id']}")
+    print(f"Report: {result.get('report_path', 'N/A')}")
 
 
 if __name__ == "__main__":
