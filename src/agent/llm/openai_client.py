@@ -11,7 +11,7 @@ T = TypeVar("T")
 
 
 class OpenAIClient(LLMClient):
-    """LLM client backed by the OpenAI API."""
+    """LLM client backed by any OpenAI-compatible API (OpenAI, DeepSeek, etc.)."""
 
     def __init__(self, api_key: str | None = None, model: str | None = None):
         self.api_key = api_key or config.OPENAI_API_KEY
@@ -21,7 +21,10 @@ class OpenAIClient(LLMClient):
     @property
     def client(self) -> OpenAI:
         if self._client is None:
-            self._client = OpenAI(api_key=self.api_key)
+            kwargs = {"api_key": self.api_key}
+            if config.OPENAI_BASE_URL:
+                kwargs["base_url"] = config.OPENAI_BASE_URL
+            self._client = OpenAI(**kwargs)
         return self._client
 
     def _prepare_messages(
@@ -53,6 +56,9 @@ class OpenAIClient(LLMClient):
                 model=model or self.default_model,
             )
 
+        # Remove kwargs not supported by all providers
+        kwargs.pop("response_format", None)
+
         resp = self.client.chat.completions.create(
             model=model or self.default_model,
             messages=self._prepare_messages(system, messages),
@@ -81,18 +87,30 @@ class OpenAIClient(LLMClient):
                 model=model or self.default_model,
             )
 
-        # Use OpenAI structured outputs via response_format
-        resp = self.client.beta.chat.completions.parse(
+        # Use standard chat API + JSON mode (compatible with DeepSeek)
+        system_prompt = system or ""
+        json_instruction = (
+            "\n\nYou MUST respond with valid JSON matching this schema: "
+            + json.dumps(response_model.model_json_schema(), ensure_ascii=False)
+        )
+
+        resp = self.client.chat.completions.create(
             model=model or self.default_model,
-            messages=self._prepare_messages(system, messages),
-            response_format=response_model,
-            **kwargs,
+            messages=self._prepare_messages(system_prompt + json_instruction, messages),
+            response_format={"type": "json_object"},
+            **{k: v for k, v in kwargs.items() if k != "response_format"},
         )
         choice = resp.choices[0]
-        parsed: T = choice.message.parsed
+        text = choice.message.content or "{}"
         usage = resp.usage
+
+        try:
+            parsed = response_model(**json.loads(text))
+        except (json.JSONDecodeError, TypeError) as e:
+            parsed = response_model()
+
         raw = LLMResponse(
-            text=choice.message.content or json.dumps(parsed, default=str),
+            text=text,
             prompt_tokens=usage.prompt_tokens if usage else 0,
             completion_tokens=usage.completion_tokens if usage else 0,
             model=resp.model,

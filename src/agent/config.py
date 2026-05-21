@@ -21,9 +21,14 @@ class Config:
     CALLS_LOG_DIR: Path = LOG_DIR / "calls"
     SESSIONS_LOG_DIR: Path = LOG_DIR / "sessions"
 
-    # LLM
-    OPENAI_API_KEY: str | None = os.getenv("OPENAI_API_KEY")
-    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o")
+    # LLM - support both OPENAI_* and generic API_* naming
+    OPENAI_API_KEY: str | None = (
+        os.getenv("OPENAI_API_KEY") or os.getenv("API_KEY")
+    )
+    OPENAI_BASE_URL: str | None = os.getenv("API_BASE_URL") or os.getenv("OPENAI_BASE_URL")
+    OPENAI_MODEL: str = (
+        os.getenv("API_MODEL") or os.getenv("OPENAI_MODEL", "gpt-4o")
+    )
     OPENAI_MINI_MODEL: str = os.getenv("OPENAI_MINI_MODEL", "gpt-4o-mini")
 
     # Tech route switches
