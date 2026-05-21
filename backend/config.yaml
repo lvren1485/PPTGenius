@@ -26,9 +26,12 @@ agent:
 
 llm:
   provider: "deepseek"
+  base_url: "https://api.deepseek.com/v1"
+  api_key: "your_deepseek_api_key"
+  model: "deepseek-v4-flash"
   temperature: 0.7
   max_tokens: 4096
 
 db:
-  type: "sqlite"
-  sqlite_path: "./data/db/pptgenius.db"
+  type: "mysql"
+  url: "mysql+asyncmy://{username}:{password}@localhost:3306/pptgenius"
