@@ -33,14 +33,16 @@ def generate_ppt(
         return {"error": f"Invalid outline JSON: {e}"}
 
     if output_path is None:
-        output_path = str(config.OUTPUT_DIR / f"presentation.pptx")
+        output_path = str(config.OUTPUT_DIR / f"{outline.topic[:20].replace(' ', '_')}.pptx")
+
+    from ...ppt.generator import generate_presentation
+    real_path = generate_presentation(outline, template, output_path)
 
     return {
-        "status": "pending",
-        "output_path": output_path,
+        "status": "success",
+        "output_path": real_path,
         "slide_count": len(outline.slides),
         "template": template,
-        "note": "PPT generation requires the full pipeline (ppt/generator.py).",
     }
 
 
@@ -68,34 +70,9 @@ def generate_chart(
     except Exception as e:
         return {"error": f"Invalid data JSON: {e}"}
 
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    fig, ax = plt.subplots(figsize=(8, 4.5))
-
-    if chart_type == "bar":
-        ax.bar(data.get("labels", []), data.get("values", []))
-    elif chart_type == "line":
-        ax.plot(data.get("labels", []), data.get("values", []), marker="o")
-    elif chart_type == "pie":
-        ax.pie(data.get("values", []), labels=data.get("labels", []), autopct="%1.1f%%")
-    elif chart_type == "scatter":
-        ax.scatter(data.get("x", []), data.get("y", []))
-    elif chart_type == "histogram":
-        ax.hist(data.get("values", []), bins=data.get("bins", 10))
-    else:
-        return {"error": f"Unknown chart type: {chart_type}"}
-
-    if title:
-        ax.set_title(title)
-
-    image_path = config.OUTPUT_DIR / f"chart_{title.replace(' ', '_')[:20]}.png"
-    plt.tight_layout()
-    plt.savefig(str(image_path), dpi=150)
-    plt.close()
-
-    return {"image_path": str(image_path)}
+    from ...ppt.charts import generate_chart_image
+    image_path = generate_chart_image(chart_type, data, title)
+    return {"image_path": image_path}
 
 
 @register
