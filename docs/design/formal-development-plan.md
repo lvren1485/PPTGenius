@@ -17,6 +17,8 @@ PPT布局:     5种内置Layout (Title/Section/Content/TwoColumn/Ending)
 视觉模板:    6-8套 (含暗色/学术/创意风格)
 Agent架构:   混合模式 (直接大纲生成 + 可选工具增强)
 工具解析:    结构化输出 (chat_structured + JSON mode)
+应用架构:    PPTGeniusAgentAPP 入口类 + 无状态设计 (API key/上下文由外部传入)
+RAG归属:     App实例内部组件，每个实例独立资源路径
 图表:        matplotlib → PNG嵌入
 图片:        内置库 + DuckDuckGo搜索
 CLI:         argparse
@@ -38,35 +40,40 @@ CLI:         argparse
 ## 二、正式版架构
 
 ```
-CLI (argparse)
-    │ --session-id <uuid>
-    ▼
-Orchestrator
-    │
-    ├── 1. 启动: 扫描 resources/ → 解析文件 → ChromaDB向量化
-    │       └── 真实Embedding (sentence-transformers)
-    │
-    ├── 2. 恢复/创建 Session → 加载对话历史
-    │
-    ├── 3. 大纲生成 (LLM直接生成, ~32s)
-    │       └── 12 slides, 5种layout混合, 详细内容
-    │
-    ├── 4. 工具增强阶段 (可选, 新增)
-    │       ├── RAG检索 → 补充事实性内容
-    │       ├── Web搜索 → 添加最新数据
-    │       ├── 图表生成 → 嵌入数据可视化
-    │       └── 图片选择 → 添加视觉元素
-    │
-    ├── 5. PPT生成 (python-pptx, ~16ms)
-    │       ├── 加载template.pptx (含自定义Layout)
-    │       ├── 按outline逐页构建
-    │       └── 应用模板颜色/字体
-    │
-    ├── 6. 审查报告 (LLM)
-    │       └── output/{session_id}_report.md
-    │
-    ├── 7. 保存对话历史 → SQLite
-    └── 8. LogCapture → logs/calls/*.md
+外部传入:
+  ├── api_key                  # 父项目按请求传入，不同客户不同 key
+  ├── session_history          # 父项目管理对话上下文
+  ├── workspace_path            # 工作空间路径（含RAG数据/状态/历史）
+  └── language                 # 生成语言 (en/zh/ja/...)
+              │
+              ▼
+     PPTGeniusAgentAPP (入口类)
+         constructor / setter 链
+              │
+              ├── 1. 启动: 扫描 resources/ → 解析文件 → ChromaDB向量化
+              │       └── 真实Embedding (sentence-transformers)
+              │
+              ├── 2. 规划 + 内容生成 (per-page)
+              │       ├── PlanningAgent → 结构规划 + 每页大纲
+              │       ├── RAGEngine → 按每页大纲检索知识
+              │       └── ContentAgent → 逐页生成内容
+              │
+              ├── 3. 视觉美化 (BeautifyAgent)
+              │       ├── search_web_image → 配图
+              │       ├── generate_image → 生成图片
+              │       ├── generate_chart → 图表嵌入
+              │       └── adjust_layout → 布局微调
+              │
+              ├── 4. PPT生成 (python-pptx, ~16ms)
+              │       ├── 加载template.pptx (含自定义Layout)
+              │       ├── 按outline逐页构建
+              │       └── 应用模板颜色/字体
+              │
+              ├── 5. 审查报告 (ReviewerAgent)
+              │       └── output/{session_id}_report.md
+              │
+              ├── 6. 保存对话历史 → 由外部父项目决定
+              └── 7. LogCapture → logs/calls/*.md
 ```
 
 ---
@@ -145,15 +152,16 @@ Orchestrator
 ## 四、代码结构（正式版）
 
 ```
-src/agent/
-├── __init__.py          # 版本号
-├── __main__.py          # CLI入口
-├── cli.py               # argparse解析 (含yield包调用借口)
-├── config.py            # 配置 (环境变量 + 默认值)
-├── logger.py            # LogCapture + token统计
+src/pptgenius_agent/
+├── __init__.py          # 版本号, 导出 PPTGeniusAgentAPP
+├── __main__.py          # CLI 入口 (python -m), 单行委托给 cli
+├── app.py               # PPTGeniusAgentAPP 入口类 (constructor + setter 链)
+├── cli.py               # argparse 解析 + 组装 APP → 调用 run()
+├── config.py            # 配置 (默认值 + CLI 传入覆盖)
+├── logger.py            # LogCapture + token 统计
 │
 ├── llm/
-│   ├── base.py          # LLMClient抽象基类
+│   ├── base.py          # LLMClient 抽象基类
 │   └── openai_client.py # OpenAI SDK (兼容DeepSeek)
 │
 ├── models/
@@ -161,8 +169,8 @@ src/agent/
 │   └── conversation.py  # 对话记录模型
 │
 ├── db/
-│   ├── engine.py        # SQLite连接管理
-│   ├── conversation.py  # 会话CRUD
+│   ├── engine.py        # SQLite连接管理 (仅本地调试/日志)
+│   ├── conversation.py  # 会话CRUD (由外部父项目主管理)
 │   └── structured_data.py # CSV/xlsx导入查询
 │
 ├── rag/
@@ -170,13 +178,16 @@ src/agent/
 │   ├── parsers/         # PDF/DOCX/PPTX/TXT/CSV解析器
 │   ├── chunker.py       # 文本分块 (paragraph默认)
 │   ├── embedder.py      # sentence-transformers / OpenAI
-│   └── vector_store.py  # ChromaDB (移除JSON回退)
+│   └── vector_store.py  # ChromaDB (按 workspace 路径隔离)
 │
 ├── agents/
-│   ├── orchestrator.py  # 顶层协调器
-│   ├── ppter.py         # 混合模式agent (大纲+工具增强)
-│   ├── reviewer.py      # 审查agent
-│   └── tools/           # 13个工具
+│   ├── orchestrator.py  # 顶层协调器 (含状态追踪 + 结构化决策)
+│   ├── planning.py      # PPT结构规划
+│   ├── content.py       # 逐页内容生成 (接收 planning + RAG)
+│   ├── beautify.py      # 视觉美化 (搜图/图表/布局微调)
+│   ├── diagram.py       # 图表生成
+│   ├── reviewer.py      # 审查agent (总结 + 改进建议)
+│   └── tools/           # 工具注册
 │       ├── registry.py  # 工具注册表
 │       ├── knowledge.py # RAG检索
 │       ├── database.py  # SQL查询
@@ -187,13 +198,27 @@ src/agent/
 │       ├── images.py    # 图片选择
 │       └── planner.py   # 规划工具
 │
-└── ppt/
-    ├── generator.py     # PPT生成主逻辑
-    ├── templates.py     # 6-8套模板定义
-    ├── slides.py        # 5种Layout构建
-    ├── styles.py        # 颜色/字体常量
-    ├── charts.py        # matplotlib图表
-    └── images.py        # 图片查询
+├── ppt/
+│   ├── generator.py     # PPT生成主逻辑
+│   ├── templates.py     # 6-8套模板定义
+│   ├── slides.py        # 5种Layout构建
+│   ├── styles.py        # 颜色/字体常量
+│   ├── charts.py        # matplotlib图表
+│   └── images.py        # 图片查询
+│
+├── resources/
+│   ├── prompts/         # LLM prompt 模板 (含 {language} 占位符)
+│   │   ├── orchestrator.md  # 含 {current_phase}, {message}, {slide_count} 等状态占位符
+│   │   ├── planning.md
+│   │   ├── content.md   # 接收 {planning_structure} + {rag_results}, 逐页生成
+│   │   ├── beautify.md  # 三阶段: Template Design → Style Guide → Apply
+│   │   ├── diagram.md
+│   │   └── reviewer.md  # 接收 {ppt_content}, 输出总结+建议
+│   ├── schema.sql       # 数据库结构
+│   └── ...              # PPT 模板等静态资源
+├── data/                # 运行时数据 (按 workspace 可配置)
+├── config.yaml          # 默认配置 (被构造器传入值覆盖)
+└── logs/                # 日志输出
 ```
 
 ---
@@ -203,7 +228,7 @@ src/agent/
 ### CLI 接口
 ```bash
 # 基础使用
-pptgenius "主题" --session-id <uuid>
+pptgenius --message "主题" --session-id <uuid>
 
 # 常用选项
 --output-dir ./my_ppts    # 输出目录
@@ -211,27 +236,26 @@ pptgenius "主题" --session-id <uuid>
 --model deepseek-v4-flash # 指定模型
 --slides 15               # 指定目标幻灯片数
 --dry-run                 # 仅生成大纲JSON，不生成PPT
-
-# 多轮修改
-pptgenius "修改第三页的内容为..." --session-id <existing-uuid>
+--workspace ./workspace   # 工作空间路径 (状态/RAG/历史持久化)
+--language zh             # 生成语言 (默认 en)
 ```
 
-### Python 包调用
-```python
-from pptgenius import PPTGenius
+### Python 包调用 — PPTGeniusAgentAPP 入口类
 
-# 同步调用
-result = PPTGenius().run(
-    topic="量子计算",
-    session_id="my-session",
-    template="modern-teal",
+`generate_presentation()` 是生成器函数，CLI 和包调用共用同一套遍历接口：
+
+```python
+from pptgenius_agent import PPTGeniusAgentAPP
+
+# 方式一: 构造器
+app = PPTGeniusAgentAPP(
+    api_key="sk-xxx",
+    api_base_url="...",
+    model="deepseek-v4-flash",
+    workspace_path="/data/tenant_a/",
 )
 
-# 生成式调用（yield进度）
-for event in PPTGenius().stream(
-    topic="量子计算",
-    session_id="my-session",
-):
+for event in app.generate_presentation():
     if event["type"] == "llm_call":
         print(f"LLM调用: {event['call_type']}")
     elif event["type"] == "tool_call":
@@ -240,6 +264,16 @@ for event in PPTGenius().stream(
         print(f"进度: {event['message']}")
     elif event["type"] == "done":
         print(f"完成: {event['output_path']}")
+
+# 方式二: setter 链 (CLI 路径风格)
+app = PPTGeniusAgentAPP() \
+    .set_api_key("sk-xxx") \
+    .set_session_id("my-session") \
+    .set_workspace_path("/data/tenant_b/")
+
+for event in app.generate_presentation():
+    if event["type"] == "done":
+        result = event["output_path"]
 ```
 
 ---
@@ -267,6 +301,11 @@ for event in PPTGenius().stream(
 | 每个文件 ≤ 300 行 | 超限则拆分 | 保持代码可维护性 |
 | 不使用 async | 同步单线程 | 原型阶段不需要，简化调试 |
 | 不使用文件监控守护 | 启动时一次性扫描 | 简化实现，满足原型需求 |
+| **子项目无状态化** | PPTGeniusAgentAPP 入口类 | API key、对话历史由外部传入，多租户隔离 |
+| **Workspace 归属 App 实例** | 每个实例独立 workspace_path | 所有状态（RAG/对话历史/大纲）统一存储在 workspace 中 |
+| **入口类双路径设计** | constructor + setter 链 | CLI 路径逐步填入参数，包调用路径构造函数一次性传入 |
+| **内容+美化分离** | PPTAgent 生成内容 → BeautifyAgent 后美化 | 图片/图表依赖具体内容，先有内容才知道配什么图 |
+| **多语言支持** | prompt 模板 `{language}` 占位符 | 一套 prompt 模板，运行时注入目标语言 |
 
 ---
 
