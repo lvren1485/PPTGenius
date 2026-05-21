@@ -13,6 +13,8 @@ resources/
 # pyton
 __pycache__/
 *.pyc
+.venv/
+
 
 # npm
 node_modules/
@@ -26,6 +28,9 @@ log/
 
 # claude
 .claude/
+
+# config (local overrides)
+config.local.yaml
 
 # dist
 dist/

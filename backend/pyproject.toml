@@ -1,0 +1,36 @@
+[project]
+name = "pptgenius"
+version = "0.1.0"
+description = "单人 AI PPT 生成网站 — BM25 检索 + LangGraph Agent + FastAPI"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "langgraph>=1.0",
+    "langchain-openai>=0.3",
+    "rank-bm25>=0.2",
+    "python-pptx>=1.0",
+    "python-docx>=1.1",
+    "PyPDF2>=3.0",
+    "openpyxl>=3.1",
+    "matplotlib>=3.10",
+    "seaborn>=0.13",
+    "pandas>=2.2",
+    "httpx>=0.28",
+    "beautifulsoup4>=4.12",
+    "sqlalchemy>=2.0",
+    "alembic>=1.14",
+    "pymysql>=1.1",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.7",
+    "pyyaml>=6.0",
+    "python-multipart>=0.0.20",
+    "tiktoken>=0.8",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pptgenius"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
