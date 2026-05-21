@@ -1,4 +1,4 @@
-"""Main PPT generator: converts a structured outline into a .pptx file."""
+"""Main PPT generator: converts a structured outline into a professional .pptx."""
 
 from pathlib import Path
 from pptx import Presentation
@@ -21,7 +21,9 @@ def generate_presentation(
     template_name: str = "professional-blue",
     output_path: str | None = None,
 ) -> str:
-    """Generate a .pptx file from a structured outline.
+    """Generate a professional .pptx file from a structured outline.
+
+    Uses proper PPT slide layouts (selectable in PowerPoint's Layout picker).
 
     Args:
         outline: PresentationOutline with slides list.
@@ -36,29 +38,38 @@ def generate_presentation(
     prs.slide_width = Inches(13.333)
     prs.slide_height = Inches(7.5)
 
-    for slide_data in outline.slides:
+    slides_data = outline.slides
+    total_slides = len(slides_data)
+
+    for idx, slide_data in enumerate(slides_data):
         layout = slide_data.layout_type
+        page_info = (idx, total_slides)
 
         if layout == "title":
-            build_title_slide(prs, template, slide_data.title, slide_data.subtitle or "")
+            build_title_slide(prs, template, slide_data.title,
+                              slide_data.subtitle or "", page_info)
 
         elif layout == "section":
-            build_section_slide(prs, template, slide_data.title)
+            build_section_slide(prs, template, slide_data.title, page_info)
 
         elif layout == "two_column":
             mid = len(slide_data.bullets) // 2
+            if mid < 1:
+                mid = len(slide_data.bullets)
             build_two_column_slide(
                 prs, template, slide_data.title,
-                left_items=slide_data.bullets[:mid],
-                right_items=slide_data.bullets[mid:],
+                left_items=slide_data.bullets[:mid] or ["(left)"],
+                right_items=slide_data.bullets[mid:] or ["(right)"],
+                page_info=page_info,
             )
 
         elif layout == "ending":
-            build_ending_slide(prs, template, slide_data.title, slide_data.subtitle or "")
+            build_ending_slide(prs, template, slide_data.title,
+                               slide_data.subtitle or "", page_info)
 
         else:
-            # Default: content slide
-            build_content_slide(prs, template, slide_data.title, slide_data.bullets)
+            build_content_slide(prs, template, slide_data.title,
+                                slide_data.bullets, page_info)
 
     # Save
     if output_path is None:

@@ -1,16 +1,40 @@
-"""PPT Agent: Plan-then-Execute loop for generating presentations."""
+"""PPT Agent: generates comprehensive presentation outlines via LLM."""
 
 import json
 
-from ..llm import create_llm_client, LLMResponse
+from ..llm import create_llm_client
 from ..logger import logger
 from ..models.outline import PresentationOutline
-from .tools import list_tools, execute_tool
-from .tools.registry import TOOL_REGISTRY
+
+
+OUTLINE_SYSTEM_PROMPT = """You are a professional presentation designer. Generate a detailed, comprehensive PowerPoint outline in JSON format.
+
+Requirements:
+1. Produce 10-12 slides covering the topic comprehensively
+2. Mix layout types: title(1), section(2-3), content(5-7), two_column(1-2), ending(1)
+3. Each content slide must have 3-5 detailed bullet points (10-20 words each)
+4. Include a logical flow: introduction → sections → summary → Q&A/ending
+5. Section slides act as chapter dividers between major topic sections
+
+Response must be valid JSON with this exact schema:
+{
+    "topic": "string",
+    "style_notes": "string (optional design suggestions)",
+    "slides": [
+        {
+            "title": "slide title",
+            "subtitle": "optional subtitle",
+            "bullets": ["bullet1", "bullet2", ...],
+            "layout_type": "title|section|content|two_column|ending"
+        }
+    ]
+}
+
+IMPORTANT: Content must be factual, specific, and professional. Avoid generic filler."""
 
 
 class PPTAgent:
-    """Main PPT generation agent with Plan-then-Execute loop."""
+    """PPT Agent: generates comprehensive outlines via direct LLM calls."""
 
     def __init__(self):
         self.client = create_llm_client()
@@ -18,126 +42,75 @@ class PPTAgent:
         self.plan: dict | None = None
 
     def run(self, topic: str) -> dict:
-        """Full Plan-then-Execute pipeline for PPT generation.
+        """Full pipeline: plan → comprehensive outline generation."""
+        self._log("Generating comprehensive outline...")
 
-        Returns dict with plan, execution log, and generated output.
-        """
-        # 1. Plan phase
-        self._log("Planning phase: analyzing request")
-        plan_result = execute_tool(
-            "create_plan",
-            goal=topic,
-            context="\n".join(self.context[-5:]),
-        )
-        self.plan = plan_result.get("plan")
-        if not self.plan:
-            return {"error": "Failed to create plan", "plan": None}
+        # Generate the outline via LLM
+        outline = self._generate_comprehensive_outline(topic)
 
-        items = self.plan.get("items", [])
-        self._log(f"Plan created with {len(items)} items")
+        if not outline or not outline.get("slides"):
+            self._log("LLM output invalid, using fallback outline")
+            outline = self._fallback_outline(topic)
 
-        # 2. Execute phase - work through each todo
-        execution_log = []
-        for item in items:
-            todo_result = self._execute_todo(item)
-            execution_log.append(todo_result)
-            if todo_result.get("error"):
-                self._log(f"Todo {item['id']} failed: {todo_result['error']}")
-                continue
+        slide_count = len(outline.get("slides", []))
+        self._log(f"Generated outline with {slide_count} slides")
 
-        # 3. Generate final output
-        output = self._generate_output(topic)
         return {
-            "plan": self.plan,
-            "execution_log": execution_log,
-            "output": output,
+            "plan": {"goal": topic, "items": [], "created_at": ""},
+            "execution_log": [],
+            "output": {"outline": outline, "slide_count": slide_count},
         }
 
-    def _execute_todo(self, todo: dict) -> dict:
-        """Execute a single todo item using ReAct loop."""
-        todo_id = todo["id"]
-        description = todo["description"]
-        self._log(f"Executing todo {todo_id}: {description}")
+    def _generate_comprehensive_outline(self, topic: str) -> dict | None:
+        """Call LLM to generate a comprehensive presentation outline."""
+        with logger.capture("generate_outline", topic=topic) as cap:
+            cap.set_system_prompt(OUTLINE_SYSTEM_PROMPT)
 
-        system = (
-            "You are executing a step in a PPT generation plan. "
-            "Use the available tools to accomplish the current task. "
-            "When the task is complete, respond with 'DONE'.\n\n"
-            f"Available tools: {json.dumps([t['name'] for t in list_tools()])}"
-        )
-        messages = [
-            f"Current task: {description}\n"
-            f"Context: {'\n'.join(self.context[-3:])}"
-        ]
+            user_msg = f"Create a detailed presentation outline about: {topic}"
+            if self.context:
+                user_msg += f"\n\nContext:\n" + "\n".join(self.context[-3:])
 
-        max_iterations = 5
-        for iteration in range(max_iterations):
-            with logger.capture(
-                "react_iteration",
-                model=self.client.default_model if hasattr(self.client, 'default_model') else 'mock',
-                todo_id=str(todo_id),
-                iteration=str(iteration),
-            ) as cap:
-                cap.set_system_prompt(system)
-                cap.set_user_messages(messages)
+            cap.set_user_messages([user_msg])
 
-                response = self.client.chat(system=system, messages=messages)
-                cap.set_response(response.text)
-                cap.set_token_usage(response.prompt_tokens, response.completion_tokens)
-
-                text = response.text.strip()
-
-            # Parse tool call from response
-            if text.upper() == "DONE" or "DONE" in text:
-                self._log(f"Todo {todo_id} completed")
-                return {"todo_id": todo_id, "status": "completed", "iterations": iteration + 1}
-
-            # Try to find and execute a tool call
-            tool_result = self._try_tool_call(text)
-            if tool_result:
-                messages.append(f"Tool result: {json.dumps(tool_result, ensure_ascii=False)}")
-                self.context.append(f"Todo {todo_id}: {tool_result}")
-
-        return {"todo_id": todo_id, "status": "completed", "iterations": max_iterations}
-
-    def _try_tool_call(self, text: str) -> dict | None:
-        """Try to parse and execute a tool call from LLM response."""
-        for tool_name in TOOL_REGISTRY:
-            if tool_name in text:
-                self._log(f"Auto-executing tool: {tool_name}")
-                return execute_tool(tool_name)
-        return None
-
-    def _generate_output(self, topic: str) -> dict:
-        """Generate the final output based on execution context."""
-        with logger.capture("generate_output", topic=topic) as cap:
-            system = "Generate a PPT outline JSON from the execution context."
             response = self.client.chat(
-                system=system,
-                messages=[
-                    f"Topic: {topic}",
-                    f"Context: {'\n'.join(self.context)}",
-                ],
+                system=OUTLINE_SYSTEM_PROMPT,
+                messages=[user_msg],
             )
             cap.set_response(response.text)
+            cap.set_token_usage(response.prompt_tokens, response.completion_tokens)
 
+            text = response.text.strip()
+
+        # Try parsing JSON from response
         try:
-            outline = json.loads(response.text)
-        except (json.JSONDecodeError, TypeError):
-            outline = {
-                "topic": topic,
-                "slides": [
-                    {"title": topic, "subtitle": "", "bullets": [], "layout_type": "title"},
-                    {"title": "Overview", "bullets": ["Key topics covered"], "layout_type": "content"},
-                    {"title": "Summary", "bullets": ["Thank you"], "layout_type": "ending"},
-                ],
-            }
+            return json.loads(text)
+        except json.JSONDecodeError:
+            pass
 
+        # Try extracting JSON block
+        import re
+        match = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
+        if match:
+            try:
+                return json.loads(match.group(1).strip())
+            except json.JSONDecodeError:
+                pass
+
+        return None
+
+    def _fallback_outline(self, topic: str) -> dict:
+        """Fallback outline when LLM fails."""
         return {
-            "outline": outline,
-            "slide_count": len(outline.get("slides", [])),
+            "topic": topic,
+            "style_notes": "Professional presentation with blue theme",
+            "slides": [
+                {"title": topic, "subtitle": "A Comprehensive Overview", "bullets": [], "layout_type": "title"},
+                {"title": "Introduction", "bullets": [f"Overview of {topic}", "Key concepts and definitions", "Why this matters today"], "layout_type": "content"},
+                {"title": "Core Concepts", "bullets": ["Fundamental principles", "Key theories and frameworks", "Practical applications"], "layout_type": "content"},
+                {"title": "Key Applications", "bullets": ["Industry use cases", "Real-world examples", "Impact and benefits"], "layout_type": "content"},
+                {"title": "Thank You", "subtitle": "Questions?", "bullets": [], "layout_type": "ending"},
+            ],
         }
 
     def _log(self, message: str):
-        """Internal logging."""
         print(f"[PPTAgent] {message}")
