@@ -1,0 +1,31 @@
+[project]
+name = "pptgenius"
+version = "0.1.0"
+description = "AI-powered PPT generation agent"
+requires-python = ">=3.11"
+dependencies = [
+    "python-pptx>=1.0.0",
+    "openai>=1.0.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+    "PyMuPDF>=1.20.0",
+    "python-docx>=1.0.0",
+    "pandas>=2.0.0",
+    "openpyxl>=3.0.0",
+    "matplotlib>=3.0.0",
+    "Pillow>=10.0.0",
+    "duckduckgo_search>=6.0",
+]
+
+[project.scripts]
+pptgenius = "agent.__main__:main"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[dependency-groups]
+dev = ["pytest>=8.0.0"]
+
+[tool.uv]
+package = true

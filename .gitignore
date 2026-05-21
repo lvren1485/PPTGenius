@@ -31,3 +31,12 @@ log/
 dist/
 build/
 release/
+
+# output
+output/
+
+# venv
+.venv/
+
+# package
+*.egg-info/
