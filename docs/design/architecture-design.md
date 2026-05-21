@@ -301,9 +301,13 @@ class BM25Manager:
         return True
 ```
 
-存储位置：`data/workspace/{conversation_id}/bm25_index.pkl`
+每个 conversation 的 workspace 独立存储 BM25 索引：
 
-对于 PPT 场景（<100 文件、<10MB 文本），索引构建 <200ms，增量更新直接重建即可。
+```
+data/workspace/{conversation_id}/bm25_index.pkl
+```
+
+不同用户（user_id）的不同会话（conversation_id）各自隔离，不会冲突。对 PPT 场景（<100 文件、<10MB 文本），索引构建 <200ms，新增文件直接重建。
 
 ---
 
@@ -395,7 +399,7 @@ workspace:
 rag:
   algorithm: "bm25"
   top_k: 5
-  bm25_index_file: "bm25_index.pkl"
+  bm25_index_file: "bm25_index.pkl"       # 文件名模板，实际路径: workspace/{conv_id}/bm25_index.pkl
   supported_formats: [".txt", ".pdf", ".docx", ".csv", ".xlsx"]
 
 agent:
@@ -407,12 +411,15 @@ agent:
 
 llm:
   provider: "deepseek"
+  base_url: "https://api.deepseek.com/v1"
+  api_key: "your_deepseek_api_key"
+  model: "deepseek-v4-flash"
   temperature: 0.7
-  max_tokens: 4096
+  max_tokens: 50000
 
 db:
   type: "mysql"
-  url: "mysql+asyncmy://root:root@localhost:3306/pptgenius"
+  url: "mysql+asyncmy://{username}:{password}@localhost:3306/pptgenius"
 ```
 
 ### .env
