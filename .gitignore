@@ -35,3 +35,6 @@ config.local.yaml
 dist/
 build/
 release/
+
+# test resources
+tests/resources/
