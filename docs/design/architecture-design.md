@@ -1,7 +1,7 @@
 # PPTGenius 架构设计
 
 > BM25 检索 + LangGraph Agent + FastAPI 单人网站
-> 日期：2026-06-03
+> 日期：2026-06-03 · 最后更新：python-pptx 调研后修订
 
 ---
 
@@ -17,7 +17,9 @@
 | 数据库 | MySQL + asyncmy | SQLAlchemy async engine，部署用 |
 | 配置 | .env + config.yaml | 密钥 env，业务 yaml |
 | LLM | DeepSeek API | 已适配 v4，OpenAI 兼容 SDK |
-| PPT 引擎 | python-pptx | 成熟稳定 |
+| PPT 引擎 | python-pptx | 成熟稳定，原生图表/表格/形状 |
+| 图表 | python-pptx 原生图表 | 非 matplotlib→PNG，原生图表可编辑+矢量 |
+| SVG 处理 | cairosvg → PNG | python-pptx 不支持 SVG，300 DPI 转换 |
 | 文件解析 | python-docx, PyPDF2, openpyxl | docx/pdf/txt/csv/xlsx |
 | 网络爬取 | httpx + BeautifulSoup | |
 | 包管理 | uv | |
@@ -142,11 +144,13 @@ backend/
     │   │
     │   ├── ppt_engine/              # PPT 引擎
     │   │   ├── __init__.py
-    │   │   ├── generator.py         # python-pptx 组装
-    │   │   ├── layouts.py           # N 种布局槽位
-    │   │   ├── charts.py            # [待做] matplotlib → PNG
-    │   │   ├── images.py            # 图片嵌入
-    │   │   └── styles.py            # 基础颜色/字体常量
+    │   │   ├── generator.py         # SlideBuilder: JSON→python-pptx 组装
+    │   │   ├── parser.py            # InstructionParser: JSON Schema 校验
+    │   │   ├── layouts.py           # N 种布局槽位定义 + 模板管理
+    │   │   ├── charts.py            # python-pptx 原生图表生成
+    │   │   ├── images.py            # 图片嵌入 + SVG→PNG 转换
+    │   │   └── styles.py            # 颜色/字体/渐变/阴影工具函数
+    │   │   ├── tables.py            # 表格生成 + 边框/填充
     │   │
     │   ├── workspace/               # 工作空间
     │   │   ├── __init__.py
@@ -168,7 +172,22 @@ backend/
         │   ├── ppt_image.md
         │   ├── ppt_chart.md
         │   └── ppt_layout.md
-        └── fonts/                   # (可选) 自定义字体
+        ├── fonts/                   # 自定义字体(可选)
+        └── templates/               # 模板 & 配色 JSON
+            ├── index.json           # 模板索引
+            ├── color_schemes/       # 配色方案
+            │   ├── business_blue.json
+            │   ├── academic_warm.json
+            │   ├── minimal_dark.json
+            │   └── creative_vivid.json
+            └── layouts/             # 布局定义
+                ├── title_slide.json
+                ├── content_bullet.json
+                ├── content_chart.json
+                ├── content_table.json
+                ├── two_column.json
+                ├── image_text.json
+                └── ending.json
 │
 └── tests/                           # ═══════ 测试 (与 pptgenius 并列) ═══════
     ├── __init__.py
@@ -194,6 +213,9 @@ backend/
 | 根 `main.py` 变为薄启动器 | 只做 `from pptgenius.main import main` |
 | 删除 `db/migrations/` | SQLite 单人场景 `create_all()` 足够 |
 | 新增 `tests/benchmark/` | 三个基准评测 |
+| `ppt_engine/` 增加 parser.py, tables.py | 调研发现需 JSON 解析层 + 表格工具函数 |
+| `resources/` 增加 templates/ | JSON 模板 + 配色方案，seed 后入库 |
+| `charts.py` 改为原生图表 | python-pptx 原生图表优于 matplotlib→PNG |
 
 ---
 
@@ -233,9 +255,11 @@ backend/
 | `supervisor.py` | 逐页决定调用哪些子 agent |
 | `text_agent.py` | 文本内容填充 |
 | `image_agent.py` | 图片爬取/嵌入 |
-| `chart_agent.py` | [待做] 数据分析 + 图表 |
-| `layout_agent.py` | 布局 + 配色（每次动态生成，无预制模板） |
-| `prompts.py` | Prompt 模板 |
+| `chart_agent.py` | 数据分析 → 选择图表类型 → 生成 python-pptx 原生图表 |
+| `table_agent.py` | [新增] 表格数据组织 → 单元格内容 + 合并 + 样式 |
+| `layout_agent.py` | 从模板 JSON 池选择 layout + 配色方案，计算元素坐标 |
+| `layout_generator.py` | [新增] 根据 layout 定义 + agent 输出 → 生成 PPTInstruction JSON |
+| `prompts.py` | 各 sub-agent 的 Prompt 模板（含 JSON Schema 约束） |
 
 **common/ — Agent 共享**
 | 文件 | 职责 |
@@ -260,11 +284,13 @@ backend/
 | db | `engine.py` | SQLAlchemy async engine: `create_async_engine("mysql+asyncmy://...")`，`create_all` 启动时自动建表 |
 | db | `models.py` | ORM 模型 |
 | db | `repository/` | 每表 CRUD |
-| ppt_engine | `generator.py` | python-pptx 组装 |
-| ppt_engine | `layouts.py` | N 种布局槽位定义 |
-| ppt_engine | `charts.py` | [待做] matplotlib 图表 |
-| ppt_engine | `images.py` | 图片嵌入/缩放 |
-| ppt_engine | `styles.py` | 颜色/字体常量（agent 在此基础上生成方案） |
+| ppt_engine | `generator.py` | SlideBuilder: 接收 PPTInstruction JSON，组装 python-pptx |
+| ppt_engine | `parser.py` | [新增] InstructionParser: Pydantic 校验 + JSON→内部模型 |
+| ppt_engine | `layouts.py` | N 种布局槽位定义 + 坐标计算引擎 |
+| ppt_engine | `charts.py` | python-pptx 原生图表：柱/线/饼/散点/气泡 |
+| ppt_engine | `tables.py` | [新增] 表格生成 + lxml 边框/填充 |
+| ppt_engine | `images.py` | 图片嵌入/缩放 + cairosvg SVG→PNG |
+| ppt_engine | `styles.py` | 颜色/字体/渐变/阴影工具函数 |
 | workspace | `manager.py` | 目录创建/清理 |
 | utils | `token_counter.py` | Token 计数，**由 common/llm.py 在每次 LLM 调用时自动调用** |
 | utils | `logger.py` | 日志 |
@@ -340,12 +366,76 @@ class OutlineState(TypedDict):
 
 ---
 
-## 七、PPT 模板策略
+## 七、PPT 模板与 Agent Checkpoint 策略
 
-- **不预制模板文件**
-- `layout_agent` 每次动态生成配色 + 字体方案
-- `styles.py` 只提供基础颜色名→RGB 映射、常用字体列表，作为 LLM prompt 参考
-- 布局槽位 (`layouts.py`) 保留 — N 种固定结构模板（python-pptx 需要预定义 slide layout）
+### 7.1 模板策略：JSON 模板 + DB 存储
+
+不使用 .pptx 模板文件（python-pptx 不能通过 API 创建自定义 slide layout），改用 JSON 定义。
+
+**三层模板体系**：
+
+```
+resources/templates/
+├── index.json              # 模板索引
+├── color_schemes/          # 4 套配色方案
+│   ├── business_blue.json  #   { colors, chart_colors, fonts }
+│   ├── academic_warm.json
+│   ├── minimal_dark.json
+│   └── creative_vivid.json
+└── layouts/                # 7 种布局定义
+    ├── title_slide.json    #   { name, label, placeholders[] }
+    ├── content_bullet.json
+    ├── content_chart.json
+    ├── content_table.json
+    ├── two_column.json
+    ├── image_text.json
+    └── ending.json
+```
+
+- **seed 脚本**在首次部署时将 JSON 导入 `templates` 和 `color_schemes` 表
+- `layout_agent` 从 DB 读取可用模板 → **选择**而非发明配色/布局
+- 每页可选择不同的 layout（如第3页用 content_chart，第4页用 content_table）
+- 坐标/尺寸从 JSON 的 placeholders 中读取，保证一致性
+
+### 7.2 生成流程：Sub-Agent 独立 Checkpoint
+
+```
+supervisor 逐页调度 sub-agent：
+
+  第 k 页开始:
+    layout_agent → 选择 template + color_scheme + layout → 写入 presentation_slides[k]
+    text_agent   → 产出 text elements → agent_outputs["text"] = [...] → status=text_done
+    chart_agent  → 产出 chart_data + chart element → status=chart_done
+    table_agent  → 产出 table_data + table element → status=table_done
+    image_agent  → 图片下载+嵌入 → agent_outputs["image"] = {...} → status=completed
+
+  失败处理:
+    任意 agent 失败 → status=failed + error_message + retry_count++
+    supervisor 重试时检查 agent_outputs → 只调失败的 agent
+    重试上限 3 次，超限则标记为 failed 并告知用户
+```
+
+**关键设计**：每个 agent 产出独立写入 `agent_outputs` 字段。text_agent 成功后的数据不会因为 chart_agent 超时而丢失。
+
+### 7.3 python-pptx 渲染管线
+
+```
+PPTInstruction JSON (LLM 产出, 经 Pydantic 校验)
+  │
+  ▼
+Parser (parser.py):       JSON → Slid`Spec[] → 校验字段完整性
+  │
+  ▼
+SlideBuilder (generator.py):  逐页 逐元素渲染
+  ├── textbox  → add_textbox() + apply_font()
+  ├── chart    → CategoryChartData → add_chart() + apply_chart_style()
+  ├── table    → add_table() + fill cells + apply borders (lxml)
+  ├── picture  → add_picture() (SVG 先 cairosvg→PNG)
+  └── shape    → add_shape() + fill/line/gradient
+  │
+  ▼
+output.pptx
+```
 
 ---
 
@@ -434,4 +524,74 @@ PYTHONUTF8=1
 
 ## 十、数据库
 
-MySQL + asyncmy（SQLAlchemy async engine）。`Base.metadata.create_all()` 启动时自动建表，无需 migration。
+### 10.1 新增表
+
+基于 python-pptx 调研结论，新增 `templates` 和 `color_schemes` 两张表存储模板数据，详见 [database-design.md](database-design.md)。
+
+### 10.3 presentation_slides 设计意图
+
+| 设计点 | 说明 |
+|--------|------|
+| `agent_outputs` JSON | 每个 sub-agent 独立写入产出。text_agent 成功后即使 chart_agent 超时，text 数据不丢失 |
+| `chart_data` / `table_data` | LLM 产出的纯数据，与 element JSON 解耦。供重试时读取和修改 |
+| `status` 细粒度 | `pending → text_done → chart_done → table_done → completed`。supervisor 按状态跳过已完成的 agent |
+| `outline_slide_id` | outline_slide : presentation_slide = 1:1，可追溯 |
+| `error_message` + `retry_count` | 失败信息 + 重试上限（3 次） |
+
+### 10.4 完整 ER 图（新增部分）
+
+```
+┌──────────────────────┐       ┌──────────────────────┐
+│      templates       │       │    color_schemes     │
+│──────────────────────│       │──────────────────────│
+│ PK id                │       │ PK id                │
+│    name (unique)     │       │    name (unique)     │
+│    label             │       │    label             │
+│    category          │       │    colors_json       │
+│    layouts_json      │       │    chart_colors_json │
+│    slide_width/h     │       │    fonts_json        │
+│    is_active         │       │    is_active         │
+└──────┬───────────────┘       └──────────┬───────────┘
+       │ FK                              │ FK
+       ▼                                 ▼
+┌───────────────────┐          ┌──────────────────────────┐
+│  presentations    │ 1:N      │   presentation_slides    │
+│──────────────────│──────────│──────────────────────────│
+│ PK id             │          │ PK id                    │
+│ FK conversation   │          │ FK presentation_id       │
+│ FK outline        │          │ FK outline_slide_id      │
+│ FK template ──────┘          │ FK template_id           │
+│ FK color_scheme ─┘           │ FK color_scheme_id       │
+│    file_path       │         │    slide_index           │
+│    slide_count     │         │    layout_name           │
+│    status          │         │    agent_outputs (JSON)  │
+└───────────────────┘         │    chart_data (JSON)      │
+                               │    table_data (JSON)      │
+                               │    image_paths (JSON)     │
+                               │    status                 │
+                               │    error_message          │
+                               │    retry_count            │
+                               └──────────────────────────┘
+```
+
+### 10.5 数据初始化
+
+`resources/templates/` 下的 JSON 文件在首次部署时通过 seed 脚本导入：
+
+```python
+# infrastructure/db/seed.py — 首次部署时运行
+async def seed(engine):
+    import json, glob
+    async with engine.begin() as conn:
+        for f in glob.glob("resources/templates/color_schemes/*.json"):
+            d = json.load(open(f, encoding="utf-8"))
+            await conn.execute(insert(ColorScheme).values(
+                name=d["name"], label=d["label"],
+                colors_json=d["colors"], chart_colors_json=d["chart_colors"],
+                fonts_json=d["fonts"]))
+        for f in glob.glob("resources/templates/layouts/*.json"):
+            d = json.load(open(f, encoding="utf-8"))
+            # layouts 合并到一个 template 的 layouts_json 中
+        await conn.execute(insert(Template).values(
+            name="default", label="默认模板",
+            layouts_json=[...所有 layout...]))
