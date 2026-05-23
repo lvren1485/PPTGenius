@@ -231,7 +231,7 @@ class WebResource(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-    url: Mapped[str] = mapped_column(String(1024), nullable=False)
+    url: Mapped[str] = mapped_column(String(768), nullable=False)
     title: Mapped[str | None] = mapped_column(String(256))
     content_text: Mapped[str | None] = mapped_column(Text)
     source_domain: Mapped[str | None] = mapped_column(String(256))

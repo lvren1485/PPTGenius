@@ -4,12 +4,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..models import User
 
 
-async def create_user(db: AsyncSession, name: str = "default") -> User:
-    user = User(name=name)
-    db.add(user)
+async def create_user(
+    db: AsyncSession,
+    name: str = "default",
+    password: str = "",
+    other: dict | None = None
+) -> User:
+    u = User(
+        name=name,
+        password=password,
+        other=other,
+    )
+    db.add(u)
     await db.commit()
-    await db.refresh(user)
-    return user
+    await db.refresh(u)
+    return u
 
 
 async def get_user(db: AsyncSession, user_id: int) -> User | None:
@@ -18,16 +27,16 @@ async def get_user(db: AsyncSession, user_id: int) -> User | None:
 
 async def get_or_create_default_user(db: AsyncSession) -> User:
     result = await db.execute(select(User).limit(1))
-    user = result.scalar_one_or_none()
-    if user is None:
-        user = await create_user(db)
-    return user
+    u = result.scalar_one_or_none()
+    if u is None:
+        u = await create_user(db)
+    return u
 
 
 async def delete_user(db: AsyncSession, user_id: int) -> bool:
-    user = await db.get(User, user_id)
-    if user is None:
+    u = await db.get(User, user_id)
+    if u is None:
         return False
-    await db.delete(user)
+    await db.delete(u)
     await db.commit()
     return True

@@ -188,7 +188,7 @@ CREATE TABLE IF NOT EXISTS knowledge_chunks (
 CREATE TABLE IF NOT EXISTS web_resources (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
-    url VARCHAR(1024) NOT NULL,
+    url VARCHAR(768) NOT NULL,
     title VARCHAR(256),
     content_text TEXT,
     source_domain VARCHAR(256),
