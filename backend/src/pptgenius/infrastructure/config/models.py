@@ -50,6 +50,16 @@ class DBConfig(BaseModel):
     url: str = "mysql+asyncmy://root:root@localhost:3306/pptgenius"
 
 
+class LogConfig(BaseModel):
+    level: str = "INFO"
+    fmt: str = "%(asctime)s | %(levelname)-7s | %(name)s | %(message)s"
+    datefmt: str = "%Y-%m-%d %H:%M:%S"
+    file_enabled: bool = True
+    file_path: str = "logs/app.log"
+    file_max_bytes: int = 10 * 1024 * 1024  # 10 MB
+    file_backup_count: int = 5
+
+
 class Settings(BaseModel):
     app: AppConfig = AppConfig()
     workspace: WorkspaceConfig = WorkspaceConfig()
@@ -57,3 +67,4 @@ class Settings(BaseModel):
     agent: AgentConfig = AgentConfig()
     llm: LLMConfig = LLMConfig()
     db: DBConfig = DBConfig()
+    log: LogConfig = LogConfig()

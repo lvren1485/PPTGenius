@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS conversations (
     status VARCHAR(32) NOT NULL DEFAULT 'active',
     current_phase VARCHAR(32) DEFAULT 'chat',
     workspace_path VARCHAR(512) NOT NULL DEFAULT '',
-    total_tokens INT DEFAULT 0,
+    estimated_cost DOUBLE DEFAULT 0,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS messages (
     role VARCHAR(16) NOT NULL,
     content TEXT NOT NULL,
     content_type VARCHAR(32) DEFAULT 'text',
-    token_count INT,
+    estimated_cost DOUBLE,
     metadata_json JSON,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (conversation_id) REFERENCES conversations(id)
@@ -188,7 +188,7 @@ CREATE TABLE IF NOT EXISTS knowledge_chunks (
 CREATE TABLE IF NOT EXISTS web_resources (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
-    url VARCHAR(768) NOT NULL,
+    url VARCHAR(750) NOT NULL,
     title VARCHAR(256),
     content_text TEXT,
     source_domain VARCHAR(256),
@@ -198,21 +198,21 @@ CREATE TABLE IF NOT EXISTS web_resources (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ==================== 索引 ====================
-CREATE INDEX IF NOT EXISTS idx_conv_user ON conversations(user_id);
-CREATE INDEX IF NOT EXISTS idx_msg_conv_idx ON messages(conversation_id, idx);
-CREATE INDEX IF NOT EXISTS idx_out_conv ON outlines(conversation_id, version DESC);
-CREATE INDEX IF NOT EXISTS idx_out_user ON outlines(user_id);
-CREATE INDEX IF NOT EXISTS idx_pres_conv ON presentations(conversation_id);
-CREATE INDEX IF NOT EXISTS idx_pres_user ON presentations(user_id);
-CREATE INDEX IF NOT EXISTS idx_pslide_pres ON presentation_slides(presentation_id, slide_index);
-CREATE INDEX IF NOT EXISTS idx_pslide_status ON presentation_slides(status);
-CREATE INDEX IF NOT EXISTS idx_pslide_outline ON presentation_slides(outline_slide_id);
-CREATE INDEX IF NOT EXISTS idx_template_cat ON templates(category);
-CREATE INDEX IF NOT EXISTS idx_colorscheme_name ON color_schemes(name);
-CREATE INDEX IF NOT EXISTS idx_snap_pres ON presentation_snapshots(presentation_id, version DESC);
-CREATE INDEX IF NOT EXISTS idx_know_user ON knowledge_files(user_id);
-CREATE INDEX IF NOT EXISTS idx_kchunk_file ON knowledge_chunks(file_id, chunk_index);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_web_url ON web_resources(url);
-CREATE INDEX IF NOT EXISTS idx_web_user ON web_resources(user_id);
+CREATE INDEX idx_conv_user ON conversations(user_id);
+CREATE INDEX idx_msg_conv_idx ON messages(conversation_id, idx);
+CREATE INDEX idx_out_conv ON outlines(conversation_id, version DESC);
+CREATE INDEX idx_out_user ON outlines(user_id);
+CREATE INDEX idx_pres_conv ON presentations(conversation_id);
+CREATE INDEX idx_pres_user ON presentations(user_id);
+CREATE INDEX idx_pslide_pres ON presentation_slides(presentation_id, slide_index);
+CREATE INDEX idx_pslide_status ON presentation_slides(status);
+CREATE INDEX idx_pslide_outline ON presentation_slides(outline_slide_id);
+CREATE INDEX idx_template_cat ON templates(category);
+CREATE INDEX idx_colorscheme_name ON color_schemes(name);
+CREATE INDEX idx_snap_pres ON presentation_snapshots(presentation_id, version DESC);
+CREATE INDEX idx_know_user ON knowledge_files(user_id);
+CREATE INDEX idx_kchunk_file ON knowledge_chunks(file_id, chunk_index);
+CREATE UNIQUE INDEX idx_web_url ON web_resources(url);
+CREATE INDEX idx_web_user ON web_resources(user_id);
 
 SET FOREIGN_KEY_CHECKS = 1;

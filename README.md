@@ -13,12 +13,14 @@
 mysqld --console
 
 # 创建数据库
-mysql -u {YOUR_USERNAME} -p {YOUR_PASSWORD} -e "CREATE DATABASE IF NOT EXISTS pptgenius \
-  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+mysql -u {YOUR_USERNAME} -p -e "CREATE DATABASE IF NOT EXISTS pptgenius CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+<enter password when prompted>
 
 # 创建测试库，如果需要运行测试
-mysql -u {YOUR_USERNAME} -p {YOUR_PASSWORD} -e "CREATE DATABASE IF NOT EXISTS pptgenius_test \
-  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+mysql -u {YOUR_USERNAME} -p -e "CREATE DATABASE IF NOT EXISTS pptgenius_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+<enter password when prompted>
 ```
 
 ### 配置
