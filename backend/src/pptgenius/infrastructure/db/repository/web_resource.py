@@ -37,17 +37,13 @@ async def find_by_url(db: AsyncSession, url: str) -> WebResource | None:
     return result.scalar_one_or_none()
 
 
-async def list_web_resources(
-    db: AsyncSession,
-    user_id: int,
-    source_domain: str | None = None,
-    offset: int = 0,
-    limit: int = 50,
-) -> list[WebResource]:
-    stmt = select(WebResource).where(WebResource.user_id == user_id)
-    if source_domain:
-        stmt = stmt.where(WebResource.source_domain == source_domain)
-    stmt = stmt.order_by(WebResource.fetched_at.desc()).offset(offset).limit(limit)
+async def get_all_web_resources(db: AsyncSession, user_id: int) -> list[WebResource]:
+    """获取某用户所有 web resource，供 BM25 索引使用。"""
+    stmt = (
+        select(WebResource)
+        .where(WebResource.user_id == user_id)
+        .order_by(WebResource.fetched_at.desc())
+    )
     result = await db.execute(stmt)
     return list(result.scalars().all())
 

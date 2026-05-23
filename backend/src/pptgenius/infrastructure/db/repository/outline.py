@@ -26,16 +26,35 @@ async def create_outline(
 
 
 async def get_outline(db: AsyncSession, outline_id: int) -> Outline | None:
-    return await db.get(Outline, outline_id)
+    outline = await db.get(Outline, outline_id)
+    if outline is None or outline.status == "deleted":
+        return None
+    return outline
 
 
-async def list_outlines(
+async def list_outlines_by_conversation(
     db: AsyncSession, conversation_id: int
 ) -> list[Outline]:
     stmt = (
         select(Outline)
         .where(Outline.conversation_id == conversation_id)
+        .where(Outline.status != "deleted")
         .order_by(Outline.version.desc())
+    )
+    result = await db.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def list_outlines_by_user(
+    db: AsyncSession, user_id: int, offset: int = 0, limit: int = 20
+) -> list[Outline]:
+    stmt = (
+        select(Outline)
+        .where(Outline.user_id == user_id)
+        .where(Outline.status != "deleted")
+        .order_by(Outline.updated_at.desc())
+        .offset(offset)
+        .limit(limit)
     )
     result = await db.execute(stmt)
     return list(result.scalars().all())
@@ -45,53 +64,36 @@ async def update_outline_status(
     db: AsyncSession, outline_id: int, status: str
 ) -> bool:
     outline = await db.get(Outline, outline_id)
-    if outline is None:
+    if outline is None or outline.status == "deleted":
         return False
     outline.status = status
     await db.commit()
     return True
 
 
-async def update_outline_eval(
-    db: AsyncSession,
-    outline_id: int,
-    score: float,
-    feedback: str,
-) -> bool:
+async def update_outline_eval(db: AsyncSession, outline_id: int, score: float) -> bool:
     outline = await db.get(Outline, outline_id)
-    if outline is None:
+    if outline is None or outline.status == "deleted":
         return False
     outline.eval_score = score
-    outline.eval_feedback = feedback
-    await db.commit()
-    return True
-
-
-async def set_user_feedback(
-    db: AsyncSession, outline_id: int, feedback: str
-) -> bool:
-    outline = await db.get(Outline, outline_id)
-    if outline is None:
-        return False
-    outline.user_feedback = feedback
     await db.commit()
     return True
 
 
 async def increment_outline_version(db: AsyncSession, outline_id: int) -> int | None:
     outline = await db.get(Outline, outline_id)
-    if outline is None:
+    if outline is None or outline.status == "deleted":
         return None
     outline.version = (outline.version or 1) + 1
     await db.commit()
     return outline.version
 
 
-async def delete_outline(db: AsyncSession, outline_id: int) -> bool:
+async def soft_delete_outline(db: AsyncSession, outline_id: int) -> bool:
     outline = await db.get(Outline, outline_id)
     if outline is None:
         return False
-    await db.delete(outline)
+    outline.status = "deleted"
     await db.commit()
     return True
 
@@ -129,9 +131,10 @@ async def get_outline_slide(db: AsyncSession, slide_id: int) -> OutlineSlide | N
     return await db.get(OutlineSlide, slide_id)
 
 
-async def list_outline_slides(
+async def get_slides_by_outline_id(
     db: AsyncSession, outline_id: int
 ) -> list[OutlineSlide]:
+    """一次性获取某个 outline 的所有 slides。"""
     stmt = (
         select(OutlineSlide)
         .where(OutlineSlide.outline_id == outline_id)
@@ -178,8 +181,7 @@ async def replace_outline_slides(
     outline_id: int,
     slides: list[dict],
 ) -> list[OutlineSlide]:
-    """Replace all slides of an outline with a new set."""
-    old = await list_outline_slides(db, outline_id)
+    old = await get_slides_by_outline_id(db, outline_id)
     for s in old:
         await db.delete(s)
     await db.commit()

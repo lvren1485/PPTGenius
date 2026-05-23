@@ -1,4 +1,4 @@
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import KnowledgeChunk, KnowledgeFile
@@ -14,7 +14,6 @@ async def create_knowledge_file(
     file_type: str,
     file_size: int | None = None,
     source_type: str = "upload",
-    content_hash: str | None = None,
 ) -> KnowledgeFile:
     kf = KnowledgeFile(
         user_id=user_id,
@@ -23,7 +22,6 @@ async def create_knowledge_file(
         file_type=file_type,
         file_size=file_size,
         source_type=source_type,
-        content_hash=content_hash,
     )
     db.add(kf)
     await db.commit()
@@ -54,12 +52,6 @@ async def list_knowledge_files(
     return list(result.scalars().all())
 
 
-async def find_by_hash(db: AsyncSession, content_hash: str) -> KnowledgeFile | None:
-    stmt = select(KnowledgeFile).where(KnowledgeFile.content_hash == content_hash)
-    result = await db.execute(stmt)
-    return result.scalar_one_or_none()
-
-
 async def update_knowledge_file_status(
     db: AsyncSession, file_id: int, status: str, chunk_count: int | None = None
 ) -> bool:
@@ -74,6 +66,7 @@ async def update_knowledge_file_status(
 
 
 async def delete_knowledge_file(db: AsyncSession, file_id: int) -> bool:
+    """删除知识文件及其所有 chunks（级联删除）。"""
     kf = await db.get(KnowledgeFile, file_id)
     if kf is None:
         return False
@@ -103,9 +96,12 @@ async def create_chunk(
     return chunk
 
 
-async def list_chunks(
-    db: AsyncSession, file_id: int
-) -> list[KnowledgeChunk]:
+async def get_chunk_by_id(db: AsyncSession, chunk_id: int) -> KnowledgeChunk | None:
+    """BM25 检索后 LLM 根据 chunk_id 获取原文。"""
+    return await db.get(KnowledgeChunk, chunk_id)
+
+
+async def list_chunks_by_file(db: AsyncSession, file_id: int) -> list[KnowledgeChunk]:
     stmt = (
         select(KnowledgeChunk)
         .where(KnowledgeChunk.file_id == file_id)
@@ -115,15 +111,13 @@ async def list_chunks(
     return list(result.scalars().all())
 
 
-async def get_all_chunks(db: AsyncSession) -> list[KnowledgeChunk]:
-    """获取所有用户的所有 chunk，用于 BM25 索引重建."""
-    result = await db.execute(select(KnowledgeChunk))
+async def get_all_chunks_for_user(db: AsyncSession, user_id: int) -> list[KnowledgeChunk]:
+    """获取某用户所有 chunk，用于 BM25 索引重建。"""
+    stmt = (
+        select(KnowledgeChunk)
+        .join(KnowledgeFile)
+        .where(KnowledgeFile.user_id == user_id)
+        .order_by(KnowledgeChunk.id.asc())
+    )
+    result = await db.execute(stmt)
     return list(result.scalars().all())
-
-
-async def delete_chunks_by_file(db: AsyncSession, file_id: int) -> int:
-    chunks = await list_chunks(db, file_id)
-    for c in chunks:
-        await db.delete(c)
-    await db.commit()
-    return len(chunks)

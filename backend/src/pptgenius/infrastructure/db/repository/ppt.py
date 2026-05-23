@@ -30,16 +30,35 @@ async def create_presentation(
 
 
 async def get_presentation(db: AsyncSession, pres_id: int) -> Presentation | None:
-    return await db.get(Presentation, pres_id)
+    pres = await db.get(Presentation, pres_id)
+    if pres is None or pres.status == "deleted":
+        return None
+    return pres
 
 
-async def list_presentations(
+async def list_presentations_by_conversation(
     db: AsyncSession, conversation_id: int
 ) -> list[Presentation]:
     stmt = (
         select(Presentation)
         .where(Presentation.conversation_id == conversation_id)
+        .where(Presentation.status != "deleted")
         .order_by(Presentation.created_at.desc())
+    )
+    result = await db.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def list_presentations_by_user(
+    db: AsyncSession, user_id: int, offset: int = 0, limit: int = 20
+) -> list[Presentation]:
+    stmt = (
+        select(Presentation)
+        .where(Presentation.user_id == user_id)
+        .where(Presentation.status != "deleted")
+        .order_by(Presentation.created_at.desc())
+        .offset(offset)
+        .limit(limit)
     )
     result = await db.execute(stmt)
     return list(result.scalars().all())
@@ -49,7 +68,7 @@ async def update_presentation_status(
     db: AsyncSession, pres_id: int, status: str, error_msg: str | None = None
 ) -> bool:
     pres = await db.get(Presentation, pres_id)
-    if pres is None:
+    if pres is None or pres.status == "deleted":
         return False
     pres.status = status
     if error_msg is not None:
@@ -58,11 +77,11 @@ async def update_presentation_status(
     return True
 
 
-async def delete_presentation(db: AsyncSession, pres_id: int) -> bool:
+async def soft_delete_presentation(db: AsyncSession, pres_id: int) -> bool:
     pres = await db.get(Presentation, pres_id)
     if pres is None:
         return False
-    await db.delete(pres)
+    pres.status = "deleted"
     await db.commit()
     return True
 
@@ -100,7 +119,7 @@ async def get_presentation_slide(
     return await db.get(PresentationSlide, slide_id)
 
 
-async def list_presentation_slides(
+async def get_slides_by_presentation_id(
     db: AsyncSession, presentation_id: int
 ) -> list[PresentationSlide]:
     stmt = (
@@ -126,7 +145,7 @@ async def replace_presentation_slides(
     presentation_id: int,
     slides: list[dict],
 ) -> list[PresentationSlide]:
-    old = await list_presentation_slides(db, presentation_id)
+    old = await get_slides_by_presentation_id(db, presentation_id)
     for s in old:
         await db.delete(s)
     await db.commit()

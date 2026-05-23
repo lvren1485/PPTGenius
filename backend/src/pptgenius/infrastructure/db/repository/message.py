@@ -1,7 +1,24 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import Message
+from ..models import Conversation, Message
+
+
+async def _get_next_idx(db: AsyncSession, conversation_id: int) -> int:
+    stmt = (
+        select(func.coalesce(func.max(Message.idx), 0))
+        .where(Message.conversation_id == conversation_id)
+    )
+    result = await db.execute(stmt)
+    return result.scalar_one() + 1
+
+
+async def _add_conversation_tokens(db: AsyncSession, conversation_id: int, tokens: int) -> None:
+    conv = await db.get(Conversation, conversation_id)
+    if conv is None:
+        return
+    conv.total_tokens = (conv.total_tokens or 0) + tokens
+    await db.commit()
 
 
 async def create_message(
@@ -13,8 +30,15 @@ async def create_message(
     token_count: int | None = None,
     metadata_json: dict | None = None,
 ) -> Message:
+    """创建消息并自动累加 conversation.total_tokens。
+
+    token_count 应为该条消息距离上一条 AIMessage 后消耗的总 token
+    （含该轮 LLM 调用的 input + output + tool_calls）。
+    """
+    idx = await _get_next_idx(db, conversation_id)
     msg = Message(
         conversation_id=conversation_id,
+        idx=idx,
         role=role,
         content=content,
         content_type=content_type,
@@ -22,44 +46,50 @@ async def create_message(
         metadata_json=metadata_json,
     )
     db.add(msg)
+    if token_count:
+        await _add_conversation_tokens(db, conversation_id, token_count)
     await db.commit()
     await db.refresh(msg)
     return msg
 
 
-async def get_message(db: AsyncSession, msg_id: int) -> Message | None:
-    return await db.get(Message, msg_id)
-
-
-async def list_messages(
+async def create_human_message(
     db: AsyncSession,
     conversation_id: int,
-    offset: int = 0,
-    limit: int = 100,
+    content: str,
+) -> Message:
+    return await create_message(
+        db,
+        conversation_id=conversation_id,
+        role="user",
+        content=content,
+        content_type="text",
+        token_count=0,
+    )
+
+
+async def get_messages_by_conversation(
+    db: AsyncSession, conversation_id: int
 ) -> list[Message]:
+    """返回该 conversation 全部消息，按 idx 升序。"""
     stmt = (
         select(Message)
         .where(Message.conversation_id == conversation_id)
-        .order_by(Message.created_at.asc())
-        .offset(offset)
-        .limit(limit)
+        .order_by(Message.idx.asc())
     )
     result = await db.execute(stmt)
     return list(result.scalars().all())
 
 
-async def count_messages(db: AsyncSession, conversation_id: int) -> int:
-    from sqlalchemy import func
+async def trim_messages(db: AsyncSession, conversation_id: int, before_idx: int) -> int:
+    """删除 conversation 中 idx 小于 before_idx 的所有消息，返回删除条数。"""
+    from sqlalchemy import delete
 
-    stmt = select(func.count()).where(Message.conversation_id == conversation_id)
+    stmt = (
+        delete(Message)
+        .where(Message.conversation_id == conversation_id)
+        .where(Message.idx < before_idx)
+    )
     result = await db.execute(stmt)
-    return result.scalar_one()
-
-
-async def delete_message(db: AsyncSession, msg_id: int) -> bool:
-    msg = await db.get(Message, msg_id)
-    if msg is None:
-        return False
-    await db.delete(msg)
     await db.commit()
-    return True
+    return result.rowcount

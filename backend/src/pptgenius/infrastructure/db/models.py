@@ -24,7 +24,7 @@ class Conversation(Base):
     title: Mapped[str] = mapped_column(UnicodeText(256), nullable=False, default="")
     status: Mapped[str] = mapped_column(UnicodeText(32), nullable=False, default="active")
     current_phase: Mapped[str | None] = mapped_column(UnicodeText(32), default="chat")
-    workspace_path: Mapped[str] = mapped_column(UnicodeText(512), nullable=False)
+    workspace_path: Mapped[str] = mapped_column(UnicodeText(512), nullable=False, default="")
     total_tokens: Mapped[int | None] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -41,6 +41,7 @@ class Message(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     conversation_id: Mapped[int] = mapped_column(ForeignKey("conversations.id"), nullable=False)
+    idx: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     role: Mapped[str] = mapped_column(UnicodeText(16), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     content_type: Mapped[str | None] = mapped_column(UnicodeText(32), default="text")
@@ -60,8 +61,6 @@ class Outline(Base):
     title: Mapped[str] = mapped_column(UnicodeText(256), nullable=False)
     status: Mapped[str] = mapped_column(UnicodeText(32), nullable=False, default="draft")
     eval_score: Mapped[float | None] = mapped_column(Float)
-    eval_feedback: Mapped[str | None] = mapped_column(Text)
-    user_feedback: Mapped[str | None] = mapped_column(Text)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     slide_count: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -138,17 +137,18 @@ class KnowledgeFile(Base):
     chunk_count: Mapped[int | None] = mapped_column(Integer, default=0)
     source_type: Mapped[str | None] = mapped_column(UnicodeText(16), default="upload")
     status: Mapped[str | None] = mapped_column(UnicodeText(32), default="indexed")
-    content_hash: Mapped[str | None] = mapped_column(UnicodeText(64))
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
-    chunks: Mapped[list["KnowledgeChunk"]] = relationship(back_populates="file")
+    chunks: Mapped[list["KnowledgeChunk"]] = relationship(
+        back_populates="file", cascade="all, delete-orphan"
+    )
 
 
 class KnowledgeChunk(Base):
     __tablename__ = "knowledge_chunks"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    file_id: Mapped[int] = mapped_column(ForeignKey("knowledge_files.id"), nullable=False)
+    file_id: Mapped[int] = mapped_column(ForeignKey("knowledge_files.id", ondelete="CASCADE"), nullable=False)
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     chunk_text: Mapped[str] = mapped_column(Text, nullable=False)
     token_count: Mapped[int | None] = mapped_column(Integer)

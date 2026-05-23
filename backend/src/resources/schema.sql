@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS conversations (
     title VARCHAR(256) NOT NULL DEFAULT '',
     status VARCHAR(32) NOT NULL DEFAULT 'active',
     current_phase VARCHAR(32) DEFAULT 'chat',
-    workspace_path VARCHAR(512) NOT NULL,
+    workspace_path VARCHAR(512) NOT NULL DEFAULT '',
     total_tokens INT DEFAULT 0,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS conversations (
 CREATE TABLE IF NOT EXISTS messages (
     id INT AUTO_INCREMENT PRIMARY KEY,
     conversation_id INT NOT NULL,
+    idx INT NOT NULL DEFAULT 0,
     role VARCHAR(16) NOT NULL,
     content TEXT NOT NULL,
     content_type VARCHAR(32) DEFAULT 'text',
@@ -41,8 +42,6 @@ CREATE TABLE IF NOT EXISTS outlines (
     title VARCHAR(256) NOT NULL,
     status VARCHAR(32) NOT NULL DEFAULT 'draft',
     eval_score DOUBLE,
-    eval_feedback TEXT,
-    user_feedback TEXT,
     version INT NOT NULL DEFAULT 1,
     slide_count INT,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -105,7 +104,6 @@ CREATE TABLE IF NOT EXISTS knowledge_files (
     chunk_count INT DEFAULT 0,
     source_type VARCHAR(16) DEFAULT 'upload',
     status VARCHAR(32) DEFAULT 'indexed',
-    content_hash VARCHAR(64),
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -117,7 +115,7 @@ CREATE TABLE IF NOT EXISTS knowledge_chunks (
     chunk_text TEXT NOT NULL,
     token_count INT,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (file_id) REFERENCES knowledge_files(id)
+    FOREIGN KEY (file_id) REFERENCES knowledge_files(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS web_resources (
@@ -134,16 +132,13 @@ CREATE TABLE IF NOT EXISTS web_resources (
 
 -- ========== 索引 ==========
 CREATE INDEX IF NOT EXISTS idx_conv_user ON conversations(user_id);
-CREATE INDEX IF NOT EXISTS idx_conv_status ON conversations(status);
-CREATE INDEX IF NOT EXISTS idx_msg_conv ON messages(conversation_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_msg_conv_idx ON messages(conversation_id, idx);
 CREATE INDEX IF NOT EXISTS idx_out_conv ON outlines(conversation_id, version DESC);
 CREATE INDEX IF NOT EXISTS idx_out_user ON outlines(user_id);
 CREATE INDEX IF NOT EXISTS idx_pres_conv ON presentations(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_pres_user ON presentations(user_id);
 CREATE INDEX IF NOT EXISTS idx_pslide_pres ON presentation_slides(presentation_id, slide_index);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_know_hash ON knowledge_files(content_hash);
 CREATE INDEX IF NOT EXISTS idx_know_user ON knowledge_files(user_id);
-CREATE INDEX IF NOT EXISTS idx_know_type ON knowledge_files(file_type);
 CREATE INDEX IF NOT EXISTS idx_kchunk_file ON knowledge_chunks(file_id, chunk_index);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_web_url ON web_resources(url);
 CREATE INDEX IF NOT EXISTS idx_web_user ON web_resources(user_id);
