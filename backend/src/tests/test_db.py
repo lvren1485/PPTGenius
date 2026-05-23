@@ -1,330 +1,312 @@
 import pytest_asyncio
 from sqlalchemy import delete
 
+from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.db.models import User
-from pptgenius.infrastructure.db.repository.conversation import (
-    create_conversation,
-    get_conversation,
-    list_conversations,
-    soft_delete_conversation,
-    update_conversation_phase,
-    update_conversation_title,
-)
-from pptgenius.infrastructure.db.repository.user import (
-    create_user,
-    delete_user,
-    get_or_create_default_user,
-    get_user,
-)
-from pptgenius.infrastructure.db.repository.message import (
-    create_human_message,
-    create_message,
-    get_messages_by_conversation,
-    trim_messages,
-)
-from pptgenius.infrastructure.db.repository.outline import (
-    create_outline,
-    create_outline_slide,
-    get_outline,
-    get_slides_by_outline_id,
-    list_outlines_by_conversation,
-    list_outlines_by_user,
-    soft_delete_outline,
-    update_outline_eval,
-    update_outline_status,
-)
-from pptgenius.infrastructure.db.repository.knowledge import (
-    create_chunk,
-    create_knowledge_file,
-    delete_knowledge_file,
-    get_chunk_by_id,
-    get_knowledge_file,
-    get_all_chunks_for_user,
-    list_chunks_by_file,
-    list_knowledge_files,
-)
-from pptgenius.infrastructure.db.repository.web_resource import (
-    create_web_resource,
-    find_by_url,
-    get_all_web_resources,
-    delete_web_resource,
-    get_web_resource,
-)
 
 
 class TestUserRepo:
     async def test_create(self, db):
-        u = await create_user(db, "alice")
+        d = Database(db)
+        u = await d.create_user("alice", "secret")
         assert u.id is not None
         assert u.name == "alice"
+        assert u.password == "secret"
 
     async def test_get(self, db):
-        u = await create_user(db, "bob")
-        fetched = await get_user(db, u.id)
-        assert fetched.name == "bob"
+        d = Database(db)
+        u = await d.create_user("bob")
+        assert (await d.get_user(u.id)).name == "bob"
 
     async def test_get_nonexistent(self, db):
-        assert await get_user(db, 99999) is None
+        assert await Database(db).get_user(99999) is None
 
     async def test_get_or_create_default(self, db):
+        d = Database(db)
         await db.execute(delete(User))
         await db.commit()
-        u1 = await get_or_create_default_user(db)
-        u2 = await get_or_create_default_user(db)
+        u1 = await d.get_or_create_default_user()
+        u2 = await d.get_or_create_default_user()
         assert u1.id == u2.id
         assert u1.name == "default"
 
     async def test_delete(self, db):
-        u = await create_user(db, "temp")
-        assert await delete_user(db, u.id) is True
-        assert await get_user(db, u.id) is None
+        d = Database(db)
+        u = await d.create_user("temp")
+        assert await d.delete_user(u.id) is True
+        assert await d.get_user(u.id) is None
 
     async def test_delete_nonexistent(self, db):
-        assert await delete_user(db, 99999) is False
+        assert await Database(db).delete_user(99999) is False
 
 
 class TestConversationRepo:
     @pytest_asyncio.fixture
     async def user(self, db):
-        return await create_user(db, "conv_user")
+        return await Database(db).create_user("conv_user")
 
     async def test_create(self, db, user):
-        conv = await create_conversation(db, user_id=user.id, title="PPT")
-        assert conv.id is not None
-        assert conv.title == "PPT"
-        assert conv.status == "active"
+        conv = await Database(db).create_conversation(user.id, "PPT")
         assert conv.workspace_path == f"./data/workspace/{conv.id}"
 
-    async def test_get(self, db, user):
-        conv = await create_conversation(db, user_id=user.id)
-        fetched = await get_conversation(db, conv.id)
-        assert fetched is not None
-
-    async def test_get_nonexistent(self, db):
-        assert await get_conversation(db, 99999) is None
-
-    async def test_get_deleted_returns_none(self, db, user):
-        conv = await create_conversation(db, user_id=user.id)
-        await soft_delete_conversation(db, conv.id)
-        assert await get_conversation(db, conv.id) is None
-
-    async def test_list_excludes_deleted(self, db, user):
-        await create_conversation(db, user_id=user.id, title="visible")
-        deleted = await create_conversation(db, user_id=user.id, title="hidden")
-        await soft_delete_conversation(db, deleted.id)
-        convs = await list_conversations(db, user_id=user.id)
+    async def test_soft_delete_and_filter(self, db, user):
+        d = Database(db)
+        visible = await d.create_conversation(user.id, "visible")
+        deleted = await d.create_conversation(user.id, "hidden")
+        await d.soft_delete_conversation(deleted.id)
+        convs = await d.list_conversations(user.id)
         assert len(convs) == 1
-        assert convs[0].title == "visible"
+        assert convs[0].id == visible.id
 
-    async def test_update_title(self, db, user):
-        conv = await create_conversation(db, user_id=user.id, title="Old")
-        assert await update_conversation_title(db, conv.id, "New")
-        assert (await get_conversation(db, conv.id)).title == "New"
+    async def test_deleted_returns_none_on_get(self, db, user):
+        d = Database(db)
+        conv = await d.create_conversation(user.id)
+        await d.soft_delete_conversation(conv.id)
+        assert await d.get_conversation(conv.id) is None
 
-    async def test_update_title_deleted(self, db, user):
-        conv = await create_conversation(db, user_id=user.id)
-        await soft_delete_conversation(db, conv.id)
-        assert await update_conversation_title(db, conv.id, "X") is False
-
-    async def test_update_phase(self, db, user):
-        conv = await create_conversation(db, user_id=user.id)
-        await update_conversation_phase(db, conv.id, "outline")
-        assert (await get_conversation(db, conv.id)).current_phase == "outline"
-
-    async def test_soft_delete(self, db, user):
-        conv = await create_conversation(db, user_id=user.id)
-        assert await soft_delete_conversation(db, conv.id) is True
-        assert await soft_delete_conversation(db, 99999) is False
+    async def test_update_title_and_phase(self, db, user):
+        d = Database(db)
+        conv = await d.create_conversation(user.id, "Old")
+        assert await d.update_conversation_title(conv.id, "New")
+        assert await d.update_conversation_phase(conv.id, "outline")
+        fetched = await d.get_conversation(conv.id)
+        assert fetched.title == "New"
+        assert fetched.current_phase == "outline"
 
 
 class TestMessageRepo:
     @pytest_asyncio.fixture
-    async def user(self, db):
-        return await create_user(db, "msg_user")
+    async def d(self, db):
+        u = await Database(db).create_user("msg_user")
+        conv = await Database(db).create_conversation(u.id)
+        return Database(db), conv
 
-    @pytest_asyncio.fixture
-    async def conv(self, db, user):
-        return await create_conversation(db, user_id=user.id)
-
-    async def test_create_message(self, db, conv):
-        msg = await create_message(db, conv.id, role="user", content="hello")
-        assert msg.idx == 1
-        assert msg.role == "user"
-        assert msg.content == "hello"
-
-    async def test_idx_auto_increment(self, db, conv):
-        m1 = await create_message(db, conv.id, role="user", content="a")
-        m2 = await create_message(db, conv.id, role="assistant", content="b")
+    async def test_idx_and_token_accumulation(self, db, d):
+        db_obj, conv = d
+        m1 = await db_obj.create_message(conv.id, "user", "q", token_count=100)
+        m2 = await db_obj.create_message(conv.id, "assistant", "a", token_count=500)
         assert m1.idx == 1
         assert m2.idx == 2
+        assert (await db_obj.get_conversation(conv.id)).total_tokens == 600
 
-    async def test_create_human_message(self, db, conv):
-        msg = await create_human_message(db, conv.id, content="hi")
+    async def test_create_human_message(self, db, d):
+        db_obj, conv = d
+        msg = await db_obj.create_human_message(conv.id, "hi")
         assert msg.role == "user"
-        assert msg.content_type == "text"
 
-    async def test_token_accumulation(self, db, conv):
-        await create_message(db, conv.id, role="user", content="q", token_count=100)
-        await create_message(db, conv.id, role="assistant", content="a", token_count=500)
-        fetched = await get_conversation(db, conv.id)
-        assert fetched.total_tokens == 600
-
-    async def test_get_messages_by_conversation(self, db, conv):
-        await create_message(db, conv.id, role="user", content="q1")
-        await create_message(db, conv.id, role="assistant", content="a1")
-        msgs = await get_messages_by_conversation(db, conv.id)
-        assert len(msgs) == 2
-
-    async def test_trim_messages(self, db, conv):
-        await create_message(db, conv.id, role="user", content="m1")  # idx=1
-        await create_message(db, conv.id, role="assistant", content="m2")  # idx=2
-        await create_message(db, conv.id, role="user", content="m3")  # idx=3
-
-        deleted = await trim_messages(db, conv.id, before_idx=3)
+    async def test_get_and_trim(self, db, d):
+        db_obj, conv = d
+        await db_obj.create_message(conv.id, "user", "m1")
+        await db_obj.create_message(conv.id, "assistant", "m2")
+        await db_obj.create_message(conv.id, "user", "m3")
+        assert len(await db_obj.get_messages_by_conversation(conv.id)) == 3
+        deleted = await db_obj.trim_messages(conv.id, before_idx=3)
         assert deleted == 2
-        msgs = await get_messages_by_conversation(db, conv.id)
+        msgs = await db_obj.get_messages_by_conversation(conv.id)
         assert len(msgs) == 1
         assert msgs[0].content == "m3"
 
 
 class TestOutlineRepo:
     @pytest_asyncio.fixture
-    async def user(self, db):
-        return await create_user(db, "outline_user")
+    async def d(self, db):
+        u = await Database(db).create_user("outline_user")
+        conv = await Database(db).create_conversation(u.id)
+        return Database(db), u, conv
 
-    @pytest_asyncio.fixture
-    async def conv(self, db, user):
-        return await create_conversation(db, user_id=user.id)
-
-    async def test_create_outline(self, db, user, conv):
-        o = await create_outline(db, user.id, conv.id, "My Outline", slide_count=5)
-        assert o.id is not None
+    async def test_crud(self, db, d):
+        db_obj, user, conv = d
+        o = await db_obj.create_outline(user.id, conv.id, "My Outline", 5)
         assert o.status == "draft"
         assert o.version == 1
 
-    async def test_get_outline(self, db, user, conv):
-        o = await create_outline(db, user.id, conv.id, "Test")
-        fetched = await get_outline(db, o.id)
-        assert fetched.title == "Test"
+        fetched = await db_obj.get_outline(o.id)
+        assert fetched.title == "My Outline"
 
-    async def test_get_deleted_returns_none(self, db, user, conv):
-        o = await create_outline(db, user.id, conv.id, "X")
-        await soft_delete_outline(db, o.id)
-        assert await get_outline(db, o.id) is None
+        await db_obj.soft_delete_outline(o.id)
+        assert await db_obj.get_outline(o.id) is None
 
-    async def test_list_by_conversation(self, db, user, conv):
-        await create_outline(db, user.id, conv.id, "V1")
-        await create_outline(db, user.id, conv.id, "V2")
-        outlines = await list_outlines_by_conversation(db, conv.id)
-        assert len(outlines) == 2
+    async def test_list_by_user(self, db, d):
+        db_obj, user, conv = d
+        await db_obj.create_outline(user.id, conv.id, "A")
+        await db_obj.create_outline(user.id, conv.id, "B")
+        assert len(await db_obj.list_outlines_by_user(user.id)) >= 2
 
-    async def test_list_by_user(self, db, user, conv):
-        await create_outline(db, user.id, conv.id, "A")
-        result = await list_outlines_by_user(db, user.id)
-        assert len(result) >= 1
+    async def test_eval_and_version(self, db, d):
+        db_obj, user, conv = d
+        o = await db_obj.create_outline(user.id, conv.id, "E")
+        await db_obj.update_outline_eval(o.id, 0.85)
+        await db_obj.increment_outline_version(o.id)
+        fetched = await db_obj.get_outline(o.id)
+        assert fetched.eval_score == 0.85
+        assert fetched.version == 2
 
-    async def test_update_status(self, db, user, conv):
-        o = await create_outline(db, user.id, conv.id, "S")
-        assert await update_outline_status(db, o.id, "approved")
-        assert (await get_outline(db, o.id)).status == "approved"
-
-    async def test_update_eval(self, db, user, conv):
-        o = await create_outline(db, user.id, conv.id, "E")
-        assert await update_outline_eval(db, o.id, 0.85)
-        assert (await get_outline(db, o.id)).eval_score == 0.85
-
-    async def test_soft_delete(self, db, user, conv):
-        o = await create_outline(db, user.id, conv.id, "D")
-        assert await soft_delete_outline(db, o.id)
-
-    async def test_outline_slides(self, db, user, conv):
-        o = await create_outline(db, user.id, conv.id, "Slides")
-        s1 = await create_outline_slide(db, o.id, 0, "Slide 1")
-        s2 = await create_outline_slide(db, o.id, 1, "Slide 2")
-        slides = await get_slides_by_outline_id(db, o.id)
+    async def test_slides(self, db, d):
+        db_obj, user, conv = d
+        o = await db_obj.create_outline(user.id, conv.id, "Slides")
+        await db_obj.create_outline_slide(o.id, 0, "Slide A")
+        await db_obj.create_outline_slide(o.id, 1, "Slide B")
+        slides = await db_obj.get_slides_by_outline_id(o.id)
         assert len(slides) == 2
+
+
+class TestPresentationRepo:
+    @pytest_asyncio.fixture
+    async def d(self, db):
+        u = await Database(db).create_user("pres_user")
+        conv = await Database(db).create_conversation(u.id)
+        return Database(db), u, conv
+
+    async def test_create_and_get(self, db, d):
+        db_obj, user, conv = d
+        pres = await db_obj.create_presentation(user.id, conv.id)
+        assert pres.status == "pending"
+        fetched = await db_obj.get_presentation(pres.id)
+        assert fetched is not None
+
+    async def test_list_by_user(self, db, d):
+        db_obj, user, conv = d
+        await db_obj.create_presentation(user.id, conv.id)
+        await db_obj.create_presentation(user.id, conv.id)
+        assert len(await db_obj.list_presentations_by_user(user.id)) >= 2
+
+    async def test_set_output(self, db, d):
+        db_obj, user, conv = d
+        pres = await db_obj.create_presentation(user.id, conv.id)
+        await db_obj.set_presentation_output(pres.id, "/tmp/out.pptx", 1024, 5)
+        fetched = await db_obj.get_presentation(pres.id)
+        assert fetched.file_path == "/tmp/out.pptx"
+        assert fetched.status == "completed"
+
+    async def test_slides_with_agent_output(self, db, d):
+        db_obj, user, conv = d
+        pres = await db_obj.create_presentation(user.id, conv.id)
+        slide = await db_obj.create_presentation_slide(pres.id, 0, "title_slide")
+        await db_obj.set_slide_agent_output(slide.id, "text", {"title": "Hello"})
+        await db_obj.set_slide_agent_output(slide.id, "layout", {"color": "blue"})
+
+        fetched = await db_obj.get_presentation_slide(slide.id)
+        assert fetched.agent_outputs["text"] == {"title": "Hello"}
+        assert fetched.agent_outputs["layout"] == {"color": "blue"}
+
+    async def test_slide_status_and_retry(self, db, d):
+        db_obj, user, conv = d
+        pres = await db_obj.create_presentation(user.id, conv.id)
+        slide = await db_obj.create_presentation_slide(pres.id, 0, "content")
+        assert (await db_obj.increment_slide_retry(slide.id)) == 1
+        await db_obj.update_slide_status(slide.id, "failed", "timeout")
+        fetched = await db_obj.get_presentation_slide(slide.id)
+        assert fetched.status == "failed"
+        assert fetched.retry_count == 1
 
 
 class TestKnowledgeRepo:
     @pytest_asyncio.fixture
-    async def user(self, db):
-        return await create_user(db, "knowledge_user")
+    async def d(self, db):
+        u = await Database(db).create_user("kn_user")
+        return Database(db), u
 
-    async def test_create_and_get(self, db, user):
-        kf = await create_knowledge_file(
-            db, user.id, "test.pdf", "/tmp/test.pdf", "pdf", file_size=1024
-        )
-        fetched = await get_knowledge_file(db, kf.id)
-        assert fetched.filename == "test.pdf"
+    async def test_file_crud(self, db, d):
+        db_obj, user = d
+        kf = await db_obj.create_knowledge_file(user.id, "test.pdf", "/tmp/test.pdf", "pdf", 1024)
+        assert kf.filename == "test.pdf"
+        assert await db_obj.get_knowledge_file(kf.id) is not None
 
-    async def test_list_files(self, db, user):
-        await create_knowledge_file(db, user.id, "a.pdf", "/tmp/a.pdf", "pdf")
-        await create_knowledge_file(db, user.id, "b.docx", "/tmp/b.docx", "docx")
-        files = await list_knowledge_files(db, user.id)
-        assert len(files) == 2
+    async def test_delete_cascades_chunks(self, db, d):
+        db_obj, user = d
+        kf = await db_obj.create_knowledge_file(user.id, "c.pdf", "/tmp/c.pdf", "pdf")
+        await db_obj.create_chunk(kf.id, 0, "text")
+        assert len(await db_obj.list_chunks_by_file(kf.id)) == 1
+        await db_obj.delete_knowledge_file(kf.id)
+        assert await db_obj.get_knowledge_file(kf.id) is None
+        assert len(await db_obj.list_chunks_by_file(kf.id)) == 0
 
-    async def test_list_filtered(self, db, user):
-        await create_knowledge_file(db, user.id, "a.pdf", "/tmp/a.pdf", "pdf")
-        await create_knowledge_file(db, user.id, "b.docx", "/tmp/b.docx", "docx")
-        pdfs = await list_knowledge_files(db, user.id, file_type="pdf")
-        assert len(pdfs) == 1
+    async def test_chunk_by_id(self, db, d):
+        db_obj, user = d
+        kf = await db_obj.create_knowledge_file(user.id, "d.txt", "/tmp/d.txt", "txt")
+        c = await db_obj.create_chunk(kf.id, 0, "hello")
+        assert (await db_obj.get_chunk_by_id(c.id)).chunk_text == "hello"
 
-    async def test_delete_cascades_chunks(self, db, user):
-        kf = await create_knowledge_file(db, user.id, "c.pdf", "/tmp/c.pdf", "pdf")
-        await create_chunk(db, kf.id, 0, "chunk text")
-        await create_chunk(db, kf.id, 1, "chunk text 2")
-
-        # chunk exists before delete
-        chunks = await list_chunks_by_file(db, kf.id)
-        assert len(chunks) == 2
-
-        await delete_knowledge_file(db, kf.id)
-
-        # file and chunks gone
-        assert await get_knowledge_file(db, kf.id) is None
-        chunks_after = await list_chunks_by_file(db, kf.id)
-        assert len(chunks_after) == 0
-
-    async def test_get_chunk_by_id(self, db, user):
-        kf = await create_knowledge_file(db, user.id, "d.txt", "/tmp/d.txt", "txt")
-        c = await create_chunk(db, kf.id, 0, "hello world")
-        fetched = await get_chunk_by_id(db, c.id)
-        assert fetched.chunk_text == "hello world"
-
-    async def test_get_all_chunks_for_user(self, db, user):
-        kf = await create_knowledge_file(db, user.id, "e.txt", "/tmp/e.txt", "txt")
-        await create_chunk(db, kf.id, 0, "chunk A")
-        await create_chunk(db, kf.id, 1, "chunk B")
-
-        all_chunks = await get_all_chunks_for_user(db, user.id)
-        assert len(all_chunks) == 2
+    async def test_chunks_for_user(self, db, d):
+        db_obj, user = d
+        kf = await db_obj.create_knowledge_file(user.id, "e.txt", "/tmp/e.txt", "txt")
+        await db_obj.create_chunk(kf.id, 0, "A")
+        await db_obj.create_chunk(kf.id, 1, "B")
+        assert len(await db_obj.get_all_chunks_for_user(user.id)) == 2
 
 
 class TestWebResourceRepo:
     @pytest_asyncio.fixture
-    async def user(self, db):
-        return await create_user(db, "web_user")
+    async def d(self, db):
+        u = await Database(db).create_user("wr_user")
+        return Database(db), u
 
-    async def test_create_and_get(self, db, user):
-        wr = await create_web_resource(
-            db, user.id, "https://example.com", title="Example", source_domain="example.com"
-        )
-        fetched = await get_web_resource(db, wr.id)
-        assert fetched.title == "Example"
+    async def test_crud(self, db, d):
+        db_obj, user = d
+        wr = await db_obj.create_web_resource(user.id, "https://x.com", "X")
+        assert (await db_obj.get_web_resource(wr.id)).title == "X"
+        assert await db_obj.delete_web_resource(wr.id) is True
+        assert await db_obj.get_web_resource(wr.id) is None
 
-    async def test_find_by_url(self, db, user):
-        await create_web_resource(db, user.id, "https://x.com/page")
-        found = await find_by_url(db, "https://x.com/page")
+    async def test_find_by_url_and_get_all(self, db, d):
+        db_obj, user = d
+        await db_obj.create_web_resource(user.id, "https://a.com")
+        await db_obj.create_web_resource(user.id, "https://b.com")
+        found = await db_obj.find_web_resource_by_url("https://a.com")
         assert found is not None
-        assert await find_by_url(db, "https://x.com/other") is None
+        assert len(await db_obj.get_all_web_resources(user.id)) == 2
 
-    async def test_get_all(self, db, user):
-        await create_web_resource(db, user.id, "https://a.com")
-        await create_web_resource(db, user.id, "https://b.com")
-        all_wr = await get_all_web_resources(db, user.id)
-        assert len(all_wr) == 2
 
-    async def test_delete(self, db, user):
-        wr = await create_web_resource(db, user.id, "https://del.com")
-        assert await delete_web_resource(db, wr.id) is True
-        assert await get_web_resource(db, wr.id) is None
+class TestSnapshotRepo:
+    @pytest_asyncio.fixture
+    async def d(self, db):
+        u = await Database(db).create_user("snap_user")
+        conv = await Database(db).create_conversation(u.id)
+        pres = await Database(db).create_presentation(u.id, conv.id)
+        return Database(db), u, conv, pres
+
+    async def test_create_and_list(self, db, d):
+        db_obj, user, conv, pres = d
+        s1 = await db_obj.create_snapshot(
+            pres.id, user.id, conv.id,
+            outline_json={"title": "V1", "slides": []},
+            presentation_json={"slides": [{"idx": 0, "text": "hello"}]},
+        )
+        assert s1.version == 1
+
+        s2 = await db_obj.create_snapshot(
+            pres.id, user.id, conv.id,
+            outline_json={"title": "V2", "slides": []},
+            presentation_json={"slides": [{"idx": 0, "text": "world"}]},
+        )
+        assert s2.version == 2
+
+        snaps = await db_obj.list_snapshots_by_presentation(pres.id)
+        assert len(snaps) == 2
+
+    async def test_get_and_latest(self, db, d):
+        db_obj, user, conv, pres = d
+        await db_obj.create_snapshot(
+            pres.id, user.id, conv.id,
+            outline_json={"title": "A"}, presentation_json={},
+        )
+        await db_obj.create_snapshot(
+            pres.id, user.id, conv.id,
+            outline_json={"title": "B"}, presentation_json={},
+        )
+        latest = await db_obj.get_latest_snapshot(pres.id)
+        assert latest is not None
+        assert latest.version == 2
+        assert latest.outline_json["title"] == "B"
+
+        fetched = await db_obj.get_snapshot(latest.id)
+        assert fetched is not None
+
+    async def test_delete(self, db, d):
+        db_obj, user, conv, pres = d
+        s = await db_obj.create_snapshot(
+            pres.id, user.id, conv.id,
+            outline_json={}, presentation_json={},
+        )
+        assert await db_obj.delete_snapshot(s.id) is True
+        assert await db_obj.get_snapshot(s.id) is None

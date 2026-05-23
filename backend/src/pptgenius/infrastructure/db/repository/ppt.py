@@ -10,18 +10,16 @@ async def create_presentation(
     db: AsyncSession,
     user_id: int,
     conversation_id: int,
-    file_path: str,
     outline_id: int | None = None,
-    file_size: int | None = None,
-    slide_count: int | None = None,
+    template_id: int | None = None,
+    color_scheme_id: int | None = None,
 ) -> Presentation:
     pres = Presentation(
         user_id=user_id,
         conversation_id=conversation_id,
         outline_id=outline_id,
-        file_path=file_path,
-        file_size=file_size,
-        slide_count=slide_count,
+        template_id=template_id,
+        color_scheme_id=color_scheme_id,
     )
     db.add(pres)
     await db.commit()
@@ -77,6 +75,24 @@ async def update_presentation_status(
     return True
 
 
+async def set_presentation_output(
+    db: AsyncSession,
+    pres_id: int,
+    file_path: str,
+    file_size: int,
+    slide_count: int,
+) -> bool:
+    pres = await db.get(Presentation, pres_id)
+    if pres is None or pres.status == "deleted":
+        return False
+    pres.file_path = file_path
+    pres.file_size = file_size
+    pres.slide_count = slide_count
+    pres.status = "completed"
+    await db.commit()
+    return True
+
+
 async def soft_delete_presentation(db: AsyncSession, pres_id: int) -> bool:
     pres = await db.get(Presentation, pres_id)
     if pres is None:
@@ -86,36 +102,32 @@ async def soft_delete_presentation(db: AsyncSession, pres_id: int) -> bool:
     return True
 
 
-# ──────────────── PresentationSlide ────────────────
+# ─── PresentationSlide ───
 
 async def create_presentation_slide(
     db: AsyncSession,
     presentation_id: int,
     slide_index: int,
-    layout_type: str,
-    color_scheme: dict | None = None,
-    text_content_json: dict | None = None,
-    image_paths: str | None = None,
-    chart_paths: str | None = None,
+    layout_name: str,
+    outline_slide_id: int | None = None,
+    template_id: int | None = None,
+    color_scheme_id: int | None = None,
 ) -> PresentationSlide:
-    slide = PresentationSlide(
+    s = PresentationSlide(
         presentation_id=presentation_id,
         slide_index=slide_index,
-        layout_type=layout_type,
-        color_scheme=color_scheme,
-        text_content_json=text_content_json,
-        image_paths=image_paths,
-        chart_paths=chart_paths,
+        layout_name=layout_name,
+        outline_slide_id=outline_slide_id,
+        template_id=template_id,
+        color_scheme_id=color_scheme_id,
     )
-    db.add(slide)
+    db.add(s)
     await db.commit()
-    await db.refresh(slide)
-    return slide
+    await db.refresh(s)
+    return s
 
 
-async def get_presentation_slide(
-    db: AsyncSession, slide_id: int
-) -> PresentationSlide | None:
+async def get_presentation_slide(db: AsyncSession, slide_id: int) -> PresentationSlide | None:
     return await db.get(PresentationSlide, slide_id)
 
 
@@ -131,11 +143,73 @@ async def get_slides_by_presentation_id(
     return list(result.scalars().all())
 
 
-async def delete_presentation_slide(db: AsyncSession, slide_id: int) -> bool:
-    slide = await db.get(PresentationSlide, slide_id)
-    if slide is None:
+async def set_slide_agent_output(
+        db: AsyncSession, slide_id: int, agent_type: str, output: dict
+) -> bool:
+    s = await db.get(PresentationSlide, slide_id)
+    if s is None:
         return False
-    await db.delete(slide)
+    outputs = s.agent_outputs or {}
+    outputs[agent_type] = output
+    s.agent_outputs = outputs
+    await db.commit()
+    return True
+
+
+async def update_slide_status(
+    db: AsyncSession, slide_id: int, status: str, error_message: str | None = None,
+) -> bool:
+    s = await db.get(PresentationSlide, slide_id)
+    if s is None:
+        return False
+    s.status = status
+    if error_message is not None:
+        s.error_message = error_message
+    await db.commit()
+    return True
+
+
+async def increment_slide_retry(db: AsyncSession, slide_id: int) -> int | None:
+    s = await db.get(PresentationSlide, slide_id)
+    if s is None:
+        return None
+    s.retry_count = (s.retry_count or 0) + 1
+    await db.commit()
+    return s.retry_count
+
+
+async def set_slide_chart_data(db: AsyncSession, slide_id: int, chart_data: dict) -> bool:
+    s = await db.get(PresentationSlide, slide_id)
+    if s is None:
+        return False
+    s.chart_data = chart_data
+    await db.commit()
+    return True
+
+
+async def set_slide_table_data(db: AsyncSession, slide_id: int, table_data: dict) -> bool:
+    s = await db.get(PresentationSlide, slide_id)
+    if s is None:
+        return False
+    s.table_data = table_data
+    await db.commit()
+    return True
+
+
+async def set_slide_image_paths(db: AsyncSession, slide_id: int, image_paths: dict) -> bool:
+    s = await db.get(PresentationSlide, slide_id)
+    if s is None:
+        return False
+    s.image_paths = image_paths
+    await db.commit()
+    return True
+
+
+async def delete_presentation_slide(db: AsyncSession, slide_id: int) -> bool:
+    s = await db.get(PresentationSlide, slide_id)
+    if s is None:
+        return False
+    await db.delete(s)
     await db.commit()
     return True
 
@@ -149,18 +223,16 @@ async def replace_presentation_slides(
     for s in old:
         await db.delete(s)
     await db.commit()
-
     new = []
     for s in slides:
         slide = await create_presentation_slide(
             db,
             presentation_id=presentation_id,
             slide_index=s["slide_index"],
-            layout_type=s["layout_type"],
-            color_scheme=s.get("color_scheme"),
-            text_content_json=s.get("text_content_json"),
-            image_paths=s.get("image_paths"),
-            chart_paths=s.get("chart_paths"),
+            layout_name=s["layout_name"],
+            outline_slide_id=s.get("outline_slide_id"),
+            template_id=s.get("template_id"),
+            color_scheme_id=s.get("color_scheme_id"),
         )
         new.append(slide)
     return new
