@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest_asyncio
 from pptgenius.infrastructure.db.database import Database
-from pptgenius.infrastructure.rag.knowledge_manager import KnowledgeManager
+from pptgenius.infrastructure.rag.knowledge import KnowledgeService
 from pptgenius.infrastructure.workspace.manager import WorkspaceManager
 
 
@@ -17,7 +17,7 @@ class TestKnowledgeManager:
     async def test_ingest_and_search_md(self, db, d):
         db_obj, user = d
         wm = WorkspaceManager(root=tempfile.mkdtemp())
-        km = KnowledgeManager()
+        km = KnowledgeService()
 
         md_path = Path(__file__).parent.parent / "resources" / "dotnet-ai-agent-project.md"
         file_id = await km.ingest(db_obj, str(md_path), user.id)
@@ -34,25 +34,25 @@ class TestKnowledgeManager:
 
     async def test_ingest_nonexistent(self, db, d):
         db_obj, user = d
-        km = KnowledgeManager()
+        km = KnowledgeService()
         file_id = await km.ingest(db_obj, "/nonexistent/path.md", user.id)
         assert file_id is None
 
     async def test_search_empty_user(self, db, d):
         db_obj, user = d
-        km = KnowledgeManager()
+        km = KnowledgeService()
         results = await km.search(user.id, "anything")
         assert results == []
 
     async def test_singleton(self):
-        km1 = KnowledgeManager()
-        km2 = KnowledgeManager()
+        km1 = KnowledgeService()
+        km2 = KnowledgeService()
         assert km1 is km2
 
     async def test_docx_semantic_kernel(self, db, d):
         """Ingest the real DOCX and search for 'Semantic Kernel' — chunks should be meaningful."""
         db_obj, user = d
-        km = KnowledgeManager()
+        km = KnowledgeService()
         wm = WorkspaceManager(root=tempfile.mkdtemp())
 
         docx_path = Path(__file__).parent.parent / "resources" / "dotnet-ai-agent-project.docx"

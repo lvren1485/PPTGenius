@@ -60,6 +60,19 @@ class LogConfig(BaseModel):
     file_backup_count: int = 5
 
 
+class WebSearchConfig(BaseModel):
+    enabled: bool = True
+    engine: str = "duckduckgo"
+    max_results: int = 5
+    timeout: int = 15
+    # API keys for paid engines go in config.local.yaml
+    bing_api_key: str = ""
+    google_api_key: str = ""
+    google_cx: str = ""
+    tavily_api_key: str = ""
+    searxng_base_url: str = ""
+
+
 class Settings(BaseModel):
     app: AppConfig = AppConfig()
     workspace: WorkspaceConfig = WorkspaceConfig()
@@ -68,3 +81,4 @@ class Settings(BaseModel):
     llm: LLMConfig = LLMConfig()
     db: DBConfig = DBConfig()
     log: LogConfig = LogConfig()
+    web_search: WebSearchConfig = WebSearchConfig()

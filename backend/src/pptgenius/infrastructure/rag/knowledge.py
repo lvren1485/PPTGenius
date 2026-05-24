@@ -21,12 +21,12 @@ from .parser import parse_file
 _log = get_logger("pptgenius.knowledge")
 
 
-class KnowledgeManager:
+class KnowledgeService:
     """Ingest files, build BM25 index, search (singleton)."""
 
-    _instance: "KnowledgeManager | None" = None
+    _instance: "KnowledgeService | None" = None
 
-    def __new__(cls) -> "KnowledgeManager":
+    def __new__(cls) -> "KnowledgeService":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
@@ -133,4 +133,4 @@ class KnowledgeManager:
 
 
 # Module-level convenience
-knowledge_manager = KnowledgeManager()
+knowledge_service = KnowledgeService()
