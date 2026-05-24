@@ -11,7 +11,6 @@ dependencies = [
     "rank-bm25>=0.2",
     "python-pptx>=1.0",
     "python-docx>=1.1",
-    "PyPDF2>=3.0",
     "openpyxl>=3.1",
     "matplotlib>=3.10",
     "seaborn>=0.13",
@@ -26,6 +25,7 @@ dependencies = [
     "pyyaml>=6.0",
     "python-multipart>=0.0.20",
     "tiktoken>=0.8",
+    "pymupdf>=1.27.2.3",
 ]
 
 [dependency-groups]

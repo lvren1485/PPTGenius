@@ -37,4 +37,4 @@ build/
 release/
 
 # test resources
-tests/resources/
+backend/src/tests/resources/
