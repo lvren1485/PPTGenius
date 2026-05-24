@@ -224,16 +224,3 @@ class KnowledgeChunk(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     file: Mapped["KnowledgeFile"] = relationship(back_populates="chunks")
-
-
-class WebResource(Base):
-    __tablename__ = "web_resources"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-    url: Mapped[str] = mapped_column(String(750), nullable=False)
-    title: Mapped[str | None] = mapped_column(String(256))
-    content_text: Mapped[str | None] = mapped_column(Text)
-    source_domain: Mapped[str | None] = mapped_column(String(256))
-    stored_path: Mapped[str | None] = mapped_column(String(512))
-    fetched_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

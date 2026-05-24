@@ -126,8 +126,9 @@ class KnowledgeService:
     # -- internal ------------------------------------------------------------
 
     def _get_bm25(self, user_id: int) -> BM25Manager:
-        cfg = get_settings().rag
-        index_dir = Path(cfg.bm25_index_file).parent
+        cfg = get_settings().workspace
+        index_dir = Path(cfg.root) / "indexes"
+        index_dir.mkdir(parents=True, exist_ok=True)
         index_path = index_dir / f"bm25_index_{user_id}.pkl"
         return BM25Manager(index_path)
 

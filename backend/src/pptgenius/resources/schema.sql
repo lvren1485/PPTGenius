@@ -185,18 +185,6 @@ CREATE TABLE IF NOT EXISTS knowledge_chunks (
     FOREIGN KEY (file_id) REFERENCES knowledge_files(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS web_resources (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    url VARCHAR(750) NOT NULL,
-    title VARCHAR(256),
-    content_text TEXT,
-    source_domain VARCHAR(256),
-    stored_path VARCHAR(512),
-    fetched_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
 -- ==================== 索引 ====================
 CREATE INDEX idx_conv_user ON conversations(user_id);
 CREATE INDEX idx_msg_conv_idx ON messages(conversation_id, idx);
@@ -212,7 +200,5 @@ CREATE INDEX idx_colorscheme_name ON color_schemes(name);
 CREATE INDEX idx_snap_pres ON presentation_snapshots(presentation_id, version DESC);
 CREATE INDEX idx_know_user ON knowledge_files(user_id);
 CREATE INDEX idx_kchunk_file ON knowledge_chunks(file_id, chunk_index);
-CREATE UNIQUE INDEX idx_web_url ON web_resources(url);
-CREATE INDEX idx_web_user ON web_resources(user_id);
 
 SET FOREIGN_KEY_CHECKS = 1;

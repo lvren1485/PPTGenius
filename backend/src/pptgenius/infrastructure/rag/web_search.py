@@ -8,9 +8,7 @@ Supported engines: duckduckgo (free) | searxng | bing / google / tavily (needs k
 
 from __future__ import annotations
 
-import asyncio
 import time
-import tempfile
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -22,6 +20,7 @@ from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils.logger import get_logger
 
 from .knowledge import KnowledgeService
+from pptgenius.infrastructure.workspace.manager import WorkspaceManager
 from .scraper import fetch_page
 
 _log = get_logger("pptgenius.websearch")
@@ -105,7 +104,7 @@ class WebSearchService:
         return await self._do_search(query, max_n, cfg)
 
     async def fetch_and_ingest(
-        self, db: Database, url: str, user_id: int,
+        self, db: Database, url: str, user_id: int, conv_id: int
     ) -> dict:
         """Fetch a single *url*, scrape its content, and index via KnowledgeService.
 
@@ -116,7 +115,7 @@ class WebSearchService:
 
         if sc["text"] and len(sc["text"]) > 100:
             sc["ingested"] = True
-            sc["knowledge_file_id"] = await self._ingest_result(db, sc, user_id)
+            sc["knowledge_file_id"] = await self._ingest_result(db, sc, user_id, conv_id)
         else:
             sc["ingested"] = False
             sc["knowledge_file_id"] = None
@@ -134,19 +133,17 @@ class WebSearchService:
         _log.warning("unsupported engine '%s' — trying duckduckgo", engine)
         return await _search_duckduckgo(query, max_n, cfg.timeout)
 
-    async def _ingest_result(self, db: Database, result: dict, user_id: int) -> int | None:
+    async def _ingest_result(self, db: Database, result: dict, user_id: int, conv_id: int) -> int | None:
         text = f"# {result['title']}\n\nURL: {result['url']}\n\n{result['text']}"
-        safe_title = "".join(c if c.isalnum() or c in "._- " else "_" for c in result["title"])[:60]
-        tmp_path = Path(tempfile.gettempdir()) / f"web_{int(time.time())}_{safe_title}.txt"
-        tmp_path.write_text(text, encoding="utf-8")
-        try:
-            ks = KnowledgeService()
-            file_id = await ks.ingest(db, str(tmp_path), user_id)
-            if file_id:
-                _log.debug("indexed %s → file_id=%d", result["url"], file_id)
-            return file_id
-        finally:
-            tmp_path.unlink(missing_ok=True)
+        safe_title = "".join(c if c.isalnum() or c in "._- " else "_" for c in result["title"])[:30]
+        kdir = WorkspaceManager().get_knowledge_dir(conv_id)
+        res_path = kdir / f"web_{int(time.time())}_{safe_title}.txt"
+        res_path.write_text(text, encoding="utf-8")
+        ks = KnowledgeService()
+        file_id = await ks.ingest(db, str(res_path), user_id)
+        if file_id:
+            _log.debug("indexed %s → file_id=%d", result["url"], file_id)
+        return file_id
 
 
 web_search_service = WebSearchService()

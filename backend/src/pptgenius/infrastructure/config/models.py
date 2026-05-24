@@ -17,7 +17,6 @@ class WorkspaceConfig(BaseModel):
 class RAGConfig(BaseModel):
     algorithm: str = "bm25"
     top_k: int = 5
-    bm25_index_file: str = "bm25_index.pkl"
     supported_formats: list[str] = [".txt", ".pdf", ".docx", ".csv", ".xlsx"]
 
 

@@ -13,7 +13,6 @@ workspace:
 rag:
   algorithm: "bm25"
   top_k: 5
-  bm25_index_file: "bm25_index.pkl"
   supported_formats: [".txt", ".pdf", ".docx", ".csv", ".xlsx"]
 
 agent:

@@ -11,7 +11,7 @@ from .repository import (
     ppt as ppt_repo,
     template as tpl_repo,
     user as user_repo,
-    web_resource as wr_repo,
+
 )
 
 
@@ -96,13 +96,6 @@ class Database:
     async def get_chunk_by_id(self, *a, **kw): return await kn_repo.get_chunk_by_id(self.db, *a, **kw)
     async def list_chunks_by_file(self, *a, **kw): return await kn_repo.list_chunks_by_file(self.db, *a, **kw)
     async def get_all_chunks_for_user(self, *a, **kw): return await kn_repo.get_all_chunks_for_user(self.db, *a, **kw)
-
-    # ─── web_resource ───
-    async def create_web_resource(self, *a, **kw): return await wr_repo.create_web_resource(self.db, *a, **kw)
-    async def get_web_resource(self, *a, **kw): return await wr_repo.get_web_resource(self.db, *a, **kw)
-    async def find_web_resource_by_url(self, *a, **kw): return await wr_repo.find_by_url(self.db, *a, **kw)
-    async def get_all_web_resources(self, *a, **kw): return await wr_repo.get_all_web_resources(self.db, *a, **kw)
-    async def delete_web_resource(self, *a, **kw): return await wr_repo.delete_web_resource(self.db, *a, **kw)
 
     # ─── snapshot ───
     async def create_snapshot(self, *a, **kw): return await snap_repo.create_snapshot(self.db, *a, **kw)

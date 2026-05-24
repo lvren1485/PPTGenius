@@ -235,28 +235,6 @@ class TestKnowledgeRepo:
         assert len(await db_obj.get_all_chunks_for_user(user.id)) == 2
 
 
-class TestWebResourceRepo:
-    @pytest_asyncio.fixture
-    async def d(self, db):
-        u = await Database(db).create_user("wr_user")
-        return Database(db), u
-
-    async def test_crud(self, db, d):
-        db_obj, user = d
-        wr = await db_obj.create_web_resource(user.id, "https://x.com", "X")
-        assert (await db_obj.get_web_resource(wr.id)).title == "X"
-        assert await db_obj.delete_web_resource(wr.id) is True
-        assert await db_obj.get_web_resource(wr.id) is None
-
-    async def test_find_by_url_and_get_all(self, db, d):
-        db_obj, user = d
-        await db_obj.create_web_resource(user.id, "https://a.com")
-        await db_obj.create_web_resource(user.id, "https://b.com")
-        found = await db_obj.find_web_resource_by_url("https://a.com")
-        assert found is not None
-        assert len(await db_obj.get_all_web_resources(user.id)) == 2
-
-
 class TestSnapshotRepo:
     @pytest_asyncio.fixture
     async def d(self, db):

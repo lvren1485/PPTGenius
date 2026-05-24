@@ -35,8 +35,10 @@ class TestScraper:
 class TestWebSearchService:
     @pytest_asyncio.fixture
     async def d(self, db):
-        user = await Database(db).create_user("ws_user")
-        return Database(db), user
+        db_obj = Database(db)
+        user = await db_obj.create_user("ws_user")
+        conv = await db_obj.create_conversation(user.id)
+        return db_obj, user, conv
 
     async def test_search(self):
         svc = WebSearchService()
@@ -55,9 +57,9 @@ class TestWebSearchService:
 
     async def test_fetch_and_ingest(self, db, d):
         """Fetch example.com, ingest, verify searchable."""
-        db_obj, user = d
+        db_obj, user, conv = d
         svc = WebSearchService()
-        result = await svc.fetch_and_ingest(db_obj, "https://example.com", user.id)
+        result = await svc.fetch_and_ingest(db_obj, "https://example.com", user.id, conv.id)
         if result["char_count"] == 0:
             pytest.skip("network unavailable")
         print(f"\n  {result['url']} → {result['char_count']} chars  ingested={result['ingested']}")
