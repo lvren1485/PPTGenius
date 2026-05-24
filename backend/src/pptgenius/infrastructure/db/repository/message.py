@@ -13,11 +13,11 @@ async def _get_next_idx(db: AsyncSession, conversation_id: int) -> int:
     return result.scalar_one() + 1
 
 
-async def _add_conversation_tokens(db: AsyncSession, conversation_id: int, tokens: int) -> None:
+async def _add_conversation_cost(db: AsyncSession, conversation_id: int, cost: float) -> None:
     conv = await db.get(Conversation, conversation_id)
     if conv is None:
         return
-    conv.total_tokens = (conv.total_tokens or 0) + tokens
+    conv.estimated_cost = (conv.estimated_cost or 0) + cost
     await db.commit()
 
 
@@ -27,14 +27,10 @@ async def create_message(
     role: str,
     content: str,
     content_type: str = "text",
-    token_count: int | None = None,
+    estimated_cost: float | None = None,
     metadata_json: dict | None = None,
 ) -> Message:
-    """创建消息并自动累加 conversation.total_tokens。
-
-    token_count 应为该条消息距离上一条 AIMessage 后消耗的总 token
-    （含该轮 LLM 调用的 input + output + tool_calls）。
-    """
+    """创建消息并自动累加 conversation.estimated_cost。"""
     idx = await _get_next_idx(db, conversation_id)
     msg = Message(
         conversation_id=conversation_id,
@@ -42,12 +38,12 @@ async def create_message(
         role=role,
         content=content,
         content_type=content_type,
-        token_count=token_count,
+        estimated_cost=estimated_cost,
         metadata_json=metadata_json,
     )
     db.add(msg)
-    if token_count:
-        await _add_conversation_tokens(db, conversation_id, token_count)
+    if estimated_cost:
+        await _add_conversation_cost(db, conversation_id, estimated_cost)
     await db.commit()
     await db.refresh(msg)
     return msg
@@ -64,7 +60,7 @@ async def create_human_message(
         role="user",
         content=content,
         content_type="text",
-        token_count=0,
+        estimated_cost=0,
     )
 
 

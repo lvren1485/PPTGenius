@@ -81,13 +81,13 @@ class TestMessageRepo:
         conv = await Database(db).create_conversation(u.id)
         return Database(db), conv
 
-    async def test_idx_and_token_accumulation(self, db, d):
+    async def test_idx_and_cost_accumulation(self, db, d):
         db_obj, conv = d
-        m1 = await db_obj.create_message(conv.id, "user", "q", token_count=100)
-        m2 = await db_obj.create_message(conv.id, "assistant", "a", token_count=500)
+        m1 = await db_obj.create_message(conv.id, "user", "q", estimated_cost=0.001)
+        m2 = await db_obj.create_message(conv.id, "assistant", "a", estimated_cost=0.005)
         assert m1.idx == 1
         assert m2.idx == 2
-        assert (await db_obj.get_conversation(conv.id)).total_tokens == 600
+        assert abs((await db_obj.get_conversation(conv.id)).estimated_cost - 0.006) < 1e-9
 
     async def test_create_human_message(self, db, d):
         db_obj, conv = d

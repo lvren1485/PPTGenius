@@ -25,7 +25,7 @@
 │    title        │         │    idx          │
 │    status       │         │    role         │
 │    workspace    │         │    content      │
-│    total_tokens │         │    token_count  │
+│ estimated_cost │         │ estimated_cost  │
 └────────┬────────┘         └─────────────────┘
          │
          │ 1:N
@@ -137,7 +137,7 @@ PPT 快照表，每次生成/修改后存入完整的 outline + presentation JSO
 | **outlines 移除 eval_feedback / user_feedback** | 反馈由 messages 表记录，不在 outline 表冗余 |
 | **knowledge_chunks ON DELETE CASCADE** | 删除 knowledge_file 时自动删除其所有 chunks |
 | **conversation.workspace_path 由 id 自动生成** | `./data/workspace/{id}`，创建时不传入 |
-| **message 创建自动累加 token** | `token_count` 为"距上次 AIMessage 后本轮总消耗"，自动累加到 conversation.total_tokens |
+| **message 创建自动累加 cost** | `estimated_cost` 为本次 LLM 调用的 CNY 费用，自动累加到 conversation.estimated_cost |
 | **presentation_slides.agent_outputs** | 每个 sub-agent 独立写入 JSON checkpoint，supervisor 重试时只重试失败的 agent |
 | **templates / color_schemes** | 独立表存储模板和配色方案，layout_agent 选择已有方案或调用 create 新建 |
 | **users.password + users.other** | 预留多用户认证和扩展字段 |

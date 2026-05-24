@@ -159,7 +159,7 @@ backend/
     │   │
     │   └── utils/                   # 工具
     │       ├── __init__.py
-    │       ├── token_counter.py     # Token 计数 + 费用估算 (由 llm.py 调用)
+    │       ├── token_counter.py     # Token 累加 + 费用估算 (由 llm.py / LangGraph node 调用)
     │       └── logger.py            # 日志
     │
     └── resources/                   # ═══════ 静态资源 ═══════
@@ -292,7 +292,7 @@ backend/
 | ppt_engine | `images.py` | 图片嵌入/缩放 + cairosvg SVG→PNG |
 | ppt_engine | `styles.py` | 颜色/字体/渐变/阴影工具函数 |
 | workspace | `manager.py` | 目录创建/清理 |
-| utils | `token_counter.py` | Token 计数，**由 common/llm.py 在每次 LLM 调用时自动调用** |
+| utils | `token_counter.py` | Token 累加 + 费用估算，**由 llm.py / LangGraph callback 自动调用** |
 | utils | `logger.py` | 日志 |
 
 ### Token 计数调用链
@@ -302,7 +302,7 @@ api/chat.py
   → agent/common/llm.py.chat_completion()
       → 调用前: token_counter.count(messages)
       → 调用后: token_counter.count(response)
-      → 自动累加到 conversation.total_tokens
+      → 自动累加到 conversation.estimated_cost
 ```
 
 外部模块不需要手动调用 `token_counter`，llm.py 内部封装。

@@ -101,7 +101,7 @@ Response 200:
     "items": [{
       "id": 1, "title": "关于AI的PPT", "status": "active",
       "current_phase": "outline", "message_count": 5,
-      "total_tokens": 3200, "created_at": "...", "updated_at": "..."
+      "estimated_cost": 0.032, "created_at": "...", "updated_at": "..."
     }],
     "total": 1, "page": 1, "page_size": 20
   }
@@ -158,10 +158,13 @@ event: ppt_ready
 data: {"presentation_id": 1, "file_path": "...", "slide_count": 12, "download_url": "/api/ppt/1/download"}
 
 event: done
-data: {"total_tokens": 6200, "elapsed_seconds": 45.2}
+data: {"estimated_cost": 0.0062, "elapsed_seconds": 45.2}
 
 event: error
 data: {"code": 40201, "message": "LLM timeout", "retry": true}
+
+event: budget
+data: {"total_tokens": 5000, "estimated_cost": 0.25}
 ```
 
 ---

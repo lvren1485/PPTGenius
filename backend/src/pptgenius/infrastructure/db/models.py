@@ -27,7 +27,7 @@ class Conversation(Base):
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
     current_phase: Mapped[str | None] = mapped_column(String(32), default="chat")
     workspace_path: Mapped[str] = mapped_column(String(512), nullable=False, default="")
-    total_tokens: Mapped[int | None] = mapped_column(Integer, default=0)
+    estimated_cost: Mapped[float | None] = mapped_column(Float, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
@@ -47,7 +47,7 @@ class Message(Base):
     role: Mapped[str] = mapped_column(String(16), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     content_type: Mapped[str | None] = mapped_column(String(32), default="text")
-    token_count: Mapped[int | None] = mapped_column(Integer)
+    estimated_cost: Mapped[float | None] = mapped_column(Float)
     metadata_json: Mapped[dict | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
@@ -231,7 +231,7 @@ class WebResource(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-    url: Mapped[str] = mapped_column(String(768), nullable=False)
+    url: Mapped[str] = mapped_column(String(750), nullable=False)
     title: Mapped[str | None] = mapped_column(String(256))
     content_text: Mapped[str | None] = mapped_column(Text)
     source_domain: Mapped[str | None] = mapped_column(String(256))
