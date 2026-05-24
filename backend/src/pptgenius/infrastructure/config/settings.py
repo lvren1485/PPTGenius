@@ -9,7 +9,7 @@ from .models import Settings
 _project_root = Path(os.environ.get("PPTGENIUS_HOME", Path.cwd()))
 DEFAULT_CONFIG = _project_root / "config.yaml"
 LOCAL_CONFIG = _project_root / "config.local.yaml"
-RESOURCES_DIR = _project_root / "src" / "resources"
+RESOURCES_DIR = _project_root / "src" / "pptgenius" / "resources"
 
 
 def _load_yaml(path: Path) -> dict:
