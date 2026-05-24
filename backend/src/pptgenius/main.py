@@ -49,9 +49,9 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    @app.get("/api/health")
-    async def health():
-        return {"code": 0, "message": "ok", "data": {"status": "healthy"}}
+    # Register API routes
+    from pptgenius.api.router import api_router
+    app.include_router(api_router)
 
     return app
 

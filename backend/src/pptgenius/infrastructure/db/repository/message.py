@@ -77,6 +77,12 @@ async def get_messages_by_conversation(
     return list(result.scalars().all())
 
 
+async def count_messages_by_conversation(db: AsyncSession, conversation_id: int) -> int:
+    stmt = select(func.count(Message.id)).where(Message.conversation_id == conversation_id)
+    result = await db.execute(stmt)
+    return result.scalar_one()
+
+
 async def trim_messages(db: AsyncSession, conversation_id: int, before_idx: int) -> int:
     """删除 conversation 中 idx 小于 before_idx 的所有消息，返回删除条数。"""
     from sqlalchemy import delete

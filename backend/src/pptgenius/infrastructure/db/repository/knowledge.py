@@ -39,6 +39,7 @@ async def list_knowledge_files(
     file_type: str | None = None,
     source_type: str | None = None,
     status: str | None = None,
+    conversation_id: int | None = None,
 ) -> list[KnowledgeFile]:
     stmt = select(KnowledgeFile).where(KnowledgeFile.user_id == user_id)
     if file_type:
@@ -47,6 +48,9 @@ async def list_knowledge_files(
         stmt = stmt.where(KnowledgeFile.source_type == source_type)
     if status:
         stmt = stmt.where(KnowledgeFile.status == status)
+    if conversation_id is not None:
+        # file_path contains workspace/{conv_id}/, derive conversation scope
+        stmt = stmt.where(KnowledgeFile.file_path.like(f"%/workspace/{conversation_id}/%"))
     stmt = stmt.order_by(KnowledgeFile.created_at.desc())
     result = await db.execute(stmt)
     return list(result.scalars().all())

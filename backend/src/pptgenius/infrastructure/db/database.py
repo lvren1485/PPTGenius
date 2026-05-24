@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .repository import (
     conversation as conv_repo,
+    cost as cost_repo,
     knowledge as kn_repo,
     message as msg_repo,
     snapshot as snap_repo,
@@ -11,7 +12,6 @@ from .repository import (
     ppt as ppt_repo,
     template as tpl_repo,
     user as user_repo,
-
 )
 
 
@@ -37,6 +37,7 @@ class Database:
     async def create_message(self, *a, **kw): return await msg_repo.create_message(self.db, *a, **kw)
     async def create_human_message(self, *a, **kw): return await msg_repo.create_human_message(self.db, *a, **kw)
     async def get_messages_by_conversation(self, *a, **kw): return await msg_repo.get_messages_by_conversation(self.db, *a, **kw)
+    async def count_messages_by_conversation(self, *a, **kw): return await msg_repo.count_messages_by_conversation(self.db, *a, **kw)
     async def trim_messages(self, *a, **kw): return await msg_repo.trim_messages(self.db, *a, **kw)
 
     # ─── outline ───
@@ -103,3 +104,8 @@ class Database:
     async def list_snapshots_by_presentation(self, *a, **kw): return await snap_repo.list_snapshots_by_presentation(self.db, *a, **kw)
     async def get_latest_snapshot(self, *a, **kw): return await snap_repo.get_latest_snapshot(self.db, *a, **kw)
     async def delete_snapshot(self, *a, **kw): return await snap_repo.delete_snapshot(self.db, *a, **kw)
+
+    # ─── cost ───
+    async def cost_summary(self, *a, **kw): return await cost_repo.cost_summary(self.db, *a, **kw)
+    async def cost_by_date(self, *a, **kw): return await cost_repo.cost_by_date(self.db, *a, **kw)
+    async def cost_by_conversation(self, *a, **kw): return await cost_repo.cost_by_conversation(self.db, *a, **kw)

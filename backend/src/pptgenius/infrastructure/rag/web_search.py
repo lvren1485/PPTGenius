@@ -137,6 +137,7 @@ class WebSearchService:
         text = f"# {result['title']}\n\nURL: {result['url']}\n\n{result['text']}"
         safe_title = "".join(c if c.isalnum() or c in "._- " else "_" for c in result["title"])[:30]
         kdir = WorkspaceManager().get_knowledge_dir(conv_id)
+        kdir.mkdir(parents=True, exist_ok=True)
         res_path = kdir / f"web_{int(time.time())}_{safe_title}.txt"
         res_path.write_text(text, encoding="utf-8")
         ks = KnowledgeService()
