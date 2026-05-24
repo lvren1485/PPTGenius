@@ -134,6 +134,7 @@ backend/
     │   │   ├── __init__.py
     │   │   ├── engine.py            # SQLAlchemy 连接 (create_all 自动建表)
     │   │   ├── models.py            # ORM 模型
+    |   |   ├── database.py          # DB 薄封装，repository不需要传入 session
     │   │   └── repository/          # CRUD
     │   │       ├── __init__.py
     │   │       ├── user.py
