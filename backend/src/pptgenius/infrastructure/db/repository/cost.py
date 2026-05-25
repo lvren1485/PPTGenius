@@ -117,7 +117,7 @@ async def cost_by_conversation(
         .where(Conversation.status != "deleted")
         .where(Conversation.updated_at >= since)
         .group_by(Conversation.id)
-        .order_by(Conversation.estimated_cost.desc().nulls_last())
+        .order_by(Conversation.estimated_cost.desc())
         .offset(offset)
         .limit(limit)
     )

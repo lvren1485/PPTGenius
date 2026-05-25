@@ -22,7 +22,25 @@ class TestUserRepo:
         assert await Database(db).get_user(99999) is None
 
     async def test_get_or_create_default(self, db):
+        from pptgenius.infrastructure.db.models import (
+            Conversation, KnowledgeChunk, KnowledgeFile, Message,
+            Outline, OutlineSlide, Presentation, PresentationSlide, PresentationSnapshot,
+        )
+
         d = Database(db)
+        # Delete in FK dependency order (children before parents)
+        for model in [
+            PresentationSlide, PresentationSnapshot,  # → presentations
+            OutlineSlide,                              # → outlines
+            KnowledgeChunk,                            # → knowledge_files
+            Message,                                   # → conversations
+            Presentation,                              # → conversations, users
+            Outline,                                   # → conversations, users
+            Conversation,                              # → users
+            KnowledgeFile,                             # → users
+        ]:
+            await db.execute(delete(model))
+        await db.commit()
         await db.execute(delete(User))
         await db.commit()
         u1 = await d.get_or_create_default_user()

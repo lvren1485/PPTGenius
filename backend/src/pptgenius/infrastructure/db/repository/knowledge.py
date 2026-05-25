@@ -49,8 +49,8 @@ async def list_knowledge_files(
     if status:
         stmt = stmt.where(KnowledgeFile.status == status)
     if conversation_id is not None:
-        # file_path contains workspace/{conv_id}/, derive conversation scope
-        stmt = stmt.where(KnowledgeFile.file_path.like(f"%/workspace/{conversation_id}/%"))
+        # file_path contains workspace/{conv_id}/ (normalize backslash for Windows)
+        stmt = stmt.where(KnowledgeFile.file_path.like(f"%workspace%{conversation_id}%"))
     stmt = stmt.order_by(KnowledgeFile.created_at.desc())
     result = await db.execute(stmt)
     return list(result.scalars().all())

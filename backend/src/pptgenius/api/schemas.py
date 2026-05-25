@@ -132,8 +132,8 @@ class PresentationBrief(BaseModel):
     slide_count: int | None = None
     file_path: str
     file_size: int | None = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 
