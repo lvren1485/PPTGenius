@@ -1,0 +1,6 @@
+{
+  "type": "chart",
+  "chart_type": "bar_clustered | bar_stacked | bar_stacked_100",
+  "description": "条形图 — 横向柱状, 适合长标签场景",
+  "same_fields_as": "chart/column.json"
+}

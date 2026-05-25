@@ -1,0 +1,6 @@
+{
+  "type": "chart",
+  "chart_type": "area | area_stacked | area_stacked_100",
+  "description": "面积图",
+  "same_fields_as": "chart/column.json"
+}

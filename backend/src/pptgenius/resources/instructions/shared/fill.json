@@ -1,0 +1,17 @@
+{
+  "FillStyle": {
+    "fields": {
+      "type": "'solid'|'gradient'|'no_fill'|'picture'",
+      "color": "string|null, hex, solid填充色或picture路径",
+      "gradient_angle": "float|null, 0=左→右, 90=下→上",
+      "gradient_stops": "[GradientStop]|null"
+    }
+  },
+  "GradientStop": {
+    "fields": {
+      "position": "float 0.0-1.0, 渐变位置",
+      "color": "string, hex"
+    },
+    "example": { "position": 0.5, "color": "ff0000" }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "LineStyle": {
+    "fields": {
+      "color": "string|null, hex, null=无线条",
+      "width_pt": "float, 线条宽度 pt",
+      "dash": "'solid'|'dash'|'dot'|'dash_dot'|null"
+    },
+    "example": { "color": "333333", "width_pt": 1.5, "dash": "solid" }
+  }
+}

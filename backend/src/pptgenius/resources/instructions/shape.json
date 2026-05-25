@@ -1,0 +1,13 @@
+{
+  "type": "shape",
+  "description": "自选图形 — 182种, 见 shape_catalog.json",
+  "fields": {
+    "position": "Position (见 shared/position.json)",
+    "shape_type": "string, 参见 shape_catalog.json 中的 shape_key",
+    "fill": "FillStyle|null (见 shared/fill.json)",
+    "line": "LineStyle|null (见 shared/line.json)",
+    "text": "[ContentBlock]|null, 形状内文字",
+    "rotation": "float|null, 旋转角度"
+  },
+  "note": "shape_type 必须来自 Python 枚举 SHAPE_KEYS (见 ppt_engine/parser/shapes.py). 常用: rectangle, rounded_rectangle, oval, diamond, triangle, pentagon, hexagon, star_5, right_arrow, heartbeat, cloud, flowchart_process."
+}

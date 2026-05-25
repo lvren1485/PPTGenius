@@ -1,0 +1,5 @@
+{
+  "type": "chart",
+  "chart_type": "radar | radar_filled | radar_markers",
+  "description": "雷达图 — 多维度对比"
+}

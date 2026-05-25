@@ -1,0 +1,5 @@
+{
+  "type": "chart",
+  "chart_type": "bubble",
+  "description": "气泡图 — 三个维度: X位置, Y位置, 气泡大小"
+}

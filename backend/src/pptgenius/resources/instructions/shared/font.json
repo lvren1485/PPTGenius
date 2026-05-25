@@ -1,0 +1,35 @@
+{
+  "FontSpec": {
+    "fields": {
+      "name": "string|null, 字体名 e.g. '微软雅黑', null=继承",
+      "size": "int|null, 字号 pt",
+      "bold": "bool|null",
+      "italic": "bool|null",
+      "color": "string|null, 6位hex, 不含#, e.g. '1a73e8'",
+      "underline": "'none'|'single'|'double'|'wavy'|null",
+      "strikethrough": "'single'|'double'|null",
+      "small_caps": "bool|null",
+      "all_caps": "bool|null",
+      "kerning_pt": "float|null",
+      "shadow": "FontShadow|null",
+      "glow": "FontGlow|null"
+    },
+    "example": { "size": 14, "bold": true, "color": "333333" }
+  },
+  "FontShadow": {
+    "fields": {
+      "blur_pt": "float, default=3.0",
+      "offset_pt": "float, default=1.5",
+      "angle_deg": "float, default=315",
+      "color": "string, hex, default='000000'",
+      "alpha_pct": "float 0-100, default=40"
+    }
+  },
+  "FontGlow": {
+    "fields": {
+      "radius_pt": "float, default=8.0",
+      "color": "string, hex, default='1a73e8'",
+      "alpha_pct": "float 0-100, default=60"
+    }
+  }
+}

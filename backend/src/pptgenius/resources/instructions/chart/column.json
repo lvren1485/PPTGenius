@@ -1,0 +1,23 @@
+{
+  "type": "chart",
+  "chart_type": "column_clustered | column_stacked | column_stacked_100",
+  "description": "柱形图 — 支持簇状/堆积/百分比堆积",
+  "fields": {
+    "position": "Position (见 shared/position.json)",
+    "title": "string|null, 图表标题",
+    "data": {
+      "categories": "string[], X轴标签 e.g. ['Q1','Q2','Q3','Q4']",
+      "series": "[{name: string, values: float[]}]"
+    },
+    "style": {
+      "has_legend": "bool",
+      "legend_position": "'bottom'|'right'",
+      "has_data_labels": "bool",
+      "data_label_position": "'outside_end'|'inside_end'|'center'",
+      "series_colors": "hex[] 按系列顺序, e.g. ['1a73e8','ea4335']",
+      "chart_area_fill": "hex|'none'",
+      "plot_area_fill": "hex|'none'",
+      "axis_font_size": "int"
+    }
+  }
+}

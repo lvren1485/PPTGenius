@@ -1,0 +1,37 @@
+{
+  "type": "table",
+  "description": "表格 — 含表头/斑马条纹/合并单元格",
+  "fields": {
+    "position": "Position (见 shared/position.json)",
+    "rows": "int >0",
+    "cols": "int >0",
+    "col_widths": "float[]|null, 列宽英寸",
+    "cells": "[CellSpec], 按 row/col 位置填充",
+    "merges": "[MergeSpec]|null, 合并区间",
+    "header": "TableHeader|null, 表头行样式",
+    "style": "TableStyle|null, 全局边框+斑马纹"
+  },
+  "CellSpec": {
+    "row": "int, 行号 0-based",
+    "col": "int, 列号 0-based",
+    "text": "string",
+    "font": "FontSpec|null"
+  },
+  "MergeSpec": {
+    "from_row": "int", "from_col": "int",
+    "to_row": "int", "to_col": "int"
+  },
+  "TableHeader": {
+    "row": "int, 表头行号",
+    "fill": "hex, 背景色",
+    "font_color": "hex, default='ffffff'",
+    "font_bold": "bool, default=true",
+    "font_size": "int, default=14"
+  },
+  "TableStyle": {
+    "border_color": "hex, default='e0e0e0'",
+    "border_width_pt": "float, default=0.5",
+    "stripe_even": "hex|null, 偶数行背景",
+    "stripe_odd": "hex|null, 奇数行背景"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "type": "shape",
+  "shape_type": "rounded_rectangle",
+  "position": { "left": 1.0, "top": 0.5, "width": 11.0, "height": 1.0 },
+  "fill": { "type": "solid", "color": "1a73e8" },
+  "line": { "color": "1557b0", "width_pt": 1.5 },
+  "text": [{
+    "paragraph": {
+      "alignment": "center",
+      "runs": [{ "text": "标题栏", "font": { "size": 18, "bold": true, "color": "ffffff" } }]
+    }
+  }]
+}

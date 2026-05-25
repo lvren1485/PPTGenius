@@ -1,0 +1,6 @@
+{
+  "type": "chart",
+  "chart_type": "line | line_markers | line_stacked | line_stacked_100",
+  "description": "折线图 — 趋势展示。line=无标记, line_markers=带数据点标记",
+  "same_fields_as": "chart/column.json"
+}

@@ -1,0 +1,22 @@
+{
+  "type": "chart",
+  "chart_type": "column_clustered",
+  "position": { "left": 1.5, "top": 1.5, "width": 10.0, "height": 5.5 },
+  "title": "季度销售对比",
+  "data": {
+    "categories": ["Q1", "Q2", "Q3", "Q4"],
+    "series": [
+      { "name": "线上", "values": [120, 145, 138, 162] },
+      { "name": "线下", "values": [80, 92, 88, 95] }
+    ]
+  },
+  "style": {
+    "has_legend": true,
+    "legend_position": "bottom",
+    "has_data_labels": true,
+    "data_label_position": "outside_end",
+    "series_colors": ["1a73e8", "ea4335"],
+    "chart_area_fill": "fafafa",
+    "axis_font_size": 10
+  }
+}

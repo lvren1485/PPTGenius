@@ -1,0 +1,21 @@
+{
+  "type": "chart",
+  "chart_type": "pie | pie_exploded | doughnut | doughnut_exploded",
+  "description": "饼图/环形图 — 仅支持1个series",
+  "fields": {
+    "position": "Position (见 shared/position.json)",
+    "title": "string|null",
+    "data": {
+      "categories": "string[], 扇区标签",
+      "series": "[{name: string, values: float[]}] — ⚠️ 只能1个series"
+    },
+    "style": {
+      "has_legend": "bool",
+      "legend_position": "'bottom'|'right'",
+      "has_data_labels": "bool",
+      "data_label_position": "'outside_end'|'inside_end'",
+      "series_colors": "hex[] 按扇区顺序",
+      "chart_area_fill": "hex|'none'"
+    }
+  }
+}

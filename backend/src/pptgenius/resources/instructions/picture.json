@@ -1,0 +1,9 @@
+{
+  "type": "picture",
+  "description": "图片嵌入 — SVG 自动转 PNG (300DPI)",
+  "fields": {
+    "position": "Position (见 shared/position.json). height可为null(自动等比)",
+    "path": "string, 图片路径 (相对workspace根)",
+    "fit": "'aspect'(等比) | 'stretch'(拉伸) | 'crop'(裁切)"
+  }
+}

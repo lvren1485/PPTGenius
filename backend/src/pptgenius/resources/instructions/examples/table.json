@@ -1,0 +1,17 @@
+{
+  "type": "table",
+  "position": { "left": 1.5, "top": 1.5, "width": 10.0, "height": 5.0 },
+  "rows": 4,
+  "cols": 3,
+  "col_widths": [2.5, 3.5, 4.0],
+  "cells": [
+    { "row": 0, "col": 0, "text": "功能" },
+    { "row": 0, "col": 1, "text": "说明" },
+    { "row": 0, "col": 2, "text": "优先级" },
+    { "row": 1, "col": 0, "text": "图表生成" },
+    { "row": 1, "col": 1, "text": "python-pptx原生图表" },
+    { "row": 1, "col": 2, "text": "P0" }
+  ],
+  "header": { "row": 0, "fill": "1a73e8", "font_color": "ffffff", "font_bold": true, "font_size": 14 },
+  "style": { "border_color": "dadce0", "border_width_pt": 0.5, "stripe_even": "f8f9fa", "stripe_odd": "ffffff" }
+}

@@ -1,0 +1,24 @@
+{
+  "type": "textbox",
+  "description": "文本框 — 段落 + 多 run 文本",
+  "fields": {
+    "position": "Position (见 shared/position.json)",
+    "content": "[ContentBlock]",
+    "fill": "FillStyle|null (见 shared/fill.json)",
+    "line": "LineStyle|null (见 shared/line.json)",
+    "rotation": "float|null, 旋转角度(度)"
+  },
+  "ContentBlock": {
+    "paragraph": {
+      "alignment": "'left'|'center'|'right'|'justify', default='left'",
+      "level": "int 0-8, 缩进层级",
+      "space_before_pt": "int|null, 段前间距 pt",
+      "space_after_pt": "int|null, 段后间距 pt",
+      "runs": "[RunSpec]"
+    }
+  },
+  "RunSpec": {
+    "text": "string, 文本内容",
+    "font": "FontSpec|null (见 shared/font.json)"
+  }
+}
