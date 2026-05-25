@@ -1,6 +1,24 @@
 {
   "type": "chart",
   "chart_type": "bar_clustered | bar_stacked | bar_stacked_100",
-  "description": "条形图 — 横向柱状, 适合长标签场景",
-  "same_fields_as": "chart/column.json"
+  "description": "条形图 — 横向柱状，适合长标签场景。clustered=簇状, stacked=堆积",
+  "fields": {
+    "position": "Position (见 shared/position.json)",
+    "title": "string|null, 图表标题",
+    "data": {
+      "categories": "string[], Y轴标签(因为是横向) e.g. ['产品A','产品B','产品C']",
+      "series": "[{name: string, values: float[]}], 每个series的values长度须= categories长度"
+    },
+    "style": {
+      "has_legend": "bool, default=true",
+      "legend_position": "'bottom'|'right'|'left'|'top', default='bottom'",
+      "has_data_labels": "bool, default=false",
+      "data_label_position": "'outside_end'|'inside_end'|'center'|'inside_base'",
+      "series_colors": "hex[]|null, 按系列顺序 e.g. ['1a73e8','ea4335']",
+      "chart_area_fill": "hex|'none'|null",
+      "plot_area_fill": "hex|'none'|null",
+      "title_font_size": "int|null",
+      "axis_font_size": "int|null"
+    }
+  }
 }

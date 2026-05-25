@@ -82,6 +82,22 @@ def validate_instruction(data: dict[str, Any]) -> ValidationResult:
 
 
 def _check_chart(el: ChartElement, bp: str, errors: list[dict]) -> None:
+    # scatter/bubble use XyChartData/BubbleChartData (points, not categories+values)
+    if el.is_xy or el.is_bubble:
+        n = len(el.data.series)  # type: ignore[attr-defined]
+        if n == 0:
+            errors.append({"path": f"{bp}.data.series", "error": "chart needs >=1 series"})
+        for si, s in enumerate(el.data.series):
+            if len(s.points) == 0:
+                errors.append({"path": f"{bp}.data.series[{si}].points",
+                               "error": f"series '{s.name}' has no points"})
+        if el.style and el.style.series_colors:
+            if len(el.style.series_colors) < n:
+                errors.append({"path": f"{bp}.style.series_colors",
+                               "error": f"series_colors ({len(el.style.series_colors)}) < series ({n})"})
+        return
+
+    # Category charts
     n = len(el.data.series)
     if n == 0:
         errors.append({"path": f"{bp}.data.series", "error": "chart needs >=1 series"})
@@ -92,6 +108,9 @@ def _check_chart(el: ChartElement, bp: str, errors: list[dict]) -> None:
     if "pie" in el.chart_type and n > 1:
         errors.append({"path": f"{bp}.chart_type",
                        "error": f"pie chart supports 1 series, got {n}"})
+    if "doughnut" in el.chart_type and n > 1:
+        errors.append({"path": f"{bp}.chart_type",
+                       "error": f"doughnut chart supports 1 series, got {n}"})
 
 
 def _check_table(el: TableElement, bp: str, errors: list[dict]) -> None:

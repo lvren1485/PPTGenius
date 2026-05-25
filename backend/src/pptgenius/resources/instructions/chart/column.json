@@ -1,23 +1,24 @@
 {
   "type": "chart",
   "chart_type": "column_clustered | column_stacked | column_stacked_100",
-  "description": "柱形图 — 支持簇状/堆积/百分比堆积",
+  "description": "柱形图 — 垂直柱状。clustered=簇状, stacked=堆积, stacked_100=百分比堆积",
   "fields": {
     "position": "Position (见 shared/position.json)",
     "title": "string|null, 图表标题",
     "data": {
       "categories": "string[], X轴标签 e.g. ['Q1','Q2','Q3','Q4']",
-      "series": "[{name: string, values: float[]}]"
+      "series": "[{name: string, values: float[]}], 每个series的values长度须= categories长度"
     },
     "style": {
-      "has_legend": "bool",
-      "legend_position": "'bottom'|'right'",
-      "has_data_labels": "bool",
-      "data_label_position": "'outside_end'|'inside_end'|'center'",
-      "series_colors": "hex[] 按系列顺序, e.g. ['1a73e8','ea4335']",
-      "chart_area_fill": "hex|'none'",
-      "plot_area_fill": "hex|'none'",
-      "axis_font_size": "int"
+      "has_legend": "bool, default=true",
+      "legend_position": "'bottom'|'right'|'left'|'top', default='bottom'",
+      "has_data_labels": "bool, default=false",
+      "data_label_position": "'outside_end'|'inside_end'|'center'|'inside_base', default='outside_end'",
+      "series_colors": "hex[]|null, 按系列顺序 e.g. ['1a73e8','ea4335']",
+      "chart_area_fill": "hex|'none'|null, 图表区背景",
+      "plot_area_fill": "hex|'none'|null, 绘图区背景",
+      "title_font_size": "int|null, 标题字号 pt",
+      "axis_font_size": "int|null, 坐标轴字号 pt"
     }
   }
 }

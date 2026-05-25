@@ -1,11 +1,20 @@
 {
   "Position": {
+    "description": "元素位置定义。支持绝对坐标和相对坐标。",
     "fields": {
-      "left":  "float >=0, 英寸, 距左边距",
-      "top":   "float >=0, 英寸, 距上边距",
+      "left":  "float >=0, 英寸, X偏移",
+      "top":   "float >=0, 英寸, Y偏移",
       "width": "float >0, 英寸",
-      "height": "float | null, 英寸, null=自动"
+      "height": "float|null, 英寸, null=自动高度",
+      "parent": "string|null, 相对容器名。'slide'|'left_col'|'right_col'|null(=绝对坐标)"
     },
-    "example": { "left": 1.0, "top": 1.5, "width": 8.0, "height": 5.0 }
+    "relative_note": "当 parent 设置时, left/top 为相对于父容器左上角的偏移。解析时通过 resolve_position(pos, parent_bounds) 计算绝对坐标。",
+    "parent_bounds_example": {
+      "slide":      { "left": 0, "top": 0,    "width": 13.333, "height": 7.5 },
+      "left_col":   { "left": 0.8, "top": 1.6, "width": 5.5,    "height": 5.0 },
+      "right_col":  { "left": 7.0, "top": 1.6, "width": 5.5,    "height": 5.0 }
+    },
+    "example_absolute": { "left": 1.5, "top": 1.5, "width": 8.0, "height": 5.0 },
+    "example_relative": { "left": 0.2, "top": 0.3, "width": 5.0, "height": 4.5, "parent": "left_col" }
   }
 }

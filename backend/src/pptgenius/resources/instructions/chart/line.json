@@ -1,6 +1,24 @@
 {
   "type": "chart",
   "chart_type": "line | line_markers | line_stacked | line_stacked_100",
-  "description": "折线图 — 趋势展示。line=无标记, line_markers=带数据点标记",
-  "same_fields_as": "chart/column.json"
+  "description": "折线图 — 趋势展示。line=无标记连线, line_markers=带数据点标记, stacked=堆积, stacked_100=百分比堆积",
+  "fields": {
+    "position": "Position (见 shared/position.json)",
+    "title": "string|null, 图表标题",
+    "data": {
+      "categories": "string[], X轴标签 e.g. ['1月','2月','3月','4月']",
+      "series": "[{name: string, values: float[]}]"
+    },
+    "style": {
+      "has_legend": "bool, default=true",
+      "legend_position": "'bottom'|'right'|'left'|'top'",
+      "has_data_labels": "bool, default=false",
+      "data_label_position": "'outside_end'|'inside_end'|'center'|'above'",
+      "series_colors": "hex[]|null, 按系列顺序",
+      "chart_area_fill": "hex|'none'|null",
+      "plot_area_fill": "hex|'none'|null",
+      "title_font_size": "int|null",
+      "axis_font_size": "int|null"
+    }
+  }
 }

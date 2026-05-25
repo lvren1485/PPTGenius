@@ -82,7 +82,36 @@ class Position(BaseModel):
     left: float = Field(ge=0)
     top: float = Field(ge=0)
     width: float = Field(gt=0)
-    height: float | None = None  # optional for picture (aspect-ratio auto-height)
+    height: float | None = None
+    parent: str | None = None  # 'slide' | 'left_col' | 'right_col' | layout_placeholder_id
+
+
+def resolve_position(pos: Position, parent_bounds: dict[str, tuple[float, float, float, float]] | None = None) -> Position:
+    """Resolve relative position to absolute coordinates.
+
+    If pos.parent is set and parent_bounds provided, computes absolute (left, top)
+    relative to the parent container.
+
+    Args:
+        pos: element position (may have .parent set).
+        parent_bounds: mapping of parent_id → (left, top, width, height) in inches.
+
+    Returns:
+        New Position with .parent cleared and absolute coordinates.
+    """
+    if not pos.parent or not parent_bounds or pos.parent not in parent_bounds:
+        if pos.parent:
+            return pos.model_copy(update={"left": pos.left, "top": pos.top, "parent": None})
+        return pos
+
+    pb = parent_bounds[pos.parent]
+    return Position(
+        left=pos.left + pb[0],
+        top=pos.top + pb[1],
+        width=pos.width,
+        height=pos.height,
+        parent=None,
+    )
 
 
 class LineStyle(BaseModel):
@@ -122,6 +151,7 @@ class ChartSeries(BaseModel):
 
 
 class ChartData(BaseModel):
+    """Category chart data (column/bar/line/pie/doughnut/area/radar)."""
     categories: list[str] = []
     series: list[ChartSeries]
 
@@ -129,7 +159,7 @@ class ChartData(BaseModel):
     @classmethod
     def _check_series_lengths(cls, v: list[ChartSeries], info) -> list[ChartSeries]:
         categories_count = info.data.get("categories")
-        if categories_count is not None:
+        if categories_count is not None and len(categories_count) > 0:
             n_cats = len(categories_count)
             for i, s in enumerate(v):
                 if len(s.values) != n_cats:
@@ -138,6 +168,39 @@ class ChartData(BaseModel):
                         f"!= categories length ({n_cats})"
                     )
         return v
+
+
+class XyPoint(BaseModel):
+    """Single XY data point for scatter charts."""
+    x: float
+    y: float
+
+
+class XySeries(BaseModel):
+    name: str
+    points: list[XyPoint]
+
+
+class XyChartData(BaseModel):
+    """XY/scatter chart data. Each series has its own (x,y) points."""
+    series: list[XySeries]
+
+
+class BubblePoint(BaseModel):
+    """Single bubble data point: X position, Y position, size."""
+    x: float
+    y: float
+    size: float
+
+
+class BubbleSeries(BaseModel):
+    name: str
+    points: list[BubblePoint]
+
+
+class BubbleChartData(BaseModel):
+    """Bubble chart data."""
+    series: list[BubbleSeries]
 
 
 CHART_TYPES = frozenset({
@@ -169,7 +232,7 @@ class ChartElement(BaseModel):
     type: Literal["chart"]
     chart_type: str
     position: Position
-    data: ChartData
+    data: ChartData | XyChartData | BubbleChartData
     style: ChartStyle | None = None
     title: str | None = None
 
@@ -179,6 +242,14 @@ class ChartElement(BaseModel):
         if v not in CHART_TYPES:
             raise ValueError(f"unknown chart_type '{v}'. valid: {sorted(CHART_TYPES)}")
         return v
+
+    @property
+    def is_xy(self) -> bool:
+        return self.chart_type.startswith("scatter")
+
+    @property
+    def is_bubble(self) -> bool:
+        return self.chart_type == "bubble"
 
 
 class CellSpec(BaseModel):

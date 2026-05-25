@@ -1,0 +1,29 @@
+{
+  "type": "chart",
+  "chart_type": "scatter",
+  "position": { "left": 1.5, "top": 1.5, "width": 10.0, "height": 5.5 },
+  "title": "身高体重关系",
+  "data": {
+    "series": [
+      {
+        "name": "男性",
+        "points": [
+          {"x": 170, "y": 65}, {"x": 175, "y": 72}, {"x": 180, "y": 78},
+          {"x": 165, "y": 58}, {"x": 185, "y": 85}
+        ]
+      },
+      {
+        "name": "女性",
+        "points": [
+          {"x": 160, "y": 50}, {"x": 165, "y": 55}, {"x": 158, "y": 48},
+          {"x": 170, "y": 60}, {"x": 163, "y": 52}
+        ]
+      }
+    ]
+  },
+  "style": {
+    "has_legend": true,
+    "legend_position": "bottom",
+    "series_colors": ["1a73e8", "ea4335"]
+  }
+}

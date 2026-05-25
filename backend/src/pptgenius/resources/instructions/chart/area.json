@@ -1,6 +1,24 @@
 {
   "type": "chart",
   "chart_type": "area | area_stacked | area_stacked_100",
-  "description": "面积图",
-  "same_fields_as": "chart/column.json"
+  "description": "面积图 — 折线下填充面积，强调数量变化。stacked=堆积, stacked_100=百分比堆积",
+  "fields": {
+    "position": "Position (见 shared/position.json)",
+    "title": "string|null, 图表标题",
+    "data": {
+      "categories": "string[], X轴标签",
+      "series": "[{name: string, values: float[]}]"
+    },
+    "style": {
+      "has_legend": "bool, default=true",
+      "legend_position": "'bottom'|'right'|'left'|'top'",
+      "has_data_labels": "bool, default=false",
+      "data_label_position": "'outside_end'|'inside_end'|'center'",
+      "series_colors": "hex[]|null, 按系列顺序(建议带透明度 e.g. '1a73e8')",
+      "chart_area_fill": "hex|'none'|null",
+      "plot_area_fill": "hex|'none'|null",
+      "title_font_size": "int|null",
+      "axis_font_size": "int|null"
+    }
+  }
 }

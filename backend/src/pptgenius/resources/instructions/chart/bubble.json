@@ -1,5 +1,24 @@
 {
   "type": "chart",
   "chart_type": "bubble",
-  "description": "气泡图 — 三个维度: X位置, Y位置, 气泡大小"
+  "description": "气泡图 — 三个维度: X值(位置), Y值(位置), 气泡大小。适合展示三维数据关系",
+  "fields": {
+    "position": "Position (见 shared/position.json)",
+    "title": "string|null, 图表标题",
+    "data": {
+      "series": "[{name: string, points: [{x: float, y: float, size: float}]}], 每个点包含x坐标、y坐标、气泡大小"
+    },
+    "style": {
+      "has_legend": "bool, default=true",
+      "legend_position": "'bottom'|'right'|'left'|'top'",
+      "has_data_labels": "bool, default=false",
+      "data_label_position": "'outside_end'|'inside_end'|'center'",
+      "series_colors": "hex[]|null, 按系列顺序",
+      "chart_area_fill": "hex|'none'|null",
+      "plot_area_fill": "hex|'none'|null",
+      "title_font_size": "int|null",
+      "axis_font_size": "int|null"
+    }
+  },
+  "note": "气泡图使用 BubbleChartData, data 格式为 {series: [{name, points:[{x,y,size}]}]}, 不需要 categories"
 }

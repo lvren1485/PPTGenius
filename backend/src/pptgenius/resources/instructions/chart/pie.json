@@ -1,21 +1,23 @@
 {
   "type": "chart",
   "chart_type": "pie | pie_exploded | doughnut | doughnut_exploded",
-  "description": "饼图/环形图 — 仅支持1个series",
+  "description": "饼图/环形图 — ⚠️ 仅支持1个series。pie=饼图, pie_exploded=分离饼图, doughnut=环形图, doughnut_exploded=分离环形图",
   "fields": {
     "position": "Position (见 shared/position.json)",
-    "title": "string|null",
+    "title": "string|null, 图表标题",
     "data": {
-      "categories": "string[], 扇区标签",
-      "series": "[{name: string, values: float[]}] — ⚠️ 只能1个series"
+      "categories": "string[], 扇区标签 e.g. ['产品A','产品B','产品C','其他']",
+      "series": "[{name: string, values: float[]}] — ⚠️ 只能1个series, values长度=categories长度"
     },
     "style": {
-      "has_legend": "bool",
-      "legend_position": "'bottom'|'right'",
-      "has_data_labels": "bool",
-      "data_label_position": "'outside_end'|'inside_end'",
-      "series_colors": "hex[] 按扇区顺序",
-      "chart_area_fill": "hex|'none'"
+      "has_legend": "bool, default=true",
+      "legend_position": "'bottom'|'right'|'left'|'top'",
+      "has_data_labels": "bool, default=true",
+      "data_label_position": "'outside_end'|'inside_end'|'best_fit'",
+      "series_colors": "hex[]|null, 按扇区顺序 e.g. ['1a73e8','ea4335','34a853','fbbc04']",
+      "chart_area_fill": "hex|'none'|null",
+      "plot_area_fill": "hex|'none'|null",
+      "title_font_size": "int|null"
     }
   }
 }

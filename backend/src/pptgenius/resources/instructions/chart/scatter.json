@@ -1,6 +1,24 @@
 {
   "type": "chart",
   "chart_type": "scatter | scatter_lines | scatter_lines_no_markers",
-  "description": "散点图 — 两个数值轴的XY关系",
-  "note": "散点图categories为数值(会被忽略), 每个series需要相同数量的点, values同时充当X值"
+  "description": "散点图 — 两个数值轴的XY关系。scatter=散点, scatter_lines=带连线, scatter_lines_no_markers=仅连线无点",
+  "fields": {
+    "position": "Position (见 shared/position.json)",
+    "title": "string|null, 图表标题",
+    "data": {
+      "series": "[{name: string, points: [{x: float, y: float}]}], 每个series独立定义点集, 不需要categories"
+    },
+    "style": {
+      "has_legend": "bool, default=true",
+      "legend_position": "'bottom'|'right'|'left'|'top'",
+      "has_data_labels": "bool, default=false",
+      "data_label_position": "'outside_end'|'inside_end'|'center'",
+      "series_colors": "hex[]|null, 按系列顺序",
+      "chart_area_fill": "hex|'none'|null",
+      "plot_area_fill": "hex|'none'|null",
+      "title_font_size": "int|null",
+      "axis_font_size": "int|null"
+    }
+  },
+  "note": "散点图使用 XyChartData, data 格式为 {series: [{name, points:[{x,y}]}]}, 不需要 categories 字段"
 }

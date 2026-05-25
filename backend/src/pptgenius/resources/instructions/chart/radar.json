@@ -1,5 +1,24 @@
 {
   "type": "chart",
   "chart_type": "radar | radar_filled | radar_markers",
-  "description": "雷达图 — 多维度对比"
+  "description": "雷达图 — 多维度对比，适合展示能力/评分等多指标数据。radar=折线雷达, radar_filled=填充雷达, radar_markers=带标记雷达",
+  "fields": {
+    "position": "Position (见 shared/position.json)",
+    "title": "string|null, 图表标题",
+    "data": {
+      "categories": "string[], 维度标签 e.g. ['速度','准确度','稳定性','易用性','成本']",
+      "series": "[{name: string, values: float[]}], 每个series代表一个比较对象"
+    },
+    "style": {
+      "has_legend": "bool, default=true",
+      "legend_position": "'bottom'|'right'|'left'|'top'",
+      "has_data_labels": "bool, default=false",
+      "data_label_position": "'outside_end'|'inside_end'|'center'",
+      "series_colors": "hex[]|null, 按系列顺序",
+      "chart_area_fill": "hex|'none'|null",
+      "plot_area_fill": "hex|'none'|null",
+      "title_font_size": "int|null",
+      "axis_font_size": "int|null"
+    }
+  }
 }
