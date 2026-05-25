@@ -345,6 +345,7 @@ Element = TextboxElement | ChartElement | TableElement | ImageElement | ShapeEle
 class SlideSpec(BaseModel):
     layout: str = "blank"
     color_scheme: dict | None = None
+    notes: str | None = None  # outline slide 备注, 写入 PPT 演讲者备注
     elements: list[Element] = []
 
     @field_validator("layout")

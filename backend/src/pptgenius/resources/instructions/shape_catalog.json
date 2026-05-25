@@ -1,0 +1,116 @@
+{
+  "description": "182 MSO_SHAPE types for LLM reference. Use shape_key in shape_type field.",
+  "groups": {
+    "basic_geometric": {
+      "label": "基础几何",
+      "shapes": {
+        "rectangle": "矩形", "rounded_rectangle": "圆角矩形",
+        "oval": "椭圆", "diamond": "菱形",
+        "triangle": "等腰三角形", "right_triangle": "直角三角形",
+        "parallelogram": "平行四边形", "trapezoid": "梯形",
+        "pentagon": "五边形", "hexagon": "六边形",
+        "octagon": "八边形", "decagon": "十边形", "dodecagon": "十二边形",
+        "cross": "十字形", "cube": "立方体", "donut": "圆环",
+        "heart": "心形", "moon": "月亮", "sun": "太阳", "tear": "泪滴",
+        "cloud": "云形", "lightning_bolt": "闪电", "smiley_face": "笑脸",
+        "no_symbol": "禁止符号",
+        "wave": "波浪", "double_wave": "双波浪",
+        "funnel": "漏斗", "gear_6": "六齿齿轮", "gear_9": "九齿齿轮",
+        "arc": "弧形", "block_arc": "块弧", "chord": "弦形",
+        "pie": "扇形", "pie_wedge": "扇形楔",
+        "frame": "相框", "half_frame": "半框",
+        "plaque": "铭牌", "bevel": "棱台", "can": "圆柱",
+        "folded_corner": "折角矩形",
+        "round_1_rectangle": "单圆角矩形",
+        "snip_1_rectangle": "单切角矩形",
+        "snip_round_rectangle": "切角圆角矩形"
+      }
+    },
+    "stars": {
+      "label": "星形",
+      "shapes": {
+        "star_4": "四角星", "star_5": "五角星", "star_6": "六角星",
+        "star_7": "七角星", "star_8": "八角星", "star_10": "十角星",
+        "star_12": "十二角星", "star_16": "十六角星",
+        "star_24": "二十四角星", "star_32": "三十二角星",
+        "explosion_1": "爆炸1", "explosion_2": "爆炸2"
+      }
+    },
+    "arrows": {
+      "label": "块箭头",
+      "shapes": {
+        "right_arrow": "右箭头", "left_arrow": "左箭头",
+        "up_arrow": "上箭头", "down_arrow": "下箭头",
+        "left_right_arrow": "左右箭头", "up_down_arrow": "上下箭头",
+        "quad_arrow": "四向箭头",
+        "bent_arrow": "弯曲箭头", "u_turn_arrow": "U型箭头",
+        "circular_arrow": "环形箭头",
+        "curved_right_arrow": "右弯箭头", "curved_left_arrow": "左弯箭头",
+        "striped_right_arrow": "条纹右箭头", "notched_right_arrow": "缺口右箭头",
+        "swoosh_arrow": "旋风箭头"
+      }
+    },
+    "callouts": {
+      "label": "标注",
+      "shapes": {
+        "rectangular_callout": "矩形标注",
+        "rounded_rectangular_callout": "圆角矩形标注",
+        "oval_callout": "椭圆标注", "cloud_callout": "云形标注",
+        "balloon": "气球标注",
+        "line_callout_1": "线标注1", "line_callout_2": "线标注2",
+        "down_arrow_callout": "下箭头标注", "up_arrow_callout": "上箭头标注",
+        "left_arrow_callout": "左箭头标注", "right_arrow_callout": "右箭头标注",
+        "quad_arrow_callout": "四向箭头标注"
+      }
+    },
+    "flowchart": {
+      "label": "流程图",
+      "shapes": {
+        "flowchart_process": "流程(矩形)",
+        "flowchart_decision": "决策(菱形)",
+        "flowchart_data": "数据(平行四边形)",
+        "flowchart_document": "文档",
+        "flowchart_predefined_process": "预定义流程",
+        "flowchart_alternate_process": "替代流程",
+        "flowchart_terminator": "终止符(圆角矩形)",
+        "flowchart_preparation": "准备(六边形)",
+        "flowchart_manual_input": "手动输入",
+        "flowchart_manual_operation": "手动操作",
+        "flowchart_connector": "连接符(圆)",
+        "flowchart_display": "显示",
+        "flowchart_delay": "延迟",
+        "flowchart_merge": "合并", "flowchart_or": "或",
+        "flowchart_sort": "排序",
+        "flowchart_summing_junction": "求和",
+        "flowchart_stored_data": "存储数据",
+        "flowchart_magnetic_disk": "磁盘"
+      }
+    },
+    "ribbons": {
+      "label": "带状横幅",
+      "shapes": {
+        "up_ribbon": "上飘带", "down_ribbon": "下飘带",
+        "curved_up_ribbon": "上弯飘带", "curved_down_ribbon": "下弯飘带",
+        "left_right_ribbon": "左右飘带"
+      }
+    },
+    "math": {
+      "label": "数学符号",
+      "shapes": {
+        "math_plus": "加号", "math_minus": "减号",
+        "math_multiply": "乘号", "math_divide": "除号",
+        "math_equal": "等号", "math_not_equal": "不等号"
+      }
+    },
+    "misc": {
+      "label": "其他",
+      "shapes": {
+        "chevron": "人字形箭头",
+        "left_bracket": "左括号", "right_bracket": "右括号",
+        "left_brace": "左花括号", "right_brace": "右花括号",
+        "double_bracket": "双方括号", "double_brace": "双花括号",
+        "horizontal_scroll": "水平卷轴", "vertical_scroll": "垂直卷轴"
+      }
+    }
+  }
+}

@@ -9,7 +9,7 @@ from typing import Any
 from pptx import Presentation
 from pptx.util import Inches
 
-from .parser.base import PPTInstruction
+from .parser.base import PPTInstruction, resolve_position
 from .validator import ValidationResult, validate_instruction
 from .parser.chart_parser import render_chart
 from .parser.table_parser import render_table
@@ -18,6 +18,9 @@ from .parser.image_parser import render_picture
 from .parser.shape_parser import render_shape
 
 logger = logging.getLogger("ppt_engine.generator")
+
+# Built-in parent bounds (slide, common columns)
+SLIDE_BOUNDS = ("slide", 0, 0, 13.333, 7.5)
 
 
 async def generate_ppt(
@@ -54,7 +57,14 @@ async def generate_ppt(
         logger.debug("Slide %d/%d: layout=%s (%d element(s))",
                      si + 1, len(instruction.slides), slide_spec.layout, len(slide_spec.elements))
 
+        # Resolve relative positions: scan for container shapes, build parent_bounds
+        parent_bounds = _build_parent_bounds(slide_spec, meta)
+
         for ei, element in enumerate(slide_spec.elements):
+            # Apply relative position resolution
+            if element.position.parent:
+                element.position = resolve_position(element.position, parent_bounds)
+
             try:
                 if element.type == "textbox":
                     render_textbox(slide, element)
@@ -73,12 +83,38 @@ async def generate_ppt(
                     "error": f"Render failed: {exc}",
                 }]}
 
+        # Slide notes
+        if slide_spec.notes:
+            notes_slide = slide.notes_slide
+            notes_slide.notes_text_frame.text = slide_spec.notes
+            logger.debug("Notes added to slide %d", si + 1)
+
     # ── Save ──
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
     prs.save(output_path)
     file_size = os.path.getsize(output_path)
     logger.info("PPT saved: %s (%d bytes, %d slides)", output_path, file_size, len(instruction.slides))
     return {"ok": True, "path": output_path, "slide_count": len(instruction.slides), "file_size": file_size}
+
+
+def _build_parent_bounds(slide_spec, meta) -> dict[str, tuple[float, float, float, float]]:
+    """Build parent bounds from container shapes on the slide.
+
+    A shape without a parent that has an explicit fill acts as a container.
+    The container name is inferred from its position pattern.
+    Returns dict of parent_id → (left, top, width, height).
+    """
+    bounds = {"slide": SLIDE_BOUNDS[1:]}
+    for el in slide_spec.elements:
+        if el.type == "shape" and not el.position.parent and el.fill and el.fill.type in ("solid", "gradient"):
+            # Determine container name from position pattern
+            l, t, w, h = el.position.left, el.position.top, el.position.width, el.position.height or 0
+            if l < meta.slide_width / 2:
+                name = "left_col"
+            else:
+                name = "right_col"
+            bounds[name] = (l, t, w, h)
+    return bounds
 
 
 def _find_layout_index(prs, layout_name: str) -> int:
