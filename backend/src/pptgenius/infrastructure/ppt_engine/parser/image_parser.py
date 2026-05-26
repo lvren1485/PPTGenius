@@ -1,4 +1,8 @@
-"""Image element renderer. SVG auto-converted via cairosvg when available."""
+"""Image element renderer. SVG auto-converted to PNG before embedding.
+
+Primary: resvg-py (Rust, pre-built wheels for all platforms, no system deps).
+Fallback: cairosvg (needs Cairo lib: apt install libcairo2 on Linux).
+"""
 
 import logging
 import os
@@ -23,7 +27,6 @@ def render_picture(slide, el: ImageElement, workspace_path: str = ".") -> None:
         logger.error("Image not found: %s", img_path)
         raise FileNotFoundError(f"Image not found: {img_path}")
 
-    # SVG → PNG conversion (best-effort)
     if img_path.lower().endswith(".svg"):
         img_path = _svg_to_png(img_path)
 
@@ -40,19 +43,35 @@ def render_picture(slide, el: ImageElement, workspace_path: str = ".") -> None:
 
 
 def _svg_to_png(svg_path: str) -> str:
-    """Convert SVG to PNG via cairosvg. Falls back to skip if unavailable."""
+    """Convert SVG to PNG at 300 DPI. Resvg primary, cairosvg fallback."""
     png_path = svg_path.rsplit(".", 1)[0] + ".png"
+
+    # Cache: skip re-conversion if PNG is newer than SVG source
     if os.path.exists(png_path) and os.path.getmtime(png_path) >= os.path.getmtime(svg_path):
         return png_path
 
+    # Primary: resvg-py (pre-built wheels, zero system deps)
+    try:
+        import resvg_py
+        png_bytes = resvg_py.svg_to_bytes(svg_path=svg_path, dpi=300)
+        with open(png_path, "wb") as f:
+            f.write(png_bytes)
+        logger.info("SVG → PNG (resvg, 300 DPI): %s", os.path.basename(svg_path))
+        return png_path
+    except ImportError:
+        pass
+    except Exception as exc:
+        logger.debug("resvg-py failed: %s, trying cairosvg fallback", exc)
+
+    # Fallback: cairosvg (needs libcairo2 on Linux, GTK runtime on Windows)
     try:
         import cairosvg
         cairosvg.svg2png(url=svg_path, write_to=png_path, dpi=300)
-        logger.info("SVG converted: %s → %s", svg_path, png_path)
+        logger.info("SVG → PNG (cairosvg, 300 DPI): %s", os.path.basename(svg_path))
         return png_path
     except ImportError:
-        logger.warning("cairosvg not installed, using SVG directly (may fail)")
+        logger.warning("No SVG converter available. Install resvg-py or cairosvg.")
         return svg_path
-    except OSError as e:
-        logger.warning("cairosvg/Cairo unavailable (%s), using SVG directly", e)
+    except OSError as exc:
+        logger.warning("Cairo library not found (%s). Install libcairo2 or use resvg-py.", exc)
         return svg_path

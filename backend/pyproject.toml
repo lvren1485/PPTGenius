@@ -26,6 +26,7 @@ dependencies = [
     "python-multipart>=0.0.20",
     "tiktoken>=0.8",
     "pymupdf>=1.27.2.3",
+    "resvg-py>=0.3.2",
 ]
 
 [dependency-groups]
