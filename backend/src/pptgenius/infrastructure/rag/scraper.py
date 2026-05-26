@@ -7,7 +7,7 @@ import re
 import httpx
 from bs4 import BeautifulSoup
 
-from pptgenius.infrastructure.utils.logger import get_logger
+from pptgenius.infrastructure.utils import get_logger
 
 _log = get_logger("pptgenius.scraper")
 

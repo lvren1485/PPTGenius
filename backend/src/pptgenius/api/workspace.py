@@ -7,9 +7,9 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, Query
 
-from pptgenius.infrastructure.config.settings import get_settings
-from pptgenius.infrastructure.db.database import Database
-from pptgenius.infrastructure.workspace.manager import WorkspaceManager
+from pptgenius.infrastructure.config import get_settings
+from pptgenius.infrastructure.db import Database
+from pptgenius.infrastructure.workspace import WorkspaceManager
 
 from .deps import get_db, get_workspace_manager
 from .schemas import (

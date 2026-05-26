@@ -15,9 +15,9 @@ from urllib.parse import urlencode
 import httpx
 from bs4 import BeautifulSoup
 
-from pptgenius.infrastructure.config.settings import get_settings
-from pptgenius.infrastructure.db.database import Database
-from pptgenius.infrastructure.utils.logger import get_logger
+from pptgenius.infrastructure.config import get_settings
+from pptgenius.infrastructure.db import Database
+from pptgenius.infrastructure.utils import get_logger
 
 from .knowledge import KnowledgeService
 from pptgenius.infrastructure.workspace.manager import WorkspaceManager

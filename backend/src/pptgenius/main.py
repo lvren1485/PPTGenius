@@ -6,7 +6,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from pptgenius.infrastructure.utils.logger import get_logger, setup_logging_from_config
+from pptgenius.infrastructure.utils import get_logger, setup_logging_from_config
 
 _log = get_logger(__name__)
 
@@ -15,7 +15,7 @@ _log = get_logger(__name__)
 
 async def _init_db() -> None:
     """Ensure database tables exist (non-destructive)."""
-    from pptgenius.infrastructure.db.engine import create_tables
+    from pptgenius.infrastructure.db import create_tables
 
     await create_tables()
     _log.info("database tables ensured")

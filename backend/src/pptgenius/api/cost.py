@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
 
-from pptgenius.infrastructure.db.database import Database
+from pptgenius.infrastructure.db import Database
 
 from .deps import get_db
 from .schemas import (

@@ -11,7 +11,7 @@ from pathlib import Path
 
 from rank_bm25 import BM25Okapi
 
-from pptgenius.infrastructure.utils.logger import get_logger
+from pptgenius.infrastructure.utils import get_logger
 
 _log = get_logger("pptgenius.bm25")
 

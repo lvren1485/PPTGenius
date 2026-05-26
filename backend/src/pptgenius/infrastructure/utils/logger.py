@@ -86,7 +86,7 @@ def setup_logging(
 
 def setup_logging_from_config() -> None:
     """Convenience: read ``Settings().log`` and call :func:`setup_logging`."""
-    from pptgenius.infrastructure.config.settings import get_settings
+    from pptgenius.infrastructure.config import get_settings
 
     cfg = get_settings().log
     setup_logging(

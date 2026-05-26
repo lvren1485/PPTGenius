@@ -11,9 +11,9 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 
-from pptgenius.infrastructure.db.database import Database
-from pptgenius.infrastructure.rag.knowledge import KnowledgeService
-from pptgenius.infrastructure.utils.logger import get_logger
+from pptgenius.infrastructure.db import Database
+from pptgenius.infrastructure.rag import KnowledgeService
+from pptgenius.infrastructure.utils import get_logger
 
 from .deps import get_db, get_knowledge_manager, get_workspace_manager
 from .schemas import (

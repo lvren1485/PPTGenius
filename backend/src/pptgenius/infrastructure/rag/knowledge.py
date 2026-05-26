@@ -10,9 +10,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pptgenius.infrastructure.config.settings import get_settings
-from pptgenius.infrastructure.db.database import Database
-from pptgenius.infrastructure.utils.logger import get_logger
+from pptgenius.infrastructure.config import get_settings
+from pptgenius.infrastructure.db import Database
+from pptgenius.infrastructure.utils import get_logger
 
 from .bm25 import BM25Manager
 from .chunker import chunk_text

@@ -16,14 +16,14 @@ from __future__ import annotations
 
 from typing import AsyncGenerator
 
-from pptgenius.infrastructure.db.database import Database
-from pptgenius.infrastructure.db.engine import get_db as _get_db_session
-from pptgenius.infrastructure.rag.knowledge import (
+from pptgenius.infrastructure.db import Database
+from pptgenius.infrastructure.db import get_db as _get_db_session
+from pptgenius.infrastructure.rag import (
     KnowledgeService,
     knowledge_service,
 )
-from pptgenius.infrastructure.rag.web_search import WebSearchService, web_search_service
-from pptgenius.infrastructure.workspace.manager import WorkspaceManager
+from pptgenius.infrastructure.rag import WebSearchService, web_search_service
+from pptgenius.infrastructure.workspace import WorkspaceManager
 
 
 # -- DB ----------------------------------------------------------------------

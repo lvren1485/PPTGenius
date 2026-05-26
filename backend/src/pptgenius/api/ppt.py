@@ -7,7 +7,7 @@ import os
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 
-from pptgenius.infrastructure.db.database import Database
+from pptgenius.infrastructure.db import Database
 
 from .deps import get_db
 

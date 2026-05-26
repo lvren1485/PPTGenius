@@ -5,8 +5,8 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from pptgenius.infrastructure.config.settings import get_settings
-from pptgenius.infrastructure.utils.logger import get_logger
+from pptgenius.infrastructure.config import get_settings
+from pptgenius.infrastructure.utils import get_logger
 
 _log = get_logger("pptgenius.workspace")
 
