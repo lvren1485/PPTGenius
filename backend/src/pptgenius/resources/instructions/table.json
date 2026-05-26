@@ -1,37 +1,39 @@
 {
   "type": "table",
-  "description": "表格 — 含表头/斑马条纹/合并单元格",
+  "description": [
+    "表格——行列结构的数据展示。支持表头行样式、斑马条纹、单元格合并。",
+    "cells 数组中每个元素指定 row(行号,0-based) 和 col(列号,0-based),以及该单元格的 text。"
+  ],
+  "note": [
+    "rows 和 cols 必须 >0。",
+    "cells 数组不需要填满所有格子,未填的格子为空。",
+    "col_widths 如果提供,长度必须=cols(每列一个宽度值)。",
+    "合并单元格: 指定 from_row/from_col 到 to_row/to_col 的矩形区域。"
+  ],
   "fields": {
-    "position": "Position (见 shared/position.json)",
-    "rows": "int >0",
-    "cols": "int >0",
-    "col_widths": "float[]|null, 列宽英寸",
-    "cells": "[CellSpec], 按 row/col 位置填充",
-    "merges": "[MergeSpec]|null, 合并区间",
-    "header": "TableHeader|null, 表头行样式",
-    "style": "TableStyle|null, 全局边框+斑马纹"
+    "type": "固定值 'table'",
+    "position": "Position 对象。{\"left\":英寸,\"top\":英寸,\"width\":英寸,\"height\":英寸}",
+    "rows": "行数。int, 必须>0。例如: 4",
+    "cols": "列数。int, 必须>0。例如: 3",
+    "col_widths": "列宽数组。float[], 长度=cols, 单位英寸。可选。例如: [2.5, 3.5, 4.0]",
+    "cells": "单元格内容数组。每个元素: {\"row\":0,\"col\":0,\"text\":\"内容\",\"font\":字体(可选)}",
+    "merges": "合并单元格数组。可选。每个元素: {\"from_row\":0,\"from_col\":0,\"to_row\":0,\"to_col\":2}",
+    "header": "表头行样式。可选。{\"row\":0,\"fill\":\"1a73e8\",\"font_color\":\"ffffff\",\"font_bold\":true,\"font_size\":14}",
+    "style": "全局表格样式。可选。{\"border_color\":\"dadce0\",\"border_width_pt\":0.5,\"stripe_even\":\"f8f9fa\",\"stripe_odd\":\"ffffff\"}"
   },
-  "CellSpec": {
-    "row": "int, 行号 0-based",
-    "col": "int, 列号 0-based",
-    "text": "string",
-    "font": "FontSpec|null"
+  "CellSpec_fields": {
+    "row": "行号, 0-based(第一行=0)。int, 必须>=0且<rows",
+    "col": "列号, 0-based。int, 必须>=0且<cols",
+    "text": "单元格文字。string",
+    "font": "字体样式。FontSpec(见 shared/font.json)。可选,不填=默认字体"
   },
-  "MergeSpec": {
-    "from_row": "int", "from_col": "int",
-    "to_row": "int", "to_col": "int"
+  "TableHeader_fields": {
+    "row": "表头所在行号。int, 通常=0(第一行)。fill: 背景色hex。font_color: 文字颜色hex。font_bold: 加粗。font_size: 字号pt"
   },
-  "TableHeader": {
-    "row": "int, 表头行号",
-    "fill": "hex, 背景色",
-    "font_color": "hex, default='ffffff'",
-    "font_bold": "bool, default=true",
-    "font_size": "int, default=14"
-  },
-  "TableStyle": {
-    "border_color": "hex, default='e0e0e0'",
-    "border_width_pt": "float, default=0.5",
-    "stripe_even": "hex|null, 偶数行背景",
-    "stripe_odd": "hex|null, 奇数行背景"
+  "TableStyle_fields": {
+    "border_color": "边框颜色hex, 默认 'e0e0e0'",
+    "border_width_pt": "边框宽度pt, 默认 0.5",
+    "stripe_even": "偶数行背景色hex, 可选。例如: 'f8f9fa'(浅灰)",
+    "stripe_odd": "奇数行背景色hex, 可选。例如: 'ffffff'(白色)"
   }
 }

@@ -1,13 +1,21 @@
 {
   "type": "shape",
-  "description": "自选图形 — 182种, 见 shape_catalog.json",
+  "description": [
+    "自选图形——182种预定义形状。从矩形圆形到流程图形状再到箭头标注。",
+    "形状可以填充颜色、渐变、图片, 可以加边框, 内部可以嵌文字。"
+  ],
+  "note": [
+    "shape_type 必须来自 shape_catalog.json 中定义的 key。不能自由发挥。",
+    "常用: rectangle, rounded_rectangle, oval, diamond, triangle, pentagon, hexagon, star_5, heart, right_arrow, left_arrow, up_arrow, down_arrow, circular_arrow, rectangular_callout, cloud_callout, flowchart_process, flowchart_decision, flowchart_terminator, chevron, up_ribbon, math_plus",
+    "填充可用 solid(纯色)、gradient(渐变)、no_fill(透明)、picture(图片填充)。"
+  ],
   "fields": {
-    "position": "Position (见 shared/position.json)",
-    "shape_type": "string, 参见 shape_catalog.json 中的 shape_key",
-    "fill": "FillStyle|null (见 shared/fill.json)",
-    "line": "LineStyle|null (见 shared/line.json)",
-    "text": "[ContentBlock]|null, 形状内文字",
-    "rotation": "float|null, 旋转角度"
-  },
-  "note": "shape_type 必须来自 Python 枚举 SHAPE_KEYS (见 ppt_engine/parser/shapes.py). 常用: rectangle, rounded_rectangle, oval, diamond, triangle, pentagon, hexagon, star_5, right_arrow, heartbeat, cloud, flowchart_process."
+    "type": "固定值 'shape'",
+    "shape_type": "形状标识符。string。从 shape_catalog.json 选择。例如: 'rounded_rectangle'",
+    "position": "Position 对象。{\"left\":英寸,\"top\":英寸,\"width\":英寸,\"height\":英寸}",
+    "fill": "形状填充。FillStyle 对象(见 shared/fill.json)。可选,不填=透明。例如: {\"type\":\"solid\",\"color\":\"1a73e8\"}",
+    "line": "形状边框。LineStyle 对象(见 shared/line.json)。可选,不填=无线条",
+    "text": "形状内部文字。格式与 textbox.content 相同(paragraph数组)。可选,不填=无文字",
+    "rotation": "旋转角度。float, 单位度。可选。例如: 45"
+  }
 }

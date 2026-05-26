@@ -1,24 +1,36 @@
 {
   "type": "chart",
   "chart_type": "line | line_markers | line_stacked | line_stacked_100",
-  "description": "折线图 — 趋势展示。line=无标记连线, line_markers=带数据点标记, stacked=堆积, stacked_100=百分比堆积",
+  "description": [
+    "折线图——用线段连接数据点,展示趋势变化。特别适合时间序列数据。",
+    "line(普通折线): 只有线段,不显示数据点。适合只看趋势走向。",
+    "line_markers(带标记折线): 线段+每个数据点的标记(圆点)。适合需要强调具体数值。",
+    "line_stacked(堆积折线): 各线从下一条线的顶部开始画,看累积趋势。",
+    "line_stacked_100(百分比堆积): 各线按比例堆积到100%,只看占比变化趋势。"
+  ],
+  "note": [
+    "每个 series 的 values 数组长度必须等于 categories 数组长度。",
+    "时间序列数据(如月份、季度)优先使用 line/line_markers。",
+    "line 不要用于分类对比(分类对比用 column/bar)。"
+  ],
   "fields": {
-    "position": "Position (见 shared/position.json)",
-    "title": "string|null, 图表标题",
+    "position": "Position 对象。{\"left\":英寸,\"top\":英寸,\"width\":英寸,\"height\":英寸}",
+    "title": "图表标题文本。string, 可选(null=无标题)",
     "data": {
-      "categories": "string[], X轴标签 e.g. ['1月','2月','3月','4月']",
-      "series": "[{name: string, values: float[]}]"
+      "categories": "X轴标签(通常是时间)。string[], 例如: [\"1月\",\"2月\",\"3月\",\"4月\",\"5月\",\"6月\"]",
+      "series": "数据系列数组。每个元素 {name: \"系列名\", values: [数值]}。values长度=categories长度"
     },
     "style": {
-      "has_legend": "bool, default=true",
-      "legend_position": "'bottom'|'right'|'left'|'top'",
-      "has_data_labels": "bool, default=false",
+      "_description": "所有字段可选,不填=默认值",
+      "has_legend": "bool, 默认 true",
+      "legend_position": "'bottom'|'right'|'left'|'top', 默认 'bottom'",
+      "has_data_labels": "bool, 默认 false",
       "data_label_position": "'outside_end'|'inside_end'|'center'|'above'",
-      "series_colors": "hex[]|null, 按系列顺序",
-      "chart_area_fill": "hex|'none'|null",
-      "plot_area_fill": "hex|'none'|null",
-      "title_font_size": "int|null",
-      "axis_font_size": "int|null"
+      "series_colors": "系列颜色数组。hex[] 无#号",
+      "chart_area_fill": "图表区背景。hex|'none'|null",
+      "plot_area_fill": "绘图区背景。hex|'none'|null",
+      "title_font_size": "标题字号 pt",
+      "axis_font_size": "坐标轴字号 pt"
     }
   }
 }

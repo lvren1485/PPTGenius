@@ -1,24 +1,34 @@
 {
   "type": "chart",
   "chart_type": "radar | radar_filled | radar_markers",
-  "description": "雷达图 — 多维度对比，适合展示能力/评分等多指标数据。radar=折线雷达, radar_filled=填充雷达, radar_markers=带标记雷达",
+  "description": [
+    "雷达图(蜘蛛网图)——从中心向多个方向辐射的轴,每个轴代表一个维度。适合多维度评分对比。",
+    "radar(折线雷达): 各维度数值用折线连接。适合看形状和轮廓。",
+    "radar_filled(填充雷达): 折线内部填充颜色。适合强调面积大小。",
+    "radar_markers(带标记雷达): 折线+每个维度的数据点标记。"
+  ],
+  "note": [
+    "每个 series 的 values 数组长度必须等于 categories 数组长度。",
+    "categories 是各维度的名称(如能力指标)。建议3-8个维度,太多会显得拥挤。",
+    "适合: 评分对比(如产品A vs 产品B在各指标上的得分)、能力评估、多维度profile。"
+  ],
   "fields": {
-    "position": "Position (见 shared/position.json)",
-    "title": "string|null, 图表标题",
+    "position": "Position 对象。{\"left\":英寸,\"top\":英寸,\"width\":英寸,\"height\":英寸}",
+    "title": "图表标题文本。string, 可选",
     "data": {
-      "categories": "string[], 维度标签 e.g. ['速度','准确度','稳定性','易用性','成本']",
-      "series": "[{name: string, values: float[]}], 每个series代表一个比较对象"
+      "categories": "维度标签数组。string[], 例如: [\"速度\",\"准确度\",\"稳定性\",\"易用性\",\"成本\"]",
+      "series": "数据系列数组。每个元素 {name: \"系列名\", values: [数值]}。每个系列代表一个对比对象。values长度=categories长度"
     },
     "style": {
-      "has_legend": "bool, default=true",
+      "_description": "所有字段可选,不填=默认值",
+      "has_legend": "bool, 默认 true",
       "legend_position": "'bottom'|'right'|'left'|'top'",
-      "has_data_labels": "bool, default=false",
-      "data_label_position": "'outside_end'|'inside_end'|'center'",
-      "series_colors": "hex[]|null, 按系列顺序",
-      "chart_area_fill": "hex|'none'|null",
-      "plot_area_fill": "hex|'none'|null",
-      "title_font_size": "int|null",
-      "axis_font_size": "int|null"
+      "has_data_labels": "bool, 默认 false",
+      "series_colors": "系列颜色数组。hex[] 无#号",
+      "chart_area_fill": "图表区背景。hex|'none'|null",
+      "plot_area_fill": "绘图区背景。hex|'none'|null",
+      "title_font_size": "标题字号 pt",
+      "axis_font_size": "坐标轴字号 pt"
     }
   }
 }

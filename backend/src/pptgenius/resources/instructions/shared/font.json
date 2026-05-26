@@ -1,35 +1,46 @@
 {
+  "_description": "字体样式定义。所有元素中引用 font 字段的地方都使用这个结构。",
   "FontSpec": {
+    "description": "字体样式。所有字段可选,不填=继承默认值。",
     "fields": {
-      "name": "string|null, 字体名 e.g. '微软雅黑', null=继承",
-      "size": "int|null, 字号 pt",
-      "bold": "bool|null",
-      "italic": "bool|null",
-      "color": "string|null, 6位hex, 不含#, e.g. '1a73e8'",
-      "underline": "'none'|'single'|'double'|'wavy'|null",
-      "strikethrough": "'single'|'double'|null",
-      "small_caps": "bool|null",
-      "all_caps": "bool|null",
-      "kerning_pt": "float|null",
-      "shadow": "FontShadow|null",
-      "glow": "FontGlow|null"
-    },
-    "example": { "size": 14, "bold": true, "color": "333333" }
+      "name": "字体名称。string。例如: '微软雅黑','Arial','Calibri'。不填=使用主题默认字体",
+      "size": "字号。int, 单位pt(磅)。例如: 14 表示14pt。不填=默认18pt",
+      "bold": "加粗。bool。true=粗体, false=不加粗。不填=继承",
+      "italic": "斜体。bool。true=斜体, false=不斜。不填=继承",
+      "color": "文字颜色。string, 6位hex不含#。例如: '1a73e8'。不填=默认黑色",
+      "underline": "下划线。'none'(无)|'single'(单线)|'double'(双线)|'wavy'(波浪线)。不填=无",
+      "strikethrough": "删除线。'single'(单删除线)|'double'(双删除线)。不填=无",
+      "small_caps": "小型大写字母。bool。英文文本的小型大写效果。不填=正常",
+      "all_caps": "全部大写。bool。英文文本强制全大写。不填=正常",
+      "kerning_pt": "字距调整。float, 单位pt。不填=默认字距",
+      "shadow": "文字阴影效果。FontShadow 对象。见下方",
+      "glow": "文字发光效果。FontGlow 对象。见下方"
+    }
   },
   "FontShadow": {
+    "description": "文字外阴影。不填=无阴影。",
     "fields": {
-      "blur_pt": "float, default=3.0",
-      "offset_pt": "float, default=1.5",
-      "angle_deg": "float, default=315",
-      "color": "string, hex, default='000000'",
-      "alpha_pct": "float 0-100, default=40"
+      "blur_pt": "模糊半径。float, 单位pt。默认 3.0。越大越模糊",
+      "offset_pt": "阴影偏移距离。float, 单位pt。默认 1.5",
+      "angle_deg": "阴影角度。float, 0=右侧 90=上方 180=左侧 270=下方。默认 315(右下)",
+      "color": "阴影颜色。string, hex 无#。默认 '000000'(黑色)",
+      "alpha_pct": "阴影透明度。float, 0=完全透明 100=完全不透明。默认 40(40%不透明=60%透明)"
     }
   },
   "FontGlow": {
+    "description": "文字发光效果。不填=无发光。",
     "fields": {
-      "radius_pt": "float, default=8.0",
-      "color": "string, hex, default='1a73e8'",
-      "alpha_pct": "float 0-100, default=60"
+      "radius_pt": "发光半径。float, 单位pt。默认 8.0。越大光晕越扩散",
+      "color": "发光颜色。string, hex 无#。默认 '1a73e8'(蓝色)",
+      "alpha_pct": "发光透明度。float, 0=透明 100=不透明。默认 60"
     }
+  },
+  "example": {
+    "basic": { "size": 14, "bold": true, "color": "333333" },
+    "with_shadow": {
+      "size": 18, "bold": true, "color": "1a73e8",
+      "shadow": { "blur_pt": 3, "offset_pt": 1.5, "angle_deg": 315, "color": "888888", "alpha_pct": 40 }
+    },
+    "with_glow": { "size": 14, "glow": { "radius_pt": 6, "color": "1a73e8", "alpha_pct": 50 } }
   }
 }

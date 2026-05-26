@@ -1,23 +1,36 @@
 {
   "type": "chart",
   "chart_type": "pie | pie_exploded | doughnut | doughnut_exploded",
-  "description": "饼图/环形图 — ⚠️ 仅支持1个series。pie=饼图, pie_exploded=分离饼图, doughnut=环形图, doughnut_exploded=分离环形图",
+  "description": [
+    "饼图——用扇形表示各部分占总体的比例。所有扇形加起来=100%。",
+    "pie(普通饼图): 扇形紧密相连,从12点方向顺时针排列。",
+    "pie_exploded(分离饼图): 扇形之间有空隙,每个扇形向外推开。适合强调每个扇区。",
+    "doughnut(环形图): 中间有个洞的饼图。可以在洞中放总数值。",
+    "doughnut_exploded(分离环形图): 带空隙的环形图。"
+  ],
+  "note": [
+    "⚠️ 硬性限制: pie/doughnut 只能有 1 个 series！如果 categories 有5个值,series 数组只能有1个元素。",
+    "categories: 每个扇区的名称。例如: [\"产品A\",\"产品B\",\"产品C\",\"其他\"]",
+    "series[0].values: 每个扇区的数值。长度必须=categories长度。",
+    "series_colors 按扇区顺序着色。例如4个扇区就提供4个颜色。"
+  ],
   "fields": {
-    "position": "Position (见 shared/position.json)",
-    "title": "string|null, 图表标题",
+    "position": "Position 对象。{\"left\":英寸,\"top\":英寸,\"width\":英寸,\"height\":英寸}",
+    "title": "图表标题文本。string, 可选",
     "data": {
-      "categories": "string[], 扇区标签 e.g. ['产品A','产品B','产品C','其他']",
-      "series": "[{name: string, values: float[]}] — ⚠️ 只能1个series, values长度=categories长度"
+      "categories": "扇区标签数组。string[], 例如: [\"产品A\",\"产品B\",\"产品C\",\"其他\"]",
+      "series": "⚠️ 只能有1个元素。格式: [{\"name\":\"占比\",\"values\":[42,28,18,12]}]。values长度=categories长度"
     },
     "style": {
-      "has_legend": "bool, default=true",
+      "_description": "所有字段可选,不填=默认值",
+      "has_legend": "bool, 默认 true。饼图通常显示图例",
       "legend_position": "'bottom'|'right'|'left'|'top'",
-      "has_data_labels": "bool, default=true",
-      "data_label_position": "'outside_end'|'inside_end'|'best_fit'",
-      "series_colors": "hex[]|null, 按扇区顺序 e.g. ['1a73e8','ea4335','34a853','fbbc04']",
-      "chart_area_fill": "hex|'none'|null",
-      "plot_area_fill": "hex|'none'|null",
-      "title_font_size": "int|null"
+      "has_data_labels": "bool, 默认 true。饼图通常显示百分比标签",
+      "data_label_position": "'outside_end'|'inside_end'|'best_fit'。推荐 'outside_end'",
+      "series_colors": "扇区颜色数组。hex[] 无#号。个数通常=categories个数。例如: [\"1a73e8\",\"ea4335\",\"34a853\",\"fbbc04\"]",
+      "chart_area_fill": "图表区背景。hex|'none'|null",
+      "plot_area_fill": "绘图区背景。hex|'none'|null",
+      "title_font_size": "标题字号 pt"
     }
   }
 }

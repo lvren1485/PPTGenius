@@ -2,6 +2,41 @@
 
 LLM 输出的 PPT 元素 JSON 规范。
 
+## 文件组织
+
+```
+instructions/
+├── HOW_TO_READ.md          ← 指令文件阅读指南
+├── README.md               ← 当前文档
+├── background.json         ← 幻灯片背景
+├── textbox.json            ← 文本框
+├── table.json              ← 表格
+├── picture.json            ← 图片
+├── shape.json              ← 自选图形
+├── shape_catalog.json      ← 182种形状目录
+├── shared/                 ← 共享子结构
+│   ├── position.json       ←   位置/尺寸
+│   ├── font.json           ←   字体+效果
+│   ├── fill.json           ←   填充
+│   └── line.json           ←   线条
+├── chart/                  ← 图表(按类型分)
+│   ├── column.json         ←   柱形图
+│   ├── bar.json            ←   条形图
+│   ├── line.json           ←   折线图
+│   ├── pie.json            ←   饼图/环形图
+│   ├── area.json           ←   面积图
+│   ├── scatter.json        ←   散点图
+│   ├── radar.json          ←   雷达图
+│   └── bubble.json         ←   气泡图
+└── examples/               ← 完整 JSON 示例
+    ├── chart_column.json
+    ├── chart_scatter.json
+    ├── chart_bubble.json
+    ├── table.json
+    └── shape.json
+```
+
+
 ## 顶层结构
 
 ```json

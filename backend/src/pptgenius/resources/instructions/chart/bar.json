@@ -1,24 +1,35 @@
 {
   "type": "chart",
   "chart_type": "bar_clustered | bar_stacked | bar_stacked_100",
-  "description": "条形图 — 横向柱状，适合长标签场景。clustered=簇状, stacked=堆积",
+  "description": [
+    "条形图——横向版本的柱形图,柱子水平延伸。特别适合分类标签文字较长(>4字)的场景。",
+    "clustered(簇状): 每个分类下多根横条并排,从0开始。",
+    "stacked(堆积): 横条首尾相接,总长度=所有系列之和。",
+    "stacked_100(百分比堆积): 每根横条都是100%长度,只显示比例关系。",
+    "注意: categories 在这里是Y轴标签(竖着读),而数值是X轴方向(横着读)。"
+  ],
+  "note": [
+    "每个 series 的 values 数组长度必须等于 categories 数组长度。",
+    "当分类标签>4个汉字或>8个英文字符时优先使用 bar 而非 column。"
+  ],
   "fields": {
-    "position": "Position (见 shared/position.json)",
-    "title": "string|null, 图表标题",
+    "position": "Position 对象。{\"left\":英寸,\"top\":英寸,\"width\":英寸,\"height\":英寸}",
+    "title": "图表标题文本。string, 可选(null=无标题)",
     "data": {
-      "categories": "string[], Y轴标签(因为是横向) e.g. ['产品A','产品B','产品C']",
-      "series": "[{name: string, values: float[]}], 每个series的values长度须= categories长度"
+      "categories": "Y轴标签(因为横向)。string[], 例如: [\"产品A\",\"产品B\",\"产品C\"]",
+      "series": "数据系列数组。每个元素是 {name: \"系列名\", values: [数值]}。values长度=categories长度。例如: [{\"name\":\"2024\",\"values\":[120,145,138]},{\"name\":\"2025\",\"values\":[150,130,160]}]"
     },
     "style": {
-      "has_legend": "bool, default=true",
-      "legend_position": "'bottom'|'right'|'left'|'top', default='bottom'",
-      "has_data_labels": "bool, default=false",
+      "_description": "所有字段可选,不填=默认值",
+      "has_legend": "是否显示图例。bool, 默认 true",
+      "legend_position": "'bottom'|'right'|'left'|'top', 默认 'bottom'",
+      "has_data_labels": "是否在横条上显示数值。bool, 默认 false",
       "data_label_position": "'outside_end'|'inside_end'|'center'|'inside_base'",
-      "series_colors": "hex[]|null, 按系列顺序 e.g. ['1a73e8','ea4335']",
-      "chart_area_fill": "hex|'none'|null",
-      "plot_area_fill": "hex|'none'|null",
-      "title_font_size": "int|null",
-      "axis_font_size": "int|null"
+      "series_colors": "系列颜色数组。hex[] 无#号。例如: [\"1a73e8\",\"ea4335\"]",
+      "chart_area_fill": "图表区背景。hex|'none'|null",
+      "plot_area_fill": "绘图区背景。hex|'none'|null",
+      "title_font_size": "标题字号 pt。例如: 14",
+      "axis_font_size": "坐标轴字号 pt。例如: 10"
     }
   }
 }

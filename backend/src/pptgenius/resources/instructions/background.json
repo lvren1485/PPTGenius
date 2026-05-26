@@ -1,23 +1,32 @@
 {
   "type": "background",
-  "description": "幻灯片背景。在 SlideSpec.background 字段中设置, 非 element。",
+  "description": [
+    "幻灯片背景。这是 SlideSpec 级别的字段(不是 element),因此放在 slide 的 'background' 键下,不在 'elements' 数组里。",
+    "三种类型: solid(纯色背景)、gradient(渐变背景)、image(图片背景)。",
+    "纯色和渐变通过 slide.background.fill API 实现。图片通过全幅 Picture shape 覆盖实现。"
+  ],
+  "usage": "在每页 slide 的 JSON 中添加 'background' 字段(与 'layout'、'elements' 同级)。不是 element。",
   "fields": {
-    "type": "'solid'|'gradient'|'image', 背景类型",
-    "color": "hex|文件路径, solid=颜色hex, image=图片路径",
-    "gradient_angle": "float|null, 渐变角度, 仅 gradient 有效",
-    "gradient_stops": "[{position: 0.0-1.0, color: hex}]|null, 渐变stop"
+    "type": "背景类型。'solid'(纯色)|'gradient'(渐变)|'image'(图片)。默认 'solid'",
+    "color": "背景色或图片路径。string。type=solid时: hex颜色无# (如 'e8f0fe')。type=image时: 文件路径 (如 'images/bg.png')",
+    "gradient_angle": "渐变角度。float。0=左→右 90=下→上 135=左上→右下。仅 type='gradient' 有效",
+    "gradient_stops": "渐变停止点。[{position: 0.0-1.0, color: hex}]。仅 type='gradient' 有效"
   },
   "examples": {
-    "solid": { "type": "solid", "color": "e8f0fe" },
-    "gradient": {
+    "solid_light_blue": { "type": "solid", "color": "e8f0fe" },
+    "gradient_corner": {
       "type": "gradient",
-      "gradient_angle": 135.0,
+      "gradient_angle": 135,
       "gradient_stops": [
         { "position": 0.0, "color": "1a73e8" },
         { "position": 1.0, "color": "34a853" }
       ]
     },
-    "image": { "type": "image", "color": "src/tests/resources/Front.png" }
+    "image_bg": { "type": "image", "color": "images/background.jpg" }
   },
-  "usage": "在 SlideSpec 中添加 'background' 字段, 非 elements 数组内"
+  "slide_level_example": {
+    "layout": "blank",
+    "background": { "type": "solid", "color": "e8f0fe" },
+    "elements": []
+  }
 }

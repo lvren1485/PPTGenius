@@ -1,24 +1,33 @@
 {
   "type": "chart",
   "chart_type": "bubble",
-  "description": "气泡图 — 三个维度: X值(位置), Y值(位置), 气泡大小。适合展示三维数据关系",
+  "description": [
+    "气泡图——散点图的升级版。每个数据点有三个属性: X坐标(横轴位置)、Y坐标(纵轴位置)、气泡大小(第三个维度)。",
+    "气泡越大=第三个维度值越大。适合展示三维数据关系。",
+    "例如: X=市场份额, Y=增长率, 气泡大小=营收规模——一眼看出谁是'大市场高增长大营收'的明星产品。"
+  ],
+  "note": [
+    "⚠️ 气泡图数据格式与其他图表不同! 使用 points 数组,每个 point 有 x, y, size 三个字段。",
+    "每个 point: {\"x\": float, \"y\": float, \"size\": float}。x/y是坐标,size是气泡大小(相对值,不是实际像素)。",
+    "每个 series 的 points 数组长度可以不同。",
+    "series_colors 按系列着色。如果2个系列就提供2个颜色。"
+  ],
   "fields": {
-    "position": "Position (见 shared/position.json)",
-    "title": "string|null, 图表标题",
+    "position": "Position 对象。{\"left\":英寸,\"top\":英寸,\"width\":英寸,\"height\":英寸}",
+    "title": "图表标题文本。string, 可选",
     "data": {
-      "series": "[{name: string, points: [{x: float, y: float, size: float}]}], 每个点包含x坐标、y坐标、气泡大小"
+      "series": "数据系列数组。每个元素格式: {\"name\":\"系列名\",\"points\":[{\"x\":数值,\"y\":数值,\"size\":数值}]}。例如: [{\"name\":\"产品A\",\"points\":[{\"x\":30,\"y\":15,\"size\":80},{\"x\":45,\"y\":28,\"size\":120}]}]"
     },
     "style": {
-      "has_legend": "bool, default=true",
+      "_description": "所有字段可选,不填=默认值",
+      "has_legend": "bool, 默认 true",
       "legend_position": "'bottom'|'right'|'left'|'top'",
-      "has_data_labels": "bool, default=false",
-      "data_label_position": "'outside_end'|'inside_end'|'center'",
-      "series_colors": "hex[]|null, 按系列顺序",
-      "chart_area_fill": "hex|'none'|null",
-      "plot_area_fill": "hex|'none'|null",
-      "title_font_size": "int|null",
-      "axis_font_size": "int|null"
+      "has_data_labels": "bool, 默认 false",
+      "series_colors": "系列颜色数组。hex[] 无#号",
+      "chart_area_fill": "图表区背景。hex|'none'|null",
+      "plot_area_fill": "绘图区背景。hex|'none'|null",
+      "title_font_size": "标题字号 pt",
+      "axis_font_size": "坐标轴字号 pt"
     }
-  },
-  "note": "气泡图使用 BubbleChartData, data 格式为 {series: [{name, points:[{x,y,size}]}]}, 不需要 categories"
+  }
 }

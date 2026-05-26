@@ -1,24 +1,56 @@
 {
   "type": "textbox",
-  "description": "文本框 — 段落 + 多 run 文本",
+  "description": [
+    "文本框——幻灯片上最常用的元素。可以放置标题、正文、列表等任意文字。",
+    "一个 textbox 包含多个 paragraph(段落),一个 paragraph 包含多个 run(文字片段)。",
+    "每个 run 可以有不同的字体样式(大小/颜色/粗斜体/下划线等)。"
+  ],
+  "note": [
+    "content 是 paragraph 的数组。至少要有1个 paragraph。",
+    "每个 paragraph 至少要有1个 run, 否则会校验失败。",
+    "paragraph.level 控制缩进: 0=一级(无缩进), 1=二级, 2=三级..."
+  ],
   "fields": {
-    "position": "Position (见 shared/position.json)",
-    "content": "[ContentBlock]",
-    "fill": "FillStyle|null (见 shared/fill.json)",
-    "line": "LineStyle|null (见 shared/line.json)",
-    "rotation": "float|null, 旋转角度(度)"
+    "type": "固定值 'textbox'",
+    "position": "Position 对象。{\"left\":英寸,\"top\":英寸,\"width\":英寸,\"height\":英寸}",
+    "content": "段落数组。每个元素格式: {\"paragraph\": {\"alignment\":\"对齐方式\",\"level\":缩进层级,\"runs\":[文字片段]}}",
+    "fill": "文本框背景填充。FillStyle 对象, 可选。例如: {\"type\":\"solid\",\"color\":\"f8f9fa\"} 表示浅灰背景",
+    "line": "文本框边框。LineStyle 对象, 可选。例如: {\"color\":\"dadce0\",\"width_pt\":1.0} 表示浅灰细边框",
+    "rotation": "旋转角度(度)。float, 可选。例如: 45 表示顺时针旋转45度"
   },
-  "ContentBlock": {
-    "paragraph": {
-      "alignment": "'left'|'center'|'right'|'justify', default='left'",
-      "level": "int 0-8, 缩进层级",
-      "space_before_pt": "int|null, 段前间距 pt",
-      "space_after_pt": "int|null, 段后间距 pt",
-      "runs": "[RunSpec]"
-    }
+  "ParagraphSpec": {
+    "alignment": "水平对齐。'left'(左对齐)|'center'(居中)|'right'(右对齐)|'justify'(两端对齐)。默认 'left'",
+    "level": "缩进层级。int 0-8。0=一级要点, 1=二级(缩进), 2=三级(更缩进)。默认 0",
+    "space_before_pt": "段前间距。int, 单位pt。可选。例如: 12 表示段前12pt空白",
+    "space_after_pt": "段后间距。int, 单位pt。可选",
+    "runs": "文字片段数组。至少1个元素。每个元素 {\"text\":\"文字内容\",\"font\":字体样式}"
   },
   "RunSpec": {
-    "text": "string, 文本内容",
-    "font": "FontSpec|null (见 shared/font.json)"
+    "text": "文字内容。string",
+    "font": "字体样式。FontSpec 对象(见 shared/font.json), 可选。不填=继承默认字体"
+  },
+  "example": {
+    "type": "textbox",
+    "position": { "left": 1.0, "top": 0.5, "width": 11.3, "height": 1.2 },
+    "content": [
+      {
+        "paragraph": {
+          "alignment": "center",
+          "runs": [
+            { "text": "标题文字", "font": { "size": 28, "bold": true, "color": "1a73e8" } }
+          ]
+        }
+      },
+      {
+        "paragraph": {
+          "alignment": "left",
+          "space_before_pt": 12,
+          "runs": [
+            { "text": "正文 ", "font": { "size": 14 } },
+            { "text": "关键数字", "font": { "size": 14, "bold": true, "color": "ea4335" } }
+          ]
+        }
+      }
+    ]
   }
 }

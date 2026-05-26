@@ -1,9 +1,25 @@
 {
   "type": "picture",
-  "description": "图片嵌入 — SVG 自动转 PNG (300DPI)",
+  "description": [
+    "图片嵌入——在幻灯片中插入 PNG/JPG 等位图。SVG 文件会自动转换为 PNG(300DPI)。",
+    "支持三种缩放模式: aspect(等比缩放)、stretch(拉伸填充)、crop(裁切)。"
+  ],
+  "note": [
+    "path 是相对路径(相对于 workspace 根目录)。例如: 'src/tests/resources/image.png'",
+    "height 可以省略(设为 null),此时根据 width 和图片原始比例自动计算高度。",
+    "如果同时指定 width 和 height, 在 fit='aspect' 模式下仍保持比例。",
+    "SVG 转换需要 cairosvg(需Cairo DLL, Windows 需额外安装GTK)。不可用时回退,可能失败。"
+  ],
   "fields": {
-    "position": "Position (见 shared/position.json). height可为null(自动等比)",
-    "path": "string, 图片路径 (相对workspace根)",
-    "fit": "'aspect'(等比) | 'stretch'(拉伸) | 'crop'(裁切)"
+    "type": "固定值 'picture'",
+    "position": "Position 对象。height 可为 null(自动等比缩放)。{\"left\":英寸,\"top\":英寸,\"width\":英寸,\"height\":英寸|null}",
+    "path": "图片文件路径。string。相对路径(相对于workspace根)或绝对路径",
+    "fit": "缩放模式。'aspect'(等比,默认)|'stretch'(拉伸变形)|'crop'(裁切填充)"
+  },
+  "example": {
+    "type": "picture",
+    "position": { "left": 1.0, "top": 1.5, "width": 5.5, "height": 3.5 },
+    "path": "images/chart_screenshot.png",
+    "fit": "aspect"
   }
 }

@@ -1,24 +1,36 @@
 {
   "type": "chart",
   "chart_type": "column_clustered | column_stacked | column_stacked_100",
-  "description": "柱形图 — 垂直柱状。clustered=簇状, stacked=堆积, stacked_100=百分比堆积",
+  "description": [
+    "柱形图——垂直方向的柱子,适合对比不同分类的数值。",
+    "clustered(簇状): 每个分类下多根柱子并排,从0开始。适合看每个系列各自的绝对值。",
+    "stacked(堆积): 柱子叠在一起,总高度=所有系列之和。适合看总量+组成。",
+    "stacked_100(百分比堆积): 每根柱子都是100%高度,只显示比例关系。适合看占比分布。",
+    "视觉效果: clustered=并排, stacked=摞起来, stacked_100=每列一样高但内部比例不同。"
+  ],
+  "note": [
+    "每个 series 的 values 数组长度必须等于 categories 数组长度。",
+    "如果 categories = ['Q1','Q2','Q3','Q4'] (4个),则每个 series.values 也必须是4个数值。",
+    "分类标签超过6个时考虑用 bar_clustered(横向)避免标签重叠。"
+  ],
   "fields": {
-    "position": "Position (见 shared/position.json)",
-    "title": "string|null, 图表标题",
+    "position": "Position 对象。{\"left\":英寸,\"top\":英寸,\"width\":英寸,\"height\":英寸}",
+    "title": "图表标题文本。string, 可选(null=无标题)。例如: \"季度销售对比\"",
     "data": {
-      "categories": "string[], X轴标签 e.g. ['Q1','Q2','Q3','Q4']",
-      "series": "[{name: string, values: float[]}], 每个series的values长度须= categories长度"
+      "categories": "X轴标签数组。string[], 例如: [\"Q1\",\"Q2\",\"Q3\",\"Q4\"]。数组长度=分类数量",
+      "series": "数据系列数组。每个元素是 {name: \"系列名\", values: [数值数组]}。values长度必须=categories长度。例如: [{\"name\":\"产品A\",\"values\":[120,145,138,162]}]"
     },
     "style": {
-      "has_legend": "bool, default=true",
-      "legend_position": "'bottom'|'right'|'left'|'top', default='bottom'",
-      "has_data_labels": "bool, default=false",
-      "data_label_position": "'outside_end'|'inside_end'|'center'|'inside_base', default='outside_end'",
-      "series_colors": "hex[]|null, 按系列顺序 e.g. ['1a73e8','ea4335']",
-      "chart_area_fill": "hex|'none'|null, 图表区背景",
-      "plot_area_fill": "hex|'none'|null, 绘图区背景",
-      "title_font_size": "int|null, 标题字号 pt",
-      "axis_font_size": "int|null, 坐标轴字号 pt"
+      "_description": "以下所有字段都是可选的,不填=使用默认值",
+      "has_legend": "是否显示图例。bool, 默认 true。例如: true",
+      "legend_position": "图例位置。'bottom'|'right'|'left'|'top', 默认 'bottom'",
+      "has_data_labels": "是否在柱子上显示数值。bool, 默认 false",
+      "data_label_position": "数值标签位置。'outside_end'(柱外上方)|'inside_end'(柱内顶部)|'center'(柱内居中)|'inside_base'(柱内底部)。默认 'outside_end'",
+      "series_colors": "系列颜色数组。hex[] 无#号。第1个颜色给series[0],第2个给series[1],以此类推。例如: [\"1a73e8\",\"ea4335\"]",
+      "chart_area_fill": "整个图表区背景色。hex(无#号) 或 'none'(透明) 或 null(默认)。例如: \"fafafa\"",
+      "plot_area_fill": "绘图区(数据区域)背景色。格式同上",
+      "title_font_size": "标题字号。int, 单位pt。例如: 14",
+      "axis_font_size": "坐标轴标签字号。int, 单位pt。例如: 10"
     }
   }
 }

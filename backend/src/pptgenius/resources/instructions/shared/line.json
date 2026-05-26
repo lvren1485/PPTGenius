@@ -1,10 +1,16 @@
 {
+  "_description": "线条/边框样式定义。用于 shape.line、textbox.line 等场景。",
   "LineStyle": {
+    "description": "形状/文本框的边框线。color=null 表示无线条(透明边框)。",
     "fields": {
-      "color": "string|null, hex, null=无线条",
-      "width_pt": "float, 线条宽度 pt",
-      "dash": "'solid'|'dash'|'dot'|'dash_dot'|null"
-    },
-    "example": { "color": "333333", "width_pt": 1.5, "dash": "solid" }
+      "color": "线条颜色。string, hex 无#。null=无线条。例如: '333333'(深灰)",
+      "width_pt": "线条宽度。float, 单位pt(磅)。例如: 1.5 表示1.5pt宽",
+      "dash": "虚线样式。'solid'(实线)|'dash'(虚线)|'dot'(点线)|'dash_dot'(点划线)。不填默认实线"
+    }
+  },
+  "examples": {
+    "thin_gray": { "color": "dadce0", "width_pt": 1.0, "dash": "solid" },
+    "blue_dashed": { "color": "1a73e8", "width_pt": 2.0, "dash": "dash" },
+    "no_line": { "color": null }
   }
 }

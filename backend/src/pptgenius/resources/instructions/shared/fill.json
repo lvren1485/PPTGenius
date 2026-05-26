@@ -1,17 +1,40 @@
 {
+  "_description": "填充样式定义。用于 shape.fill、textbox.fill 等场景。",
   "FillStyle": {
+    "description": "形状/文本框的填充。type 决定后续哪些字段有效。",
     "fields": {
-      "type": "'solid'|'gradient'|'no_fill'|'picture'",
-      "color": "string|null, hex, solid填充色或picture路径",
-      "gradient_angle": "float|null, 0=左→右, 90=下→上",
-      "gradient_stops": "[GradientStop]|null"
+      "type": "填充类型。'solid'(纯色)|'gradient'(渐变)|'no_fill'(透明/无填充)|'picture'(图片填充)。默认 'solid'",
+      "color": "填充颜色。string, hex 无#。仅 type='solid' 时有效。type='picture'时表示图片路径。例如: '1a73e8'",
+      "gradient_angle": "渐变角度。float, 0=左→右 90=下→上 135=左上→右下。仅 type='gradient' 有效",
+      "gradient_stops": "GradientStop对象（见下方）数组。[{position: 0.0-1.0, color: hex}]。仅 type='gradient' 有效。不填=使用默认2色渐变。position 0.0=渐变起点颜色, position 1.0=终点颜色"
     }
   },
   "GradientStop": {
+    "description": "渐变中的一个颜色停止点。",
     "fields": {
-      "position": "float 0.0-1.0, 渐变位置",
-      "color": "string, hex"
+      "position": "渐变位置。float, 0.0(起点)到1.0(终点)。例如: 0.5=正中间",
+      "color": "该位置的hex颜色。string, 无#"
+    }
+  },
+  "examples": {
+    "solid_blue": { "type": "solid", "color": "1a73e8" },
+    "transparent": { "type": "no_fill" },
+    "gradient_blue_green": {
+      "type": "gradient",
+      "gradient_angle": 135,
+      "gradient_stops": [
+        { "position": 0.0, "color": "1a73e8" },
+        { "position": 1.0, "color": "34a853" }
+      ]
     },
-    "example": { "position": 0.5, "color": "ff0000" }
+    "gradient_3stop": {
+      "type": "gradient",
+      "gradient_angle": 0,
+      "gradient_stops": [
+        { "position": 0.0, "color": "1a73e8" },
+        { "position": 0.5, "color": "ffffff" },
+        { "position": 1.0, "color": "ea4335" }
+      ]
+    }
   }
 }
