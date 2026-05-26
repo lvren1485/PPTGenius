@@ -159,10 +159,18 @@ def _apply_chart_style(chart, el: ChartElement) -> None:
             )
 
     if style.series_colors:
-        for i, c in enumerate(style.series_colors):
-            if i < len(chart.series):
-                chart.series[i].format.fill.solid()
-                chart.series[i].format.fill.fore_color.rgb = RGBColor.from_string(c)
+        # Pie/doughnut: colors apply to points (sectors) within the single series
+        if el.chart_type.startswith("pie") or el.chart_type.startswith("doughnut"):
+            series = chart.series[0]
+            for i, c in enumerate(style.series_colors):
+                if i < len(series.points):
+                    series.points[i].format.fill.solid()
+                    series.points[i].format.fill.fore_color.rgb = RGBColor.from_string(c)
+        else:
+            for i, c in enumerate(style.series_colors):
+                if i < len(chart.series):
+                    chart.series[i].format.fill.solid()
+                    chart.series[i].format.fill.fore_color.rgb = RGBColor.from_string(c)
 
     # Chart area / plot area background
     if style.chart_area_fill:

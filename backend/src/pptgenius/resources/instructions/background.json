@@ -1,0 +1,23 @@
+{
+  "type": "background",
+  "description": "幻灯片背景。在 SlideSpec.background 字段中设置, 非 element。",
+  "fields": {
+    "type": "'solid'|'gradient'|'image', 背景类型",
+    "color": "hex|文件路径, solid=颜色hex, image=图片路径",
+    "gradient_angle": "float|null, 渐变角度, 仅 gradient 有效",
+    "gradient_stops": "[{position: 0.0-1.0, color: hex}]|null, 渐变stop"
+  },
+  "examples": {
+    "solid": { "type": "solid", "color": "e8f0fe" },
+    "gradient": {
+      "type": "gradient",
+      "gradient_angle": 135.0,
+      "gradient_stops": [
+        { "position": 0.0, "color": "1a73e8" },
+        { "position": 1.0, "color": "34a853" }
+      ]
+    },
+    "image": { "type": "image", "color": "src/tests/resources/Front.png" }
+  },
+  "usage": "在 SlideSpec 中添加 'background' 字段, 非 elements 数组内"
+}

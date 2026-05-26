@@ -342,9 +342,18 @@ LAYOUT_NAMES = frozenset({
 Element = TextboxElement | ChartElement | TableElement | ImageElement | ShapeElement
 
 
+class SlideBackground(BaseModel):
+    """Slide background definition."""
+    type: Literal["solid", "gradient", "image"] = "solid"
+    color: str | None = None  # hex for solid, file path for image
+    gradient_angle: float | None = None
+    gradient_stops: list[GradientStop] | None = None
+
+
 class SlideSpec(BaseModel):
     layout: str = "blank"
     color_scheme: dict | None = None
+    background: SlideBackground | None = None  # slide background
     notes: str | None = None  # outline slide 备注, 写入 PPT 演讲者备注
     elements: list[Element] = []
 

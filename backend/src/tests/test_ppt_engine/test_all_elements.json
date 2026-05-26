@@ -1,0 +1,668 @@
+{
+  "meta": {
+    "template_name": "default",
+    "color_scheme_name": "business_blue",
+    "slide_width": 13.333,
+    "slide_height": 7.5,
+    "language": "zh"
+  },
+  "slides": [
+    {
+      "layout": "blank",
+      "notes": "封面页 — 使用 textbox 元素，测试居中标题+副标题",
+      "elements": [
+        {
+          "type": "textbox",
+          "position": { "left": 1.0, "top": 2.2, "width": 11.3, "height": 1.2 },
+          "content": [
+            { "paragraph": { "alignment": "center", "runs": [{ "text": "PPT Element Test Suite", "font": { "size": 40, "bold": true, "color": "1a73e8" } }] } }
+          ]
+        },
+        {
+          "type": "textbox",
+          "position": { "left": 1.0, "top": 3.8, "width": 11.3, "height": 0.6 },
+          "content": [
+            { "paragraph": { "alignment": "center", "runs": [{ "text": "python-pptx 全元素测试 · 含 图片", "font": { "size": 18, "color": "5f6368" } }] } }
+          ]
+        }
+      ]
+    },
+    {
+      "layout": "blank",
+      "notes": "{\"type\":\"textbox\",\"position\":{\"left\":0.8,\"top\":0.4,\"width\":11.7,\"height\":0.9},\"content\":[{\"paragraph\":{\"alignment\":\"left\",\"runs\":[{\"text\":\"文本框测试\",\"font\":{\"size\":28,\"bold\":true,\"color\":\"202124\"}}]}}]}",
+      "elements": [
+        {
+          "type": "textbox",
+          "position": { "left": 0.8, "top": 0.4, "width": 11.7, "height": 0.9 },
+          "content": [
+            { "paragraph": { "alignment": "left", "runs": [{ "text": "文本框测试", "font": { "size": 28, "bold": true, "color": "202124" } }] } }
+          ]
+        },
+        {
+          "type": "textbox",
+          "position": { "left": 0.8, "top": 1.5, "width": 5.5, "height": 5.0 },
+          "fill": { "type": "solid", "color": "f8f9fa" },
+          "line": { "color": "dadce0", "width_pt": 1.0 },
+          "content": [
+            { "paragraph": { "alignment": "left", "runs": [{ "text": "左栏：纯文本+格式", "font": { "size": 16, "bold": true, "color": "1a73e8" } }] } },
+            { "paragraph": { "alignment": "left", "space_before_pt": 12, "runs": [{ "text": "这是粗体文字", "font": { "size": 14, "bold": true, "color": "333333" } }] } },
+            { "paragraph": { "alignment": "left", "runs": [{ "text": "这是斜体文字", "font": { "size": 14, "italic": true, "color": "333333" } }] } },
+            { "paragraph": { "alignment": "left", "runs": [{ "text": "这是下划线文字", "font": { "size": 14, "underline": "single", "color": "333333" } }] } },
+            { "paragraph": { "alignment": "left", "runs": [{ "text": "这是删除线文字", "font": { "size": 14, "strikethrough": "single", "color": "999999" } }] } },
+            { "paragraph": { "alignment": "left", "runs": [{ "text": "这是粗体+蓝色+阴影", "font": { "size": 14, "bold": true, "color": "1a73e8", "shadow": { "blur_pt": 3, "offset_pt": 1.5, "angle_deg": 315, "color": "888888", "alpha_pct": 40 } } }] } },
+            { "paragraph": { "alignment": "left", "runs": [{ "text": "这是发光文字", "font": { "size": 14, "glow": { "radius_pt": 6, "color": "1a73e8", "alpha_pct": 50 }, "color": "1a73e8" } }] } },
+            { "paragraph": { "alignment": "left", "runs": [{ "text": "小号大写字母: SMALL CAPS", "font": { "size": 12, "small_caps": true, "color": "666666" } }] } }
+          ]
+        },
+        {
+          "type": "textbox",
+          "position": { "left": 7.0, "top": 1.5, "width": 5.5, "height": 5.0 },
+          "fill": { "type": "solid", "color": "f8f9fa" },
+          "line": { "color": "dadce0", "width_pt": 1.0 },
+          "content": [
+            { "paragraph": { "alignment": "left", "runs": [{ "text": "右栏：样式+多级缩进", "font": { "size": 16, "bold": true, "color": "ea4335" } }] } },
+            { "paragraph": { "alignment": "left", "space_before_pt": 12, "runs": [{ "text": "一级要点", "font": { "size": 14, "bold": true } }] } },
+            { "paragraph": { "alignment": "left", "level": 1, "runs": [{ "text": "二级要点 — 缩进层级1", "font": { "size": 13, "color": "333333" } }] } },
+            { "paragraph": { "alignment": "left", "level": 2, "runs": [{ "text": "三级要点 — 缩进层级2", "font": { "size": 12, "color": "666666" } }] } },
+            { "paragraph": { "alignment": "left", "space_before_pt": 16, "runs": [{ "text": "居中对齐文本", "font": { "size": 14, "color": "1a73e8" } }] } }
+          ]
+        }
+      ]
+    },
+    {
+      "layout": "blank",
+      "notes": "{\"type\":\"chart\",\"chart_type\":\"column_clustered\",\"title\":\"季度营收对比\",\"data\":{\"categories\":[\"Q1\",\"Q2\",\"Q3\",\"Q4\"],\"series\":[{\"name\":\"产品A\",\"values\":[120,145,138,162]},{\"name\":\"产品B\",\"values\":[80,92,88,95]}]},\"style\":{\"has_legend\":true,\"legend_position\":\"bottom\",\"has_data_labels\":true,\"data_label_position\":\"outside_end\",\"series_colors\":[\"1a73e8\",\"ea4335\"],\"chart_area_fill\":\"fafafa\",\"axis_font_size\":10}}",
+      "elements": [
+        {
+          "type": "textbox",
+          "position": { "left": 0.8, "top": 0.3, "width": 11.7, "height": 0.8 },
+          "content": [
+            { "paragraph": { "runs": [{ "text": "图表测试 — 柱形图", "font": { "size": 28, "bold": true, "color": "202124" } }] } }
+          ]
+        },
+        {
+          "type": "chart",
+          "chart_type": "column_clustered",
+          "position": { "left": 0.8, "top": 1.3, "width": 8.0, "height": 5.5 },
+          "title": "季度营收对比",
+          "data": {
+            "categories": ["Q1", "Q2", "Q3", "Q4"],
+            "series": [
+              { "name": "产品A", "values": [120, 145, 138, 162] },
+              { "name": "产品B", "values": [80, 92, 88, 95] }
+            ]
+          },
+          "style": {
+            "has_legend": true,
+            "legend_position": "bottom",
+            "has_data_labels": true,
+            "data_label_position": "outside_end",
+            "series_colors": ["1a73e8", "ea4335"],
+            "chart_area_fill": "fafafa",
+            "axis_font_size": 10
+          }
+        }
+      ]
+    },
+    {
+      "layout": "blank",
+      "notes": "图表测试 — 饼图 (1 series only)",
+      "elements": [
+        {
+          "type": "textbox",
+          "position": { "left": 0.8, "top": 0.3, "width": 11.7, "height": 0.8 },
+          "content": [
+            { "paragraph": { "runs": [{ "text": "图表测试 — 饼图", "font": { "size": 28, "bold": true, "color": "202124" } }] } }
+          ]
+        },
+        {
+          "type": "chart",
+          "chart_type": "pie",
+          "position": { "left": 1.5, "top": 1.5, "width": 7.0, "height": 5.0 },
+          "title": "市场份额",
+          "data": {
+            "categories": ["产品A", "产品B", "产品C", "其他"],
+            "series": [{ "name": "占比", "values": [42, 28, 18, 12] }]
+          },
+          "style": {
+            "has_legend": true,
+            "legend_position": "right",
+            "has_data_labels": true,
+            "data_label_position": "outside_end",
+            "series_colors": ["1a73e8", "ea4335", "34a853", "fbbc04"]
+          }
+        }
+      ]
+    },
+    {
+      "layout": "blank",
+      "notes": "图表测试 — 折线图，左侧图表右侧图注",
+      "elements": [
+        {
+          "type": "textbox",
+          "position": { "left": 0.8, "top": 0.3, "width": 11.7, "height": 0.8 },
+          "content": [
+            { "paragraph": { "runs": [{ "text": "图表测试 — 折线图", "font": { "size": 28, "bold": true, "color": "202124" } }] } }
+          ]
+        },
+        {
+          "type": "chart",
+          "chart_type": "line_markers",
+          "position": { "left": 0.8, "top": 1.3, "width": 8.0, "height": 5.5 },
+          "title": "月度趋势",
+          "data": {
+            "categories": ["1月", "2月", "3月", "4月", "5月", "6月"],
+            "series": [
+              { "name": "营收", "values": [100, 120, 115, 140, 155, 170] },
+              { "name": "成本", "values": [70, 80, 75, 85, 90, 95] }
+            ]
+          },
+          "style": {
+            "has_legend": true,
+            "legend_position": "bottom",
+            "series_colors": ["1a73e8", "ea4335"]
+          }
+        },
+        {
+          "type": "textbox",
+          "position": { "left": 9.3, "top": 1.3, "width": 3.5, "height": 5.5 },
+          "fill": { "type": "solid", "color": "f8f9fa" },
+          "content": [
+            { "paragraph": { "alignment": "left", "runs": [{ "text": "关键洞察", "font": { "size": 16, "bold": true, "color": "1a73e8" } }] } },
+            { "paragraph": { "space_before_pt": 12, "runs": [{ "text": "营收持续增长", "font": { "size": 13, "color": "333333" } }] } },
+            { "paragraph": { "runs": [{ "text": "6月较1月增长70%", "font": { "size": 13, "bold": true, "color": "1a73e8" } }] } },
+            { "paragraph": { "space_before_pt": 12, "runs": [{ "text": "成本增速低于营收", "font": { "size": 13, "color": "333333" } }] } },
+            { "paragraph": { "runs": [{ "text": "利润率持续改善", "font": { "size": 13, "bold": true, "color": "34a853" } }] } }
+          ]
+        }
+      ]
+    },
+    {
+      "layout": "blank",
+      "notes": "图表测试 — 散点图 (XY, XyChartData, points格式, 无categories)",
+      "elements": [
+        {
+          "type": "textbox",
+          "position": { "left": 0.8, "top": 0.3, "width": 11.7, "height": 0.8 },
+          "content": [
+            { "paragraph": { "runs": [{ "text": "图表测试 — 散点图 (XyChartData)", "font": { "size": 28, "bold": true, "color": "202124" } }] } }
+          ]
+        },
+        {
+          "type": "chart",
+          "chart_type": "scatter",
+          "position": { "left": 1.0, "top": 1.3, "width": 8.0, "height": 5.5 },
+          "title": "身高 vs 体重",
+          "data": {
+            "series": [
+              { "name": "男性", "points": [{"x": 170, "y": 65}, {"x": 175, "y": 72}, {"x": 180, "y": 78}, {"x": 165, "y": 58}, {"x": 185, "y": 85}, {"x": 172, "y": 68}] },
+              { "name": "女性", "points": [{"x": 160, "y": 50}, {"x": 165, "y": 55}, {"x": 158, "y": 48}, {"x": 170, "y": 60}, {"x": 163, "y": 53}, {"x": 168, "y": 57}] }
+            ]
+          },
+          "style": {
+            "has_legend": true,
+            "legend_position": "bottom",
+            "series_colors": ["1a73e8", "ea4335"],
+            "chart_area_fill": "fafafa"
+          }
+        }
+      ]
+    },
+    {
+      "layout": "blank",
+      "notes": "图表测试 — 雷达图 (多维度对比)",
+      "elements": [
+        {
+          "type": "textbox",
+          "position": { "left": 0.8, "top": 0.3, "width": 11.7, "height": 0.8 },
+          "content": [
+            { "paragraph": { "runs": [{ "text": "图表测试 — 雷达图", "font": { "size": 28, "bold": true, "color": "202124" } }] } }
+          ]
+        },
+        {
+          "type": "chart",
+          "chart_type": "radar",
+          "position": { "left": 1.5, "top": 1.3, "width": 7.0, "height": 6.0 },
+          "title": "能力评估",
+          "data": {
+            "categories": ["速度", "准确度", "稳定性", "易用性", "成本"],
+            "series": [
+              { "name": "产品A", "values": [85, 90, 78, 65, 70] },
+              { "name": "产品B", "values": [70, 75, 88, 80, 85] }
+            ]
+          },
+          "style": {
+            "has_legend": true,
+            "legend_position": "bottom",
+            "series_colors": ["1a73e8", "ea4335"]
+          }
+        }
+      ]
+    },
+    {
+      "layout": "blank",
+      "notes": "图表测试 — 气泡图 (BubbleChartData, 三变量: x位置 + y位置 + 大小)",
+      "elements": [
+        {
+          "type": "textbox",
+          "position": { "left": 0.8, "top": 0.3, "width": 11.7, "height": 0.8 },
+          "content": [
+            { "paragraph": { "runs": [{ "text": "图表测试 — 气泡图 (BubbleChartData)", "font": { "size": 28, "bold": true, "color": "202124" } }] } }
+          ]
+        },
+        {
+          "type": "chart",
+          "chart_type": "bubble",
+          "position": { "left": 1.0, "top": 1.3, "width": 8.0, "height": 5.5 },
+          "title": "市场分析",
+          "data": {
+            "series": [
+              { "name": "产品A", "points": [{"x": 30, "y": 15, "size": 80}, {"x": 45, "y": 28, "size": 120}, {"x": 60, "y": 22, "size": 65}, {"x": 75, "y": 35, "size": 150}] },
+              { "name": "产品B", "points": [{"x": 25, "y": 10, "size": 45}, {"x": 40, "y": 18, "size": 90}, {"x": 55, "y": 30, "size": 110}, {"x": 70, "y": 20, "size": 55}] }
+            ]
+          },
+          "style": {
+            "has_legend": true,
+            "legend_position": "bottom",
+            "series_colors": ["1a73e8", "ea4335"],
+            "chart_area_fill": "fafafa"
+          }
+        }
+      ]
+    },
+    {
+      "layout": "blank",
+      "notes": "图表测试 — 面积图 + 环形图 双图布局",
+      "elements": [
+        {
+          "type": "textbox",
+          "position": { "left": 0.8, "top": 0.3, "width": 11.7, "height": 0.8 },
+          "content": [
+            { "paragraph": { "runs": [{ "text": "图表测试 — 面积图 + 环形图", "font": { "size": 28, "bold": true, "color": "202124" } }] } }
+          ]
+        },
+        {
+          "type": "chart",
+          "chart_type": "area",
+          "position": { "left": 0.5, "top": 1.3, "width": 6.0, "height": 5.5 },
+          "title": "营收趋势(面积图)",
+          "data": {
+            "categories": ["Q1", "Q2", "Q3", "Q4"],
+            "series": [
+              { "name": "线上", "values": [50, 65, 75, 90] },
+              { "name": "线下", "values": [60, 55, 70, 65] }
+            ]
+          },
+          "style": {
+            "has_legend": true,
+            "legend_position": "bottom",
+            "series_colors": ["1a73e8", "ea4335"]
+          }
+        },
+        {
+          "type": "chart",
+          "chart_type": "doughnut",
+          "position": { "left": 7.0, "top": 1.3, "width": 5.5, "height": 5.5 },
+          "title": "渠道占比(环形图)",
+          "data": {
+            "categories": ["线上", "线下", "分销", "其他"],
+            "series": [{ "name": "占比", "values": [45, 30, 15, 10] }]
+          },
+          "style": {
+            "has_legend": true,
+            "legend_position": "bottom",
+            "has_data_labels": true,
+            "data_label_position": "outside_end",
+            "series_colors": ["1a73e8", "ea4335", "34a853", "fbbc04"]
+          }
+        }
+      ]
+    },
+    {
+      "layout": "blank",
+      "notes": "表格测试 — 含表头、斑马条纹、合并单元格",
+      "elements": [
+        {
+          "type": "textbox",
+          "position": { "left": 0.8, "top": 0.3, "width": 11.7, "height": 0.8 },
+          "content": [
+            { "paragraph": { "runs": [{ "text": "表格测试", "font": { "size": 28, "bold": true, "color": "202124" } }] } }
+          ]
+        },
+        {
+          "type": "table",
+          "position": { "left": 1.0, "top": 1.5, "width": 11.0, "height": 5.5 },
+          "rows": 6,
+          "cols": 4,
+          "col_widths": [2.5, 3.0, 3.0, 2.5],
+          "cells": [
+            { "row": 0, "col": 0, "text": "功能模块" },
+            { "row": 0, "col": 1, "text": "说明" },
+            { "row": 0, "col": 2, "text": "状态" },
+            { "row": 0, "col": 3, "text": "负责人" },
+            { "row": 1, "col": 0, "text": "文本渲染" },
+            { "row": 1, "col": 1, "text": "多段落 + 字体效果" },
+            { "row": 1, "col": 2, "text": "完成" },
+            { "row": 1, "col": 3, "text": "Agent A" },
+            { "row": 2, "col": 0, "text": "图表生成" },
+            { "row": 2, "col": 1, "text": "原生图表 8种类型" },
+            { "row": 2, "col": 2, "text": "完成" },
+            { "row": 2, "col": 3, "text": "Agent B" },
+            { "row": 3, "col": 0, "text": "表格渲染" },
+            { "row": 3, "col": 1, "text": "含边框+斑马条纹" },
+            { "row": 3, "col": 2, "text": "完成" },
+            { "row": 3, "col": 3, "text": "Agent B" },
+            { "row": 4, "col": 0, "text": "形状支持" },
+            { "row": 4, "col": 1, "text": "182种 AutoShape" },
+            { "row": 4, "col": 2, "text": "测试中" },
+            { "row": 4, "col": 3, "text": "Agent C" },
+            { "row": 5, "col": 0, "text": "合计" },
+            { "row": 5, "col": 1, "text": "" },
+            { "row": 5, "col": 2, "text": "" },
+            { "row": 5, "col": 3, "text": "3 Agents" }
+          ],
+          "merges": [
+            { "from_row": 5, "from_col": 0, "to_row": 5, "to_col": 2 }
+          ],
+          "header": {
+            "row": 0, "fill": "1a73e8", "font_color": "ffffff", "font_bold": true, "font_size": 14
+          },
+          "style": {
+            "border_color": "dadce0", "border_width_pt": 0.5,
+            "stripe_even": "f8f9fa", "stripe_odd": "ffffff"
+          }
+        }
+      ]
+    },
+    {
+      "layout": "blank",
+      "notes": "图片测试 — PNG 嵌入 (SVG 需 Cairo DLL, Windows 暂跳过)",
+      "elements": [
+        {
+          "type": "textbox",
+          "position": { "left": 0.8, "top": 0.3, "width": 11.7, "height": 0.8 },
+          "content": [
+            { "paragraph": { "runs": [{ "text": "图片测试 — PNG 嵌入", "font": { "size": 28, "bold": true, "color": "202124" } }] } }
+          ]
+        },
+        {
+          "type": "picture",
+          "position": { "left": 0.5, "top": 1.5, "width": 5.5, "height": 3.5 },
+          "path": "src/tests/resources/Front.png",
+          "fit": "aspect"
+        },
+        {
+          "type": "picture",
+          "position": { "left": 6.5, "top": 1.5, "width": 5.5, "height": 3.5 },
+          "path": "src/tests/resources/45Side.png",
+          "fit": "aspect"
+        },
+        {
+          "type": "textbox",
+          "position": { "left": 0.5, "top": 5.3, "width": 5.5, "height": 0.5 },
+          "content": [
+            { "paragraph": { "alignment": "center", "runs": [{ "text": "PNG 图片 1 (Front.png)", "font": { "size": 11, "color": "666666", "italic": true } }] } }
+          ]
+        },
+        {
+          "type": "textbox",
+          "position": { "left": 6.5, "top": 5.3, "width": 5.5, "height": 0.5 },
+          "content": [
+            { "paragraph": { "alignment": "center", "runs": [{ "text": "PNG 图片 2 (45Side.png)", "font": { "size": 11, "color": "666666", "italic": true } }] } }
+          ]
+        }
+      ]
+    },
+    {
+      "layout": "blank",
+      "notes": "形状测试 — 每个系列至少一个形状: 基础几何(圆角矩形+椭圆+菱形+心形)、星形(五角星+爆炸)、箭头(右箭头+环形箭头)、标注(矩形标注+云形标注)、流程图(流程+决策+终止符)、飘带(上飘带)、数学(加号)、其他(人字形箭头)。形状内嵌文字。",
+      "elements": [
+        {
+          "type": "textbox",
+          "position": { "left": 0.8, "top": 0.2, "width": 11.7, "height": 0.6 },
+          "content": [
+            { "paragraph": { "runs": [{ "text": "形状测试 — 8个系列各至少1个", "font": { "size": 24, "bold": true, "color": "202124" } }] } }
+          ]
+        },
+        {
+          "type": "shape", "shape_type": "rounded_rectangle",
+          "position": { "left": 0.5, "top": 1.0, "width": 2.8, "height": 1.0 },
+          "fill": { "type": "solid", "color": "1a73e8" },
+          "text": [{ "paragraph": { "alignment": "center", "runs": [{ "text": "圆角矩形 (basic)", "font": { "size": 11, "bold": true, "color": "ffffff" } }] } }]
+        },
+        {
+          "type": "shape", "shape_type": "oval",
+          "position": { "left": 3.6, "top": 1.0, "width": 2.8, "height": 1.0 },
+          "fill": { "type": "solid", "color": "ea4335" },
+          "text": [{ "paragraph": { "alignment": "center", "runs": [{ "text": "椭圆 (basic)", "font": { "size": 11, "bold": true, "color": "ffffff" } }] } }]
+        },
+        {
+          "type": "shape", "shape_type": "diamond",
+          "position": { "left": 6.7, "top": 1.0, "width": 2.8, "height": 1.0 },
+          "fill": { "type": "gradient", "gradient_angle": 0, "gradient_stops": [{"position": 0.5, "color": "34a853"}] },
+          "text": [{ "paragraph": { "alignment": "center", "runs": [{ "text": "菱形 (basic)", "font": { "size": 11, "bold": true, "color": "ffffff" } }] } }]
+        },
+        {
+          "type": "shape", "shape_type": "heart",
+          "position": { "left": 9.8, "top": 1.0, "width": 2.8, "height": 1.0 },
+          "fill": { "type": "solid", "color": "ea4335" },
+          "text": [{ "paragraph": { "alignment": "center", "runs": [{ "text": "心形 (basic)", "font": { "size": 11, "bold": true, "color": "ffffff" } }] } }]
+        },
+        {
+          "type": "shape", "shape_type": "star_5",
+          "position": { "left": 0.5, "top": 2.3, "width": 2.8, "height": 1.0 },
+          "fill": { "type": "solid", "color": "fbbc04" },
+          "text": [{ "paragraph": { "alignment": "center", "runs": [{ "text": "五角星", "font": { "size": 11, "bold": true, "color": "333333" } }] } }]
+        },
+        {
+          "type": "shape", "shape_type": "explosion_1",
+          "position": { "left": 3.6, "top": 2.3, "width": 2.8, "height": 1.0 },
+          "fill": { "type": "solid", "color": "ea4335" },
+          "text": [{ "paragraph": { "alignment": "center", "runs": [{ "text": "爆炸", "font": { "size": 11, "bold": true, "color": "ffffff" } }] } }]
+        },
+        {
+          "type": "shape", "shape_type": "right_arrow",
+          "position": { "left": 6.7, "top": 2.3, "width": 2.8, "height": 1.0 },
+          "fill": { "type": "solid", "color": "1a73e8" },
+          "text": [{ "paragraph": { "alignment": "center", "runs": [{ "text": "右箭头", "font": { "size": 11, "bold": true, "color": "ffffff" } }] } }]
+        },
+        {
+          "type": "shape", "shape_type": "circular_arrow",
+          "position": { "left": 9.8, "top": 2.3, "width": 2.8, "height": 1.0 },
+          "fill": { "type": "solid", "color": "34a853" },
+          "text": [{ "paragraph": { "alignment": "center", "runs": [{ "text": "环形箭头", "font": { "size": 11, "bold": true, "color": "ffffff" } }] } }]
+        },
+        {
+          "type": "shape", "shape_type": "rectangular_callout",
+          "position": { "left": 0.5, "top": 3.6, "width": 2.8, "height": 1.0 },
+          "fill": { "type": "solid", "color": "d2e3fc" },
+          "line": { "color": "1a73e8", "width_pt": 1.5 },
+          "text": [{ "paragraph": { "alignment": "center", "runs": [{ "text": "矩形标注", "font": { "size": 11, "color": "1a73e8" } }] } }]
+        },
+        {
+          "type": "shape", "shape_type": "cloud_callout",
+          "position": { "left": 3.6, "top": 3.6, "width": 2.8, "height": 1.0 },
+          "fill": { "type": "solid", "color": "d2e3fc" },
+          "text": [{ "paragraph": { "alignment": "center", "runs": [{ "text": "云形标注", "font": { "size": 11, "color": "1a73e8" } }] } }]
+        },
+        {
+          "type": "shape", "shape_type": "flowchart_process",
+          "position": { "left": 6.7, "top": 3.6, "width": 2.8, "height": 1.0 },
+          "fill": { "type": "solid", "color": "34a853" },
+          "text": [{ "paragraph": { "alignment": "center", "runs": [{ "text": "流程", "font": { "size": 11, "bold": true, "color": "ffffff" } }] } }]
+        },
+        {
+          "type": "shape", "shape_type": "flowchart_decision",
+          "position": { "left": 9.8, "top": 3.6, "width": 2.8, "height": 1.0 },
+          "fill": { "type": "solid", "color": "fbbc04" },
+          "text": [{ "paragraph": { "alignment": "center", "runs": [{ "text": "决策", "font": { "size": 11, "bold": true, "color": "333333" } }] } }]
+        },
+        {
+          "type": "shape", "shape_type": "flowchart_terminator",
+          "position": { "left": 0.5, "top": 4.9, "width": 2.8, "height": 1.0 },
+          "fill": { "type": "solid", "color": "ab47bc" },
+          "text": [{ "paragraph": { "alignment": "center", "runs": [{ "text": "终止符", "font": { "size": 11, "bold": true, "color": "ffffff" } }] } }]
+        },
+        {
+          "type": "shape", "shape_type": "up_ribbon",
+          "position": { "left": 3.6, "top": 4.9, "width": 2.8, "height": 1.0 },
+          "fill": { "type": "solid", "color": "1a73e8" },
+          "text": [{ "paragraph": { "alignment": "center", "runs": [{ "text": "上飘带", "font": { "size": 11, "bold": true, "color": "ffffff" } }] } }]
+        },
+        {
+          "type": "shape", "shape_type": "math_plus",
+          "position": { "left": 6.7, "top": 4.9, "width": 1.3, "height": 1.0 },
+          "fill": { "type": "solid", "color": "34a853" }
+        },
+        {
+          "type": "shape", "shape_type": "chevron",
+          "position": { "left": 8.3, "top": 4.9, "width": 2.0, "height": 1.0 },
+          "fill": { "type": "solid", "color": "ea4335" },
+          "text": [{ "paragraph": { "alignment": "center", "runs": [{ "text": "人字形", "font": { "size": 10, "bold": true, "color": "ffffff" } }] } }]
+        }
+      ]
+    },
+    {
+      "layout": "blank",
+      "notes": "背景测试: 纯色(浅蓝)→渐变(蓝→绿)→图片背景。分别测试 solid/gradient/image 三种背景类型。",
+      "background": { "type": "solid", "color": "e8f0fe" },
+      "elements": [
+        {
+          "type": "textbox",
+          "position": { "left": 0.8, "top": 0.2, "width": 11.7, "height": 0.6 },
+          "content": [
+            { "paragraph": { "runs": [{ "text": "背景测试 — 纯色 (e8f0fe)", "font": { "size": 28, "bold": true, "color": "1a73e8" } }] } }
+          ]
+        },
+        {
+          "type": "textbox",
+          "position": { "left": 3.0, "top": 3.0, "width": 7.0, "height": 2.0 },
+          "fill": { "type": "solid", "color": "ffffff" },
+          "line": { "color": "dadce0", "width_pt": 1.0 },
+          "content": [
+            { "paragraph": { "alignment": "center", "runs": [{ "text": "纯色背景 slide.background.fill.solid()", "font": { "size": 14, "color": "333333" } }] } }
+          ]
+        }
+      ]
+    },
+    {
+      "layout": "blank",
+      "notes": "背景测试: 渐变背景 (蓝色→绿色 135度)",
+      "background": {
+        "type": "gradient",
+        "gradient_angle": 135.0,
+        "gradient_stops": [
+          { "position": 0.0, "color": "1a73e8" },
+          { "position": 1.0, "color": "34a853" }
+        ]
+      },
+      "elements": [
+        {
+          "type": "textbox",
+          "position": { "left": 0.8, "top": 0.2, "width": 11.7, "height": 0.6 },
+          "content": [
+            { "paragraph": { "runs": [{ "text": "背景测试 — 渐变 (蓝→绿 135度)", "font": { "size": 28, "bold": true, "color": "ffffff" } }] } }
+          ]
+        },
+        {
+          "type": "textbox",
+          "position": { "left": 3.0, "top": 3.0, "width": 7.0, "height": 2.0 },
+          "fill": { "type": "solid", "color": "ffffff" },
+          "content": [
+            { "paragraph": { "alignment": "center", "runs": [{ "text": "渐变背景 slide.background.fill.gradient()", "font": { "size": 14, "color": "333333" } }] } }
+          ]
+        }
+      ]
+    },
+    {
+      "layout": "blank",
+      "notes": "背景测试: 图片背景 (使用 lxml set_slide_image_background)",
+      "background": { "type": "image", "color": "src/tests/resources/Front.png" },
+      "elements": [
+        {
+          "type": "textbox",
+          "position": { "left": 0.8, "top": 0.2, "width": 11.7, "height": 0.6 },
+          "content": [
+            { "paragraph": { "runs": [{ "text": "背景测试 — 图片背景", "font": { "size": 28, "bold": true, "color": "ffffff" } }] } }
+          ]
+        }
+      ]
+    },
+    {
+      "layout": "blank",
+      "notes": "相对位置 + 多元素混合: 使用 parent 字段。left_col 和 right_col 作为父容器, textbox+shape+chart+table 混排。",
+      "elements": [
+        {
+          "type": "textbox",
+          "position": { "left": 0.8, "top": 0.2, "width": 11.7, "height": 0.6 },
+          "content": [
+            { "paragraph": { "runs": [{ "text": "相对位置测试 — 多元素混合", "font": { "size": 24, "bold": true, "color": "202124" } }] } }
+          ]
+        },
+        {
+          "type": "shape", "shape_type": "rounded_rectangle",
+          "position": { "left": 0.5, "top": 1.2, "width": 5.8, "height": 5.8 },
+          "fill": { "type": "solid", "color": "f8f9fa" },
+          "line": { "color": "dadce0", "width_pt": 1.0 }
+        },
+        {
+          "type": "textbox",
+          "position": { "left": 0.2, "top": 0.0, "width": 5.4, "height": 0.5, "parent": "left_col" },
+          "content": [
+            { "paragraph": { "alignment": "center", "runs": [{ "text": "左列 (相对位置)", "font": { "size": 14, "bold": true, "color": "1a73e8" } }] } }
+          ]
+        },
+        {
+          "type": "chart",
+          "chart_type": "column_clustered",
+          "position": { "left": 0.0, "top": 0.6, "width": 5.5, "height": 2.5, "parent": "left_col" },
+          "title": "月度数据",
+          "data": {
+            "categories": ["1月", "2月", "3月"],
+            "series": [{ "name": "销售额", "values": [30, 45, 38] }]
+          },
+          "style": { "has_legend": false, "series_colors": ["1a73e8"], "axis_font_size": 8 }
+        },
+        {
+          "type": "table",
+          "position": { "left": 0.0, "top": 3.3, "width": 5.5, "height": 2.3, "parent": "left_col" },
+          "rows": 3, "cols": 2,
+          "cells": [
+            {"row": 0, "col": 0, "text": "指标"}, {"row": 0, "col": 1, "text": "值"},
+            {"row": 1, "col": 0, "text": "增长率"}, {"row": 1, "col": 1, "text": "+27%"},
+            {"row": 2, "col": 0, "text": "目标"}, {"row": 2, "col": 1, "text": "120%"}
+          ],
+          "header": { "row": 0, "fill": "ea4335", "font_color": "ffffff", "font_bold": true, "font_size": 10 },
+          "style": { "border_color": "dadce0", "border_width_pt": 0.5, "stripe_even": "fef7f7" }
+        },
+        {
+          "type": "shape", "shape_type": "rounded_rectangle",
+          "position": { "left": 6.8, "top": 1.2, "width": 5.8, "height": 5.8 },
+          "fill": { "type": "solid", "color": "f8f9fa" },
+          "line": { "color": "dadce0", "width_pt": 1.0 }
+        },
+        {
+          "type": "textbox",
+          "position": { "left": 0.2, "top": 0.0, "width": 5.4, "height": 0.5, "parent": "right_col" },
+          "content": [
+            { "paragraph": { "alignment": "center", "runs": [{ "text": "右列 (相对定位)", "font": { "size": 14, "bold": true, "color": "ea4335" } }] } }
+          ]
+        },
+        {
+          "type": "picture",
+          "position": { "left": 0.3, "top": 0.6, "width": 5.0, "height": 2.8, "parent": "right_col" },
+          "path": "src/tests/resources/Front.png",
+          "fit": "aspect"
+        },
+        {
+          "type": "textbox",
+          "position": { "left": 0.2, "top": 3.6, "width": 5.2, "height": 2.0, "parent": "right_col" },
+          "content": [
+            { "paragraph": { "alignment": "left", "runs": [{ "text": "图片标题 (aspect fit)", "font": { "size": 12, "bold": true, "color": "333333" } }] } },
+            { "paragraph": { "runs": [{ "text": "PNG 图片通过相对位置嵌入", "font": { "size": 11, "color": "666666" } }] } }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -144,10 +144,7 @@ def set_shape_picture_fill(shape, image_path: str, fill_mode: str = "stretch") -
         image_path: absolute path to image file.
         fill_mode: 'stretch' or 'tile'.
     """
-    rId = shape.part.relate_to(
-        image_path,
-        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-    )
+    image_part, rId = shape.part.get_or_add_image_part(image_path)
 
     spPr = shape._element.spPr
     # Remove existing fills
@@ -331,39 +328,30 @@ def set_plot_area_fill(chart, color_hex: str | None = None, no_fill: bool = Fals
 # ═══════════════════════════════════════════════════════════════════
 
 def set_slide_image_background(slide, image_path: str, fill_mode: str = "stretch") -> None:
-    """Set slide background to an image (true background, not overlay shape).
+    """Set slide background to an image using full-slide overlay Picture shape.
+
+    This is the recommended approach (pptx research: no high-level API for true
+    background). Overlays a full-slide picture at z-order 0.
 
     Args:
         slide: python-pptx Slide.
         image_path: absolute path to image file.
-        fill_mode: 'stretch' or 'tile'.
+        fill_mode: 'stretch' or 'tile' (not applicable for overlay, always stretch).
     """
-    rId = slide.part.relate_to(
+    import os as _os
+    from pptx.util import Inches as _Inches
+
+    if not _os.path.isabs(image_path):
+        raise ValueError(f"image_path must be absolute: {image_path}")
+
+    # Place picture at slide origin, full slide size
+    prs = slide.part.package.presentation_part.presentation
+    slide.shapes.add_picture(
         image_path,
-        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+        _Inches(0), _Inches(0),
+        width=prs.slide_width,
+        height=prs.slide_height,
     )
-
-    bg = slide.background._element
-    bgPr = bg.find(qn("p:bgPr"))
-    if bgPr is None:
-        bgPr = OxmlElement("p:bgPr")
-        bg.insert(0, bgPr)
-    else:
-        for child in list(bgPr):
-            bgPr.remove(child)
-
-    if fill_mode == "stretch":
-        fill_mode_fragment = "<a:stretch><a:fillRect/></a:stretch>"
-    else:
-        fill_mode_fragment = "<a:tile/>"
-
-    blipFill = etree.fromstring(
-        f'<p:blipFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"'
-        f' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'
-        f' xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">'
-        f'<a:blip r:embed="{rId}"/>{fill_mode_fragment}</p:blipFill>'
-    )
-    bgPr.append(blipFill)
 
 
 # ═══════════════════════════════════════════════════════════════════

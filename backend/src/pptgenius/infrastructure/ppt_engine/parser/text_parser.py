@@ -88,11 +88,11 @@ def _apply_font(run, font_spec) -> None:
         from pptx.enum.text import MSO_TEXT_UNDERLINE_TYPE
         ul_map = {
             "none": MSO_TEXT_UNDERLINE_TYPE.NONE,
-            "single": True,
-            "double": MSO_TEXT_UNDERLINE_TYPE.DOUBLE,
-            "wavy": MSO_TEXT_UNDERLINE_TYPE.WAVY,
+            "single": MSO_TEXT_UNDERLINE_TYPE.SINGLE_LINE,
+            "double": MSO_TEXT_UNDERLINE_TYPE.DOUBLE_LINE,
+            "wavy": MSO_TEXT_UNDERLINE_TYPE.WAVY_LINE,
         }
-        f.underline = ul_map.get(font_spec.underline, True)
+        f.underline = ul_map.get(font_spec.underline, MSO_TEXT_UNDERLINE_TYPE.SINGLE_LINE)
 
     # lxml-based effects
     if font_spec.strikethrough:

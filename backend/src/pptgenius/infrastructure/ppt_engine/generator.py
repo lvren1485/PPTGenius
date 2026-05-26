@@ -57,6 +57,9 @@ async def generate_ppt(
         logger.debug("Slide %d/%d: layout=%s (%d element(s))",
                      si + 1, len(instruction.slides), slide_spec.layout, len(slide_spec.elements))
 
+        if slide_spec.background:
+            _apply_slide_background(slide, slide_spec.background)
+
         # Resolve relative positions: scan for container shapes, build parent_bounds
         parent_bounds = _build_parent_bounds(slide_spec, meta)
 
@@ -115,6 +118,42 @@ def _build_parent_bounds(slide_spec, meta) -> dict[str, tuple[float, float, floa
                 name = "right_col"
             bounds[name] = (l, t, w, h)
     return bounds
+
+
+def _apply_slide_background(slide, bg) -> None:
+    """Apply slide background (solid color / gradient / image)."""
+    from pptx.dml.color import RGBColor
+    fill = slide.background.fill
+
+    if bg.type == "solid" and bg.color:
+        fill.solid()
+        fill.fore_color.rgb = RGBColor.from_string(bg.color)
+    elif bg.type == "gradient":
+        fill.gradient()
+        if bg.gradient_angle is not None:
+            fill.gradient_angle = bg.gradient_angle
+        if bg.gradient_stops:
+            from .parser.styles import add_gradient_stop
+            # Replace default stops with custom ones
+            for i, gs in enumerate(bg.gradient_stops):
+                if i < 2:
+                    # Modify existing stops
+                    stops = fill.gradient_stops
+                    if i == 0:
+                        stops[0].color.rgb = RGBColor.from_string(gs.color)
+                    elif i == 1:
+                        stops[1].color.rgb = RGBColor.from_string(gs.color)
+                else:
+                    # Add extra stops via lxml
+                    _shape = type("obj", (), {"fill": fill})()
+                    add_gradient_stop(_shape, gs.position, gs.color.lstrip("#"))
+    elif bg.type == "image" and bg.color:
+        from .parser.styles import set_slide_image_background
+        import os as _os
+        img_path = bg.color
+        if not _os.path.isabs(img_path):
+            img_path = _os.path.abspath(_os.path.join(_os.getcwd(), img_path))
+        set_slide_image_background(slide, img_path)
 
 
 def _find_layout_index(prs, layout_name: str) -> int:
