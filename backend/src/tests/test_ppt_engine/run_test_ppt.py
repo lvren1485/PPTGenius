@@ -4,7 +4,7 @@ import asyncio, json, sys, os
 backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 sys.path.insert(0, os.path.join(backend_dir, "src"))
 
-from pptgenius.infrastructure.ppt_engine.generator import generate_ppt
+from pptgenius.infrastructure.ppt_engine import generate_ppt
 
 
 async def main():

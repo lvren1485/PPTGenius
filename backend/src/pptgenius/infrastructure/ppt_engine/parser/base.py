@@ -9,7 +9,7 @@ The LLM receives a single error report with all problems, minimizing retry round
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -339,7 +339,10 @@ LAYOUT_NAMES = frozenset({
     "two_column", "image_text", "ending", "blank",
 })
 
-Element = TextboxElement | ChartElement | TableElement | ImageElement | ShapeElement
+Element = Annotated[
+    TextboxElement | ChartElement | TableElement | ImageElement | ShapeElement,
+    Field(discriminator="type")
+]
 
 
 class SlideBackground(BaseModel):
