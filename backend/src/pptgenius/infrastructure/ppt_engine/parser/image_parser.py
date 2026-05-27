@@ -15,13 +15,23 @@ logger = logging.getLogger("ppt_engine.image")
 
 
 def render_picture(slide, el: ImageElement, workspace_path: str = ".") -> None:
-    """Render a picture element onto a slide."""
+    """Render a picture element onto a slide.
+
+    Supports:
+      - path:  direct file path (PNG / SVG, resolved against workspace_path)
+      - name+color:  Tabler icon lookup → colored SVG → PNG
+    """
     left = Inches(el.position.left)
     top = Inches(el.position.top)
 
-    img_path = el.path
-    if not os.path.isabs(img_path):
-        img_path = os.path.join(workspace_path, img_path)
+    if el.name:
+        from ..icon_search import get_colored_svg
+        img_path = get_colored_svg(el.name, el.color, workspace_path)
+        img_path = _svg_to_png(os.path.join(workspace_path, img_path))
+    else:
+        img_path = el.path
+        if not os.path.isabs(img_path):
+            img_path = os.path.join(workspace_path, img_path)
 
     if not os.path.exists(img_path):
         logger.error("Image not found: %s", img_path)

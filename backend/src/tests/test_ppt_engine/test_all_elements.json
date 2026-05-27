@@ -663,6 +663,138 @@
           ]
         }
       ]
+    },
+    {
+      "layout": "blank",
+      "notes": "图标测试 — Tabler Icons 装饰素材: 使用 name+color 从内置库查找图标，自动着色为 PNG。search_icons('growth')→chart-line, search_icons('business')→businessplan, search_icons('chart')→chart-arcs-3, search_icons('settings')→settings, search_icons('lightbulb')→bulb, search_icons('star')→star",
+      "elements": [
+        {
+          "type": "textbox",
+          "position": { "left": 0.8, "top": 0.2, "width": 11.7, "height": 0.6 },
+          "content": [
+            { "paragraph": { "runs": [{ "text": "图标测试 — Tabler Icons 装饰素材", "font": { "size": 24, "bold": true, "color": "202124" } }] } }
+          ]
+        },
+        {
+          "type": "textbox",
+          "position": { "left": 0.8, "top": 0.9, "width": 11.7, "height": 0.4 },
+          "content": [
+            { "paragraph": { "runs": [{ "text": "使用 name+color 从内置5,000+图标库查找，自动着色 → SVG → PNG (300DPI)", "font": { "size": 12, "color": "666666", "italic": true } }] } }
+          ]
+        },
+        {
+          "type": "picture",
+          "position": { "left": 1.0, "top": 1.8, "width": 2.0, "height": 2.0 },
+          "name": "chart-line",
+          "color": "1a73e8",
+          "fit": "aspect"
+        },
+        {
+          "type": "picture",
+          "position": { "left": 3.5, "top": 1.8, "width": 2.0, "height": 2.0 },
+          "name": "businessplan",
+          "color": "34a853",
+          "fit": "aspect"
+        },
+        {
+          "type": "picture",
+          "position": { "left": 6.0, "top": 1.8, "width": 2.0, "height": 2.0 },
+          "name": "chart-arcs-3",
+          "color": "ea4335",
+          "fit": "aspect"
+        },
+        {
+          "type": "picture",
+          "position": { "left": 8.5, "top": 1.8, "width": 2.0, "height": 2.0 },
+          "name": "settings",
+          "color": "5f6368",
+          "fit": "aspect"
+        },
+        {
+          "type": "picture",
+          "position": { "left": 11.0, "top": 1.8, "width": 2.0, "height": 2.0 },
+          "name": "bulb",
+          "color": "fbbc04",
+          "fit": "aspect"
+        },
+        {
+          "type": "textbox",
+          "position": { "left": 1.0, "top": 4.0, "width": 2.0, "height": 0.4 },
+          "content": [
+            { "paragraph": { "alignment": "center", "runs": [{ "text": "chart-line (#1a73e8)", "font": { "size": 9, "color": "666666" } }] } }
+          ]
+        },
+        {
+          "type": "textbox",
+          "position": { "left": 3.5, "top": 4.0, "width": 2.0, "height": 0.4 },
+          "content": [
+            { "paragraph": { "alignment": "center", "runs": [{ "text": "businessplan (#34a853)", "font": { "size": 9, "color": "666666" } }] } }
+          ]
+        },
+        {
+          "type": "textbox",
+          "position": { "left": 6.0, "top": 4.0, "width": 2.0, "height": 0.4 },
+          "content": [
+            { "paragraph": { "alignment": "center", "runs": [{ "text": "chart-arcs-3 (#ea4335)", "font": { "size": 9, "color": "666666" } }] } }
+          ]
+        },
+        {
+          "type": "textbox",
+          "position": { "left": 8.5, "top": 4.0, "width": 2.0, "height": 0.4 },
+          "content": [
+            { "paragraph": { "alignment": "center", "runs": [{ "text": "settings (#5f6368)", "font": { "size": 9, "color": "666666" } }] } }
+          ]
+        },
+        {
+          "type": "textbox",
+          "position": { "left": 11.0, "top": 4.0, "width": 2.0, "height": 0.4 },
+          "content": [
+            { "paragraph": { "alignment": "center", "runs": [{ "text": "bulb (#fbbc04)", "font": { "size": 9, "color": "666666" } }] } }
+          ]
+        },
+        {
+          "type": "picture",
+          "position": { "left": 1.0, "top": 5.0, "width": 1.5, "height": 1.5 },
+          "name": "star",
+          "color": "fbbc04",
+          "fit": "aspect"
+        },
+        {
+          "type": "picture",
+          "position": { "left": 2.8, "top": 5.0, "width": 1.5, "height": 1.5 },
+          "name": "star",
+          "color": "ea4335",
+          "fit": "aspect"
+        },
+        {
+          "type": "picture",
+          "position": { "left": 4.6, "top": 5.0, "width": 1.5, "height": 1.5 },
+          "name": "star",
+          "color": "34a853",
+          "fit": "aspect"
+        },
+        {
+          "type": "picture",
+          "position": { "left": 6.4, "top": 5.0, "width": 1.5, "height": 1.5 },
+          "name": "star",
+          "color": "1a73e8",
+          "fit": "aspect"
+        },
+        {
+          "type": "picture",
+          "position": { "left": 8.2, "top": 5.0, "width": 1.5, "height": 1.5 },
+          "name": "star",
+          "color": "ab47bc",
+          "fit": "aspect"
+        },
+        {
+          "type": "textbox",
+          "position": { "left": 1.0, "top": 6.6, "width": 9.0, "height": 0.4 },
+          "content": [
+            { "paragraph": { "runs": [{ "text": "同一图标 (star) 五种颜色: fbbc04 / ea4335 / 34a853 / 1a73e8 / ab47bc", "font": { "size": 10, "color": "999999", "italic": true } }] } }
+          ]
+        }
+      ]
     }
   ]
 }

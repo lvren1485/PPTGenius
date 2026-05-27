@@ -26,7 +26,7 @@ SLIDE_BOUNDS = ("slide", 0, 0, 13.333, 7.5)
 async def generate_ppt(
     data: dict[str, Any],
     output_path: str,
-    workspace_path: str | None = None,
+    workspace_path: str | None = None,  # A path only for temp files without any important data
 ) -> dict[str, Any]:
     """Validate instruction JSON, then generate .pptx.
 
@@ -97,6 +97,11 @@ async def generate_ppt(
     prs.save(output_path)
     file_size = os.path.getsize(output_path)
     logger.info("PPT saved: %s (%d bytes, %d slides)", output_path, file_size, len(instruction.slides))
+
+    # Clean up temp icon files (colored SVGs + PNGs generated per-run)
+    from .icon_search import cleanup_temp_icons
+    cleanup_temp_icons(workspace_path)
+
     return {"ok": True, "path": output_path, "slide_count": len(instruction.slides), "file_size": file_size}
 
 

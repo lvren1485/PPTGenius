@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .shapes import ALL_SHAPE_KEYS
 
@@ -303,8 +303,18 @@ class TableElement(BaseModel):
 class ImageElement(BaseModel):
     type: Literal["picture"]
     position: Position
-    path: str
+    path: str | None = None          # file path (relative to workspace)
+    name: str | None = None          # Tabler icon name (uses bundled library)
+    color: str | None = None         # hex color override (required when name is set)
     fit: Literal["aspect", "stretch", "crop"] = "aspect"
+
+    @model_validator(mode="after")
+    def _check_path_or_name(self) -> "ImageElement":
+        if not self.path and not self.name:
+            raise ValueError("'path' or 'name'+'color' is required for picture element")
+        if self.name and not self.color:
+            raise ValueError("'color' is required when 'name' (icon lookup) is provided")
+        return self
 
 
 SHAPE_KEYS = frozenset(ALL_SHAPE_KEYS)

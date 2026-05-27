@@ -38,3 +38,6 @@ release/
 
 # BM25 index
 *.pkl
+
+# Tabler icons (downloaded via npm, see README)
+backend/src/pptgenius/resources/tabler/

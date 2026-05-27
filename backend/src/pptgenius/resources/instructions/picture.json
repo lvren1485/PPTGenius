@@ -1,25 +1,41 @@
 {
   "type": "picture",
   "description": [
-    "图片嵌入——在幻灯片中插入 PNG/JPG 等位图。SVG 文件会自动转换为 PNG(300DPI)。",
-    "支持三种缩放模式: aspect(等比缩放)、stretch(拉伸填充)、crop(裁切)。"
+    "图片嵌入——两种方式: (1) 本地文件路径 (2) 图标库查找(按名称+颜色)。SVG 文件会自动转换为 PNG(300DPI)。",
+    "支持三种缩放模式: aspect(等比缩放)、stretch(拉伸填充)、crop(裁切)。",
+    "图标模式 (name+color): 从内置 Tabler 5,000+ MIT 图标库中按名查找,自动着色渲染为 PNG。",
+    "图标名通过 search_icons(query) 工具获得,调用后 LLM 从 top-5 结果中挑选。"
   ],
   "note": [
-    "path 是相对路径(相对于 workspace 根目录)。例如: 'src/tests/resources/image.png'",
-    "height 可以省略(设为 null),此时根据 width 和图片原始比例自动计算高度。",
-    "如果同时指定 width 和 height, 在 fit='aspect' 模式下仍保持比例。",
-    "SVG 转换需要 cairosvg(需Cairo DLL, Windows 需额外安装GTK)。不可用时回退,可能失败。"
+    "二选一: 要么用 path(本地文件), 要么用 name+color(图标库)。不能混用。",
+    "path 模式: 相对路径(相对于 workspace 根)。例如 'images/photo.png'。height 可省略(自动等比)。",
+    "name+color 模式: 不需要 path 字段。引擎自动生成着色 SVG→PNG(生成后清理),LLM 无需关心路径。",
+    "color: hex 颜色字符串,如 '3B82F6' 或 '#3B82F6'。仅当 name 不为空时必填。",
+    "fit='aspect' 时如果同时指定 width 和 height 仍保持比例。"
   ],
   "fields": {
     "type": "固定值 'picture'",
     "position": "Position 对象。height 可为 null(自动等比缩放)。{\"left\":英寸,\"top\":英寸,\"width\":英寸,\"height\":英寸|null}",
-    "path": "图片文件路径。string。相对路径(相对于workspace根)或绝对路径",
+    "path": "图片文件路径?string。相对路径(相对于workspace根)或绝对路径。与 name+color 二选一",
+    "name": "图标名?string。Tabler 图标库中的图标名(通过 search_icons 工具获得)。与 path 二选一",
+    "color": "图标颜色?string。6位hex如 '3B82F6'。仅 name 不为空时需要",
     "fit": "缩放模式。'aspect'(等比,默认)|'stretch'(拉伸变形)|'crop'(裁切填充)"
   },
-  "example": {
-    "type": "picture",
-    "position": { "left": 1.0, "top": 1.5, "width": 5.5, "height": 3.5 },
-    "path": "images/chart_screenshot.png",
-    "fit": "aspect"
-  }
+  "example": [
+    {
+      "_comment": "本地文件模式",
+      "type": "picture",
+      "position": { "left": 1.0, "top": 1.5, "width": 5.5, "height": 3.5 },
+      "path": "images/chart_screenshot.png",
+      "fit": "aspect"
+    },
+    {
+      "_comment": "图标库模式 (先调 search_icons('growth') → 选 chart-line → 蓝色着色)",
+      "type": "picture",
+      "position": { "left": 10.0, "top": 2.0, "width": 2.0, "height": 2.0 },
+      "name": "chart-line",
+      "color": "3B82F6",
+      "fit": "aspect"
+    }
+  ]
 }

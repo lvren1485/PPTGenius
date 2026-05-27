@@ -232,5 +232,12 @@ def _check_shape(el: ShapeElement, path: str, errors: list[dict]) -> None:
 
 
 def _check_picture(el: ImageElement, path: str, errors: list[dict]) -> None:
-    if not el.path:
+    if el.name:
+        # Check icon exists in bundled library
+        from .icon_search import _get_icons_dir
+        svg_path = _get_icons_dir() / f"{el.name}.svg"
+        if not svg_path.exists():
+            errors.append({"path": f"{path}.name",
+                           "error": f"icon '{el.name}' not found in Tabler library"})
+    elif not el.path:
         errors.append({"path": f"{path}.path", "error": "picture path is empty"})

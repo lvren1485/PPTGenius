@@ -38,6 +38,28 @@ cd backend
 uv sync
 ```
 
+## 安装 Tabler 图标库 (PPT装饰素材)
+
+PPTGenius 使用 [Tabler Icons](https://tabler.io/icons)（MIT 许可，5,800+ 图标）作为 PPT 矢量装饰素材。
+
+```bash
+# 1. 下载并解压
+cd backend/src/pptgenius/resources/tabler
+npm pack @tabler/icons
+tar -xzf tabler-icons-*.tgz # 解压后会生成 package/ 目录，或者使用工具如 bandizip 直接解压 .tgz 文件
+
+# 2. 拷贝元数据
+cp package/icons.json icons_meta.json
+
+# 3. 拷贝 outline SVG（用于 PPT 装饰）
+mkdir -p svg
+cp package/icons/outline/*.svg svg/
+
+# 4. 清理
+rm -rf package tabler-icons-*.tgz
+```
+
+
 ## 运行
 
 ```bash
