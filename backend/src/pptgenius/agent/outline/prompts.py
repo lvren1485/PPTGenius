@@ -89,22 +89,81 @@ def build_generator_user_prompt(
     return "\n".join(parts)
 
 
+def compute_outline_metrics(slides: list) -> dict:
+    """Compute quantitative metrics from outline slides for evaluator."""
+    lt_counts: dict[str, int] = {}
+    fmt_counts: dict[str, int] = {}
+    img_count = 0
+    chart_count = 0
+    total_content_len = 0
+    formats_in_order: list[str] = []
+
+    for s in slides:
+        lt = s.layout_type if hasattr(s, 'layout_type') else s.get('layout_type', 'content')
+        lt_counts[lt] = lt_counts.get(lt, 0) + 1
+
+        cj = s.content_json if hasattr(s, 'content_json') else s.get('content_json', {})
+        if isinstance(cj, dict):
+            fmt = cj.get('recommended_ppt_format', 'unknown')
+            if cj.get('detailed_content'):
+                total_content_len += len(cj['detailed_content'])
+        else:
+            fmt = 'unknown'
+
+        fmt_counts[fmt] = fmt_counts.get(fmt, 0) + 1
+        formats_in_order.append(fmt)
+
+        if hasattr(s, 'has_image'):
+            if s.has_image: img_count += 1
+            if s.has_chart: chart_count += 1
+        elif isinstance(s, dict):
+            if s.get('has_image'): img_count += 1
+            if s.get('has_chart'): chart_count += 1
+
+    # Max consecutive same format
+    max_consecutive = 0
+    current_consecutive = 1
+    for i in range(1, len(formats_in_order)):
+        if formats_in_order[i] == formats_in_order[i-1]:
+            current_consecutive += 1
+        else:
+            max_consecutive = max(max_consecutive, current_consecutive)
+            current_consecutive = 1
+    max_consecutive = max(max_consecutive, current_consecutive)
+
+    total = len(slides)
+    return {
+        "total_slides": total,
+        "layout_type_counts": lt_counts,
+        "layout_type_variety": len(lt_counts),
+        "format_counts": fmt_counts,
+        "format_variety": len(fmt_counts),
+        "max_consecutive_same_format": max_consecutive,
+        "image_ratio": f"{img_count}/{total}",
+        "chart_ratio": f"{chart_count}/{total}",
+        "avg_content_length": total_content_len // max(total, 1),
+    }
+
+
+def format_metrics_for_prompt(metrics: dict) -> str:
+    """Format computed metrics as a readable string for the evaluator prompt."""
+    return (
+        f"- 总页数: {metrics['total_slides']}\n"
+        f"- layout_type 分布: {metrics['layout_type_counts']}（共 {metrics['layout_type_variety']} 种）\n"
+        f"- recommended_ppt_format 分布: {metrics['format_counts']}（共 {metrics['format_variety']} 种）\n"
+        f"- 同一 format 最大连续使用: {metrics['max_consecutive_same_format']} 页\n"
+        f"- 含图片页面: {metrics['image_ratio']}, 含图表页面: {metrics['chart_ratio']}\n"
+        f"- 每页平均内容长度: {metrics['avg_content_length']} 字符"
+    )
+
+
 def build_evaluator_user_prompt(
     outline_title: str,
     slides_text: str,
     design_rationale: str = "",
+    metrics: dict | None = None,
 ) -> str:
-    """Build the user prompt for the evaluator node.
-
-    Parameters
-    ----------
-    outline_title : str
-        The outline title.
-    slides_text : str
-        Formatted text of all slides with their content.
-    design_rationale : str
-        The generator's design rationale for this outline.
-    """
+    """Build the user prompt for the evaluator node."""
     parts = [
         "请对以下PPT大纲进行评审打分。",
         "",
@@ -112,6 +171,13 @@ def build_evaluator_user_prompt(
     ]
     if design_rationale:
         parts.extend(["", "## 设计思路", "", design_rationale])
+    if metrics:
+        parts.extend([
+            "",
+            "## 大纲量化指标（程序自动计算，供参考）",
+            "",
+            format_metrics_for_prompt(metrics),
+        ])
     parts.extend([
         "",
         "## 大纲全文",
@@ -119,7 +185,8 @@ def build_evaluator_user_prompt(
         slides_text,
         "",
         "---",
-        "请严格对照评分标准对三个维度分别打分，并给出具体的改进建议。",
+        "请严格对照评分标准对四个维度分别打分，参考量化指标但不要机械套用。",
+        "如果量化指标显示明显问题（如 layout_type 只有2种、连续5页相同 format），必须在对应维度扣分。",
         "**必须使用 submit_evaluation 工具提交评分。**",
     ])
     return "\n".join(parts)

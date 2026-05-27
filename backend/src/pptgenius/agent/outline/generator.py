@@ -19,6 +19,7 @@ from langchain_core.messages import HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
+from langgraph.config import get_stream_writer
 
 from pptgenius.agent.common.langchain_adapter import apply_deepseek_patch
 from pptgenius.infrastructure.config import get_settings
@@ -87,6 +88,45 @@ def _make_search_web():
         return "\n\n".join(items)
 
     return search_web
+
+
+def _make_list_files(db: Database, user_id: int):
+    @tool
+    async def list_knowledge_files(dummy: str = "") -> str:
+        """List all knowledge files belonging to the current user.
+        Pass an empty string as the argument.
+        """
+        files = await db.list_knowledge_files(user_id)
+        if not files:
+            return "知识库中没有任何文件。"
+        items = []
+        for f in files[:50]:
+            items.append(f"- [{f.file_type}] {f.filename} ({f.chunk_count} chunks, {f.file_size} bytes)")
+        return "\n".join(items)
+
+    return list_knowledge_files
+
+
+def _make_read_file(db: Database):
+    @tool
+    async def read_file(file_id: int) -> str:
+        """Read the full text of a knowledge file (all chunks). Use this after
+        list_knowledge_files to get the complete content of a relevant file.
+
+        Parameters
+        ----------
+        file_id : int — The file ID from list_knowledge_files.
+        """
+        chunks = await db.list_chunks_by_file(file_id)
+        if not chunks:
+            return f"文件 {file_id} 没有内容。"
+        parts = []
+        for c in sorted(chunks, key=lambda x: x.chunk_index):
+            parts.append(c.chunk_text)
+        full = "\n\n".join(parts)
+        return full[:8000]  # limit to avoid overwhelming context
+
+    return read_file
 
 
 def _make_fetch_web(db: Database, user_id: int, conv_id: int):
@@ -174,9 +214,15 @@ async def generator_node(state: OutlineState, config: RunnableConfig) -> dict:
     conv_id = state["conversation_id"]
     outline_id = state.get("outline_id")
     is_revision = outline_id is not None and state.get("evaluated", False)
+    try:
+        writer = get_stream_writer()
+    except RuntimeError:
+        writer = lambda _: None  # no-op when not inside a running graph (e.g. tests)
 
     write_outline_tool, get_result = _make_write_outline(db, user_id, conv_id, outline_id)
     tools = [
+        _make_list_files(db, user_id),
+        _make_read_file(db),
         _make_search_knowledge(user_id),
         _make_search_web(),
         _make_fetch_web(db, user_id, conv_id),
@@ -199,10 +245,12 @@ async def generator_node(state: OutlineState, config: RunnableConfig) -> dict:
         middleware=[TokenCountingMiddleware(conv_id)],
     )
 
+    writer({"type": "generator_start", "is_revision": is_revision})
     result = await agent.ainvoke(
         {"messages": [HumanMessage(content=user_prompt)]},
         config=config,
     )
+    writer({"type": "generator_end", "was_called": False})  # placeholder
 
     final_outline_id, rationale, was_called = get_result()
     new_iteration = state.get("iteration", 0) + 1

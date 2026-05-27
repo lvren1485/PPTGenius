@@ -22,6 +22,7 @@ from pptgenius.infrastructure.utils import get_logger
 from .middleware import TokenCountingMiddleware
 from .prompts import (
     build_evaluator_user_prompt,
+    compute_outline_metrics,
     format_rubric_for_prompt,
     load_evaluator_system,
 )
@@ -126,6 +127,7 @@ async def evaluator_node(state: OutlineState, config: RunnableConfig) -> dict:
 
     slides = await db.get_slides_by_outline_id(outline_id)
     slides_text = _format_slides_text(slides)
+    metrics = compute_outline_metrics(slides)
 
     rubric_text = format_rubric_for_prompt()
     system_prompt = load_evaluator_system() + "\n\n" + rubric_text
@@ -135,6 +137,7 @@ async def evaluator_node(state: OutlineState, config: RunnableConfig) -> dict:
         outline_title=outline.title,
         slides_text=slides_text,
         design_rationale="\n---\n".join(design_rationales) if design_rationales else "",
+        metrics=metrics,
     )
 
     agent = create_agent(

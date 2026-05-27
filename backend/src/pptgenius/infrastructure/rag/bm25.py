@@ -101,5 +101,9 @@ class BM25Manager:
 
     @staticmethod
     def _tokenize(text: str) -> list[str]:
-        # Simple whitespace tokenization — BM25Okapi default
-        return text.lower().split()
+        """Tokenize with jieba for Chinese + English mixed text."""
+        try:
+            import jieba
+            return [t.lower() for t in jieba.cut(text) if t.strip()]
+        except ImportError:
+            return text.lower().split()

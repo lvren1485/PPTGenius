@@ -307,6 +307,14 @@ async def _run_outline(
                 async for sse in _tool_end_sse(event, db):
                     yield sse
 
+            elif kind == "on_custom_event":
+                # Events pushed via get_stream_writer() from generator/evaluator nodes
+                custom_data = event.get("data", {})
+                if custom_data.get("type") == "generator_start":
+                    _log.debug("generator started via stream_writer")
+                elif custom_data.get("type") == "generator_end":
+                    _log.debug("generator ended via stream_writer")
+
             elif kind == "on_chain_end" and event["name"] == "finalize":
                 # Outline graph finished — emit final outline data directly
                 output = event["data"].get("output", {})
