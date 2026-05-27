@@ -1,11 +1,10 @@
 """SSE streaming chat endpoint — single entry point for all user messages.
 
-Agent supervisor decides what to do based on current conversation phase.
+The coordinator agent analyses intent and dispatches to sub-agents.
 """
 
 from __future__ import annotations
 
-import asyncio
 import json
 import time
 from typing import AsyncGenerator
@@ -13,10 +12,11 @@ from typing import AsyncGenerator
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
+from pptgenius.agent import run_coordinator
 from pptgenius.infrastructure.db import Database
 from pptgenius.infrastructure.utils import get_logger
 
-from .deps import get_db, get_knowledge_manager, get_web_search_service, get_workspace_manager
+from .deps import get_db
 from .schemas import ChatSendRequest
 
 _log = get_logger("pptgenius.api.chat")
@@ -73,48 +73,8 @@ async def chat_send(
 
 
 async def _run_agent(req: ChatSendRequest, db: Database) -> AsyncGenerator[str, None]:
-    """Agent supervisor — TODO: replace with actual LangGraph agent.
+    """Run the coordinator agent — analyses intent and dispatches to sub-agents."""
+    _log.info("coordinator start: conv=%d msg=%r", req.conversation_id, req.message)
 
-    Placeholder simulates the full agent flow.
-    """
-    # TODO: Implement agent supervisor here.
-    #   The supervisor should:
-    #   1. Load conversation state (phase, messages, latest outline/presentation)
-    #   2. Run BM25 RAG via KnowledgeService.search(user_id, query)
-    #   3. Optionally run web search via WebSearchService.search() + fetch_and_ingest()
-    #   4. Decide next action based on current_phase:
-    #      - "chat" / no outline → generate outline (generator-evaluator loop)
-    #      - "waiting_user" + outline exists → interpret feedback, modify outline or proceed
-    #      - confirmed outline → generate PPT (supervisor-subagent pipeline)
-    #      - generated PPT → interpret feedback, modify slides or regenerate
-    #   5. Stream progress, outline, ppt_ready events via SSE
-    #
-    #   For now, emit placeholder events to demonstrate SSE plumbing.
-
-    _log.info("TODO: agent supervisor for conv=%d msg=%r", req.conversation_id, req.message)
-
-    yield _sse("phase", {"phase": "rag", "message": "检索知识库..."})
-
-    # Simulate knowledge retrieval
-    await asyncio.sleep(0.1)
-    yield _sse("knowledge", {"sources": []})
-
-    yield _sse("phase", {"phase": "outline", "message": "开始生成大纲..."})
-
-    yield _sse("progress", {"step": "generating", "detail": "正在生成大纲...", "pct": 10})
-    await asyncio.sleep(0.1)
-
-    yield _sse("progress", {"step": "evaluating", "detail": "评估中...", "pct": 30})
-    await asyncio.sleep(0.1)
-
-    # Placeholder outline
-    yield _sse("outline", {
-        "outline_id": 0,
-        "title": "大纲示例",
-        "slides": [
-            {"slide_index": 0, "title": "示例页", "layout_type": "title", "content_json": {}}
-        ],
-        "eval_score": 0.80,
-    })
-
-    yield _sse("phase", {"phase": "waiting_user", "message": "请确认大纲，或提出修改意见"})
+    async for event in run_coordinator(db, req.conversation_id, req.message):
+        yield event

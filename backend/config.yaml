@@ -17,10 +17,12 @@ rag:
 
 agent:
   outline:
+    mode: "mix"               # max_iteration | pass_score | mix
     max_iterations: 5
+    pass_score: 8.0           # 0-10, used by pass_score / mix modes
     evaluation_threshold: 0.7
   cache:
-    trim_max_tokens: 8000
+    trim_max_tokens: 500000
     enable_node_cache: true
 
 llm:

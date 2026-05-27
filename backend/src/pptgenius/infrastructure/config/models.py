@@ -21,7 +21,9 @@ class RAGConfig(BaseModel):
 
 
 class OutlineAgentConfig(BaseModel):
+    mode: str = "mix"  # max_iteration | pass_score | mix
     max_iterations: int = 5
+    pass_score: float = 8.0  # 0-10, used by pass_score / mix modes
     evaluation_threshold: float = 0.7
 
 
