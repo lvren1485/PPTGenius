@@ -13,6 +13,7 @@ from pptgenius.agent.coordinator import (
     _load_coordinator_prompt,
     run_coordinator,
 )
+from .test_outline_graph import _ReActMockModel
 
 
 # ── prompt loading ───────────────────────────────────────────────────────────
@@ -153,46 +154,29 @@ async def test_run_coordinator_generate_outline(db):
     mock_llm = MagicMock()
     mock_llm.with_structured_output.return_value.ainvoke = AsyncMock(return_value=mock_decision)
 
-    # Mock for the outline generator node (calls write_outline)
-    gen_response = AIMessage(
-        content="",
-        tool_calls=[{
-            "name": "write_outline",
-            "args": {
-                "title": "测试大纲",
-                "design_rationale": "测试",
-                "slides": [{
-                    "slide_index": 0, "title": "首页",
-                    "content_json": {"main_points": ["测试"]},
-                    "layout_type": "title",
-                    "has_image": False, "has_chart": False, "notes": "",
-                }],
-            },
-            "id": "call_gen",
-            "type": "tool_call",
-        }],
-    )
-    # Mock for the evaluator node (calls submit_evaluation with high score → stops loop)
-    eval_response = AIMessage(
-        content="",
-        tool_calls=[{
-            "name": "submit_evaluation",
-            "args": {
-                "structure_clarity": 9.0,
-                "logic_coherence": 9.0,
-                "comprehensiveness": 9.0,
-                "suggestions": "很好了",
-            },
-            "id": "call_eval",
-            "type": "tool_call",
-        }],
-    )
-    mock_gen_model = MagicMock(bind_tools=MagicMock(return_value=MagicMock(ainvoke=AsyncMock(return_value=gen_response))))
-    mock_eval_model = MagicMock(bind_tools=MagicMock(return_value=MagicMock(ainvoke=AsyncMock(return_value=eval_response))))
+    # ReAct mocks for generator (write_outline → finish) and evaluator (submit_eval → finish)
+    gen_tool_msg = AIMessage(content="", tool_calls=[{
+        "name": "write_outline", "args": {
+            "title": "测试大纲", "design_rationale": "测试",
+            "slides": [{"slide_index": 0, "title": "首页", "content_json": {"main_points": ["测试"]}, "layout_type": "title", "has_image": False, "has_chart": False, "notes": ""}],
+        },
+        "id": "call_gen", "type": "tool_call",
+    }])
+    gen_final_msg = AIMessage(content="完成")
+    eval_tool_msg = AIMessage(content="", tool_calls=[{
+        "name": "submit_evaluation", "args": {
+            "structure_clarity": 9.0, "logic_coherence": 9.0,
+            "comprehensiveness": 9.0, "visual_diversity": 9.0, "suggestions": "很好了",
+        },
+        "id": "call_eval", "type": "tool_call",
+    }])
+    eval_final_msg = AIMessage(content="完成")
 
     with patch("pptgenius.agent.coordinator._get_model", return_value=mock_llm), \
-         patch("pptgenius.agent.outline.generator._get_model", return_value=mock_gen_model), \
-         patch("pptgenius.agent.outline.evaluator._get_model", return_value=mock_eval_model):
+         patch("pptgenius.agent.outline.generator._get_model",
+               return_value=_ReActMockModel(gen_tool_msg, gen_final_msg)), \
+         patch("pptgenius.agent.outline.evaluator._get_model",
+               return_value=_ReActMockModel(eval_tool_msg, eval_final_msg)):
         events = []
         async for event in run_coordinator(database, conv.id, "帮我做一个关于AI的PPT"):
             events.append(event)
@@ -237,43 +221,28 @@ async def test_run_coordinator_modify_outline(db):
     mock_llm = MagicMock()
     mock_llm.with_structured_output.return_value.ainvoke = AsyncMock(return_value=mock_decision)
 
-    gen_response = AIMessage(
-        content="",
-        tool_calls=[{
-            "name": "write_outline",
-            "args": {
-                "title": "修改后的大纲",
-                "design_rationale": "改进",
-                "slides": [{
-                    "slide_index": 0, "title": "新页",
-                    "content_json": {"main_points": ["新内容"]},
-                    "layout_type": "content",
-                    "has_image": False, "has_chart": False, "notes": "",
-                }],
-            },
-            "id": "call_1",
-            "type": "tool_call",
-        }],
-    )
-    # Evaluator mock (high score → stops loop)
-    eval_response = AIMessage(
-        content="",
-        tool_calls=[{
-            "name": "submit_evaluation",
-            "args": {
-                "structure_clarity": 9.0, "logic_coherence": 9.0,
-                "comprehensiveness": 9.0, "suggestions": "OK",
-            },
-            "id": "call_ev",
-            "type": "tool_call",
-        }],
-    )
-    mock_gen = MagicMock(bind_tools=MagicMock(return_value=MagicMock(ainvoke=AsyncMock(return_value=gen_response))))
-    mock_eval = MagicMock(bind_tools=MagicMock(return_value=MagicMock(ainvoke=AsyncMock(return_value=eval_response))))
+    gen_tool_msg = AIMessage(content="", tool_calls=[{
+        "name": "write_outline", "args": {
+            "title": "修改后的大纲", "design_rationale": "改进",
+            "slides": [{"slide_index": 0, "title": "新页", "content_json": {"main_points": ["新内容"]}, "layout_type": "content", "has_image": False, "has_chart": False, "notes": ""}],
+        },
+        "id": "call_1", "type": "tool_call",
+    }])
+    gen_final_msg = AIMessage(content="完成")
+    eval_tool_msg = AIMessage(content="", tool_calls=[{
+        "name": "submit_evaluation", "args": {
+            "structure_clarity": 9.0, "logic_coherence": 9.0,
+            "comprehensiveness": 9.0, "visual_diversity": 9.0, "suggestions": "OK",
+        },
+        "id": "call_ev", "type": "tool_call",
+    }])
+    eval_final_msg = AIMessage(content="完成")
 
     with patch("pptgenius.agent.coordinator._get_model", return_value=mock_llm), \
-         patch("pptgenius.agent.outline.generator._get_model", return_value=mock_gen), \
-         patch("pptgenius.agent.outline.evaluator._get_model", return_value=mock_eval):
+         patch("pptgenius.agent.outline.generator._get_model",
+               return_value=_ReActMockModel(gen_tool_msg, gen_final_msg)), \
+         patch("pptgenius.agent.outline.evaluator._get_model",
+               return_value=_ReActMockModel(eval_tool_msg, eval_final_msg)):
         events = []
         async for event in run_coordinator(database, conv.id, "加一个案例研究"):
             events.append(event)

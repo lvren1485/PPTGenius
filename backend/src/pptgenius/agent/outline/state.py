@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated
 import operator
 
 from langchain_core.messages import BaseMessage
@@ -17,30 +17,29 @@ class OutlineState(TypedDict):
     user_id : int
     conversation_id : int
     query : str
-        Current user message / task description. On revision rounds this
-        carries the evaluator's suggestions from the previous round.
+        Current user message / task description.
     outline_id : int | None
-        ID of the outline being worked on.  ``None`` means we need to
-        create a new one.
+        ID of the outline being worked on.  ``None`` means create new.
     evaluated : bool
-        Whether the current outline has been evaluated.  Controls routing:
-        ``False`` → evaluator, ``True`` → generator (revise).
+        Controls routing: ``False`` → evaluator, ``True`` → generator.
     iteration : int
-        How many times the generator has run (used for max-iteration stop).
+        Generator run count (used for max-iteration stop).
     eval_score : float | None
         Latest evaluation total score (0-10).
     eval_suggestions : str
         Latest evaluator improvement suggestions.
     mode : str
-        Stop mode: ``"max_iteration"`` | ``"pass_score"`` | ``"mix"``.
+        ``"max_iteration"`` | ``"pass_score"`` | ``"mix"``.
     max_iterations : int
         Hard cap on generator runs.
     pass_score : float
-        Score threshold (0-10) for pass_score / mix modes.
+        Score threshold (0-10).
     design_rationale : str
-        Generator's design rationale for the latest outline.
-    messages : list[BaseMessage]
-        Conversation history passed from the chat layer.
+        Latest generator design rationale.
+    design_rationales : list[str]
+        Accumulated rationales from every generator run.
+    final_outline_data : dict | None
+        Serialised outline + slides for frontend emission.
     messages : Annotated[list[BaseMessage], operator.add]
         Accumulated messages across agent invocations.
     """
@@ -57,4 +56,6 @@ class OutlineState(TypedDict):
     max_iterations: int
     pass_score: float
     design_rationale: str
+    design_rationales: Annotated[list[str], operator.add]
+    final_outline_data: dict | None
     messages: Annotated[list[BaseMessage], operator.add]

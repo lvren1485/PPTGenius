@@ -1,4 +1,4 @@
-"""Evaluator node — scores an outline against the rubric and writes results.
+"""Evaluator agent — uses LangChain create_agent for the ReAct loop.
 
 The evaluator has one tool:
 - ``submit_evaluation`` — persist scores + suggestions to DB (terminal tool)
@@ -8,15 +8,18 @@ from __future__ import annotations
 
 import json
 
-from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+from langchain.agents import create_agent
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 
+from pptgenius.agent.common.langchain_adapter import apply_deepseek_patch
 from pptgenius.infrastructure.config import get_settings
 from pptgenius.infrastructure.db import Database
 from pptgenius.infrastructure.utils import get_logger
 
+from .middleware import TokenCountingMiddleware
 from .prompts import (
     build_evaluator_user_prompt,
     format_rubric_for_prompt,
@@ -26,6 +29,8 @@ from .state import OutlineState
 
 _log = get_logger("pptgenius.agent.outline.evaluator")
 
+apply_deepseek_patch()
+
 
 def _get_model() -> ChatOpenAI:
     cfg = get_settings().llm
@@ -33,7 +38,7 @@ def _get_model() -> ChatOpenAI:
         model=cfg.model,
         base_url=cfg.base_url,
         api_key=cfg.api_key,
-        temperature=0.3,  # lower temperature for evaluation
+        temperature=0.3,
         max_tokens=cfg.max_tokens,
     )
 
@@ -47,7 +52,8 @@ def _format_slides_text(slides: list) -> str:
         if s.content_json:
             cj = s.content_json
             if isinstance(cj, dict):
-                for key in ("main_points", "detailed_content", "key_data", "visual_note"):
+                for key in ("main_points", "detailed_content", "key_data",
+                            "visual_note", "recommended_ppt_format"):
                     val = cj.get(key)
                     if val:
                         if isinstance(val, list):
@@ -72,28 +78,27 @@ def _make_submit_evaluation(db: Database, outline_id: int):
         structure_clarity: float,
         logic_coherence: float,
         comprehensiveness: float,
+        visual_diversity: float,
         suggestions: str,
     ) -> str:
-        """Submit evaluation scores for the current outline. MUST be called as the final action.
+        """Submit evaluation scores for the current outline. MUST be called last.
 
         Parameters
         ----------
-        structure_clarity : float
-            Score for structure clarity (0-10).
-        logic_coherence : float
-            Score for logic coherence (0-10).
-        comprehensiveness : float
-            Score for comprehensiveness (0-10).
-        suggestions : str
-            Specific, actionable improvement suggestions.
+        structure_clarity : float — Score for structure clarity (0-10).
+        logic_coherence : float — Score for logic coherence (0-10).
+        comprehensiveness : float — Score for comprehensiveness (0-10).
+        visual_diversity : float — Score for visual element diversity (0-10).
+        suggestions : str — Specific, actionable improvement suggestions.
         """
-        total = round((structure_clarity + logic_coherence + comprehensiveness) / 3, 2)
+        total = round((structure_clarity + logic_coherence + comprehensiveness + visual_diversity) / 4, 2)
         await db.update_outline_eval(outline_id, total)
         _log.info("evaluation submitted for outline %d: %.2f", outline_id, total)
         return json.dumps({
             "structure_clarity": structure_clarity,
             "logic_coherence": logic_coherence,
             "comprehensiveness": comprehensiveness,
+            "visual_diversity": visual_diversity,
             "total": total,
             "suggestions": suggestions,
         })
@@ -101,17 +106,14 @@ def _make_submit_evaluation(db: Database, outline_id: int):
     return submit_evaluation
 
 
-# ── evaluator node ──────────────────────────────────────────────────────────
+# ── evaluator node ───────────────────────────────────────────────────────────
 
 
 async def evaluator_node(state: OutlineState, config: RunnableConfig) -> dict:
-    """Evaluator agent: read outline → score → submit_evaluation.
-
-    Reads the current outline + slides from DB, asks the LLM to score against
-    the rubric, and writes the results.
-    """
+    """Evaluator: read outline → build prompt → create_agent → extract scores."""
     db: Database = config["configurable"]["db"]
     outline_id = state["outline_id"]
+    conv_id = state["conversation_id"]
 
     if outline_id is None:
         _log.error("evaluator called with no outline_id")
@@ -125,62 +127,58 @@ async def evaluator_node(state: OutlineState, config: RunnableConfig) -> dict:
     slides = await db.get_slides_by_outline_id(outline_id)
     slides_text = _format_slides_text(slides)
 
-    model = _get_model()
-    submit_tool = _make_submit_evaluation(db, outline_id)
-    tools = [submit_tool]
-    tools_by_name = {t.name: t for t in tools}
-    model_with_tools = model.bind_tools(tools)
-
     rubric_text = format_rubric_for_prompt()
     system_prompt = load_evaluator_system() + "\n\n" + rubric_text
+
+    design_rationales = state.get("design_rationales", [])
     user_prompt = build_evaluator_user_prompt(
         outline_title=outline.title,
         slides_text=slides_text,
-        design_rationale=state.get("design_rationale", ""),
+        design_rationale="\n---\n".join(design_rationales) if design_rationales else "",
     )
 
-    messages = [SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)]
+    agent = create_agent(
+        model=_get_model(),
+        tools=[_make_submit_evaluation(db, outline_id)],
+        system_prompt=system_prompt,
+        middleware=[TokenCountingMiddleware(conv_id)],
+    )
 
+    result = await agent.ainvoke(
+        {"messages": [HumanMessage(content=user_prompt)]},
+        config=config,
+    )
+
+    # Extract scores from submit_evaluation ToolMessage
     eval_score: float = 0.0
     eval_suggestions = ""
-
-    for _turn in range(10):
-        response = await model_with_tools.ainvoke(messages)
-        messages.append(response)
-
-        if not response.tool_calls:
-            _log.warning("evaluator stopped without calling submit_evaluation")
-            break
-
-        for tc in response.tool_calls:
-            tool_func = tools_by_name.get(tc["name"])
-            if tool_func is None:
-                messages.append(ToolMessage(
-                    content=f"Unknown tool: {tc['name']}", tool_call_id=tc["id"]
-                ))
-                continue
-
+    for msg in reversed(result["messages"]):
+        name = getattr(msg, "name", None)
+        if name == "submit_evaluation":
             try:
-                result = await tool_func.ainvoke(tc["args"])
-            except Exception as exc:
-                _log.exception("submit_evaluation failed")
-                result = f"Tool error: {exc}"
-
-            messages.append(ToolMessage(content=str(result), tool_call_id=tc["id"]))
-
-            if tc["name"] == "submit_evaluation":
-                parsed = json.loads(str(result))
-                eval_score = parsed["total"]
+                parsed = json.loads(str(msg.content))
+                eval_score = parsed.get("total", 0.0)
                 eval_suggestions = parsed.get("suggestions", "")
-                break
-
-        if eval_score > 0 or any(tc["name"] == "submit_evaluation" for tc in response.tool_calls):
+            except (json.JSONDecodeError, TypeError):
+                pass
             break
+    else:
+        # Fallback: try to parse any ToolMessage content that looks like eval result
+        for msg in reversed(result["messages"]):
+            if hasattr(msg, "tool_call_id"):
+                try:
+                    parsed = json.loads(str(msg.content))
+                    if "total" in parsed and "structure_clarity" in parsed:
+                        eval_score = parsed.get("total", 0.0)
+                        eval_suggestions = parsed.get("suggestions", "")
+                        break
+                except (json.JSONDecodeError, TypeError):
+                    pass
 
     return {
         "evaluated": True,
         "eval_score": eval_score,
         "eval_suggestions": eval_suggestions,
-        "query": eval_suggestions,  # becomes next round's generator input
-        "messages": messages,
+        "query": eval_suggestions,
+        "messages": result["messages"],
     }

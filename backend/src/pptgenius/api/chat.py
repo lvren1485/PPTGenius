@@ -14,7 +14,7 @@ from fastapi.responses import StreamingResponse
 
 from pptgenius.agent import run_coordinator
 from pptgenius.infrastructure.db import Database
-from pptgenius.infrastructure.utils import get_logger
+from pptgenius.infrastructure.utils import TokenCounter, get_logger
 
 from .deps import get_db
 from .schemas import ChatSendRequest
@@ -61,9 +61,11 @@ async def chat_send(
                     return
                 yield event
             elapsed = round(time.time() - t0, 2)
+            token_snapshot = TokenCounter.for_conversation(req.conversation_id).snapshot()
             yield _sse("done", {
                 "estimated_cost": round(conv.estimated_cost or 0, 4),
                 "elapsed_seconds": elapsed,
+                "token_usage": token_snapshot,
             })
         except Exception as exc:
             _log.exception("agent error")

@@ -1,4 +1,4 @@
-"""Generator node — LLM agent that creates/revises PPT outlines.
+"""Generator agent — uses LangChain create_agent for the ReAct tool-calling loop.
 
 The generator has four tools:
 - ``search_knowledge`` — BM25 search across the user's knowledge base
@@ -6,14 +6,16 @@ The generator has four tools:
 - ``fetch_web`` — fetch + index a single URL
 - ``write_outline`` — persist the outline + slides to DB (terminal tool)
 
-After the LLM calls ``write_outline`` the node returns updated state.
+create_agent handles the ReAct loop (model → tools → model → ...)
+and manages DeepSeek reasoning_content natively.
 """
 
 from __future__ import annotations
 
 import json
 
-from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+from langchain.agents import create_agent
+from langchain_core.messages import HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
@@ -24,16 +26,16 @@ from pptgenius.infrastructure.db import Database
 from pptgenius.infrastructure.rag import KnowledgeService, WebSearchService
 from pptgenius.infrastructure.utils import get_logger
 
-from .prompts import (
-    build_generator_user_prompt,
-    load_generator_system,
-)
+from .middleware import TokenCountingMiddleware
+from .prompts import build_generator_user_prompt, load_generator_system
 from .state import OutlineState
 
 _log = get_logger("pptgenius.agent.outline.generator")
 
 _web_search = WebSearchService()
 _knowledge = KnowledgeService()
+
+apply_deepseek_patch()
 
 
 def _get_model() -> ChatOpenAI:
@@ -47,7 +49,7 @@ def _get_model() -> ChatOpenAI:
     )
 
 
-# ── tools (built as closures inside the node so they capture db / state) ──
+# ── tools (built as closures so they capture db / state at runtime) ──
 
 
 def _make_search_knowledge(user_id: int):
@@ -107,7 +109,13 @@ def _make_fetch_web(db: Database, user_id: int, conv_id: int):
     return fetch_web
 
 
-def _make_write_outline(db: Database, user_id: int, conv_id: int, outline_id: int | None):
+def _make_write_outline(db: Database, user_id: int, conv_id: int, initial_outline_id: int | None):
+    """Returns (tool, get_ids).  Uses a mutable list wrapper so the tool can
+    communicate outline_id and rationale back to the caller after create_agent
+    completes."""
+    _store: list[int | None] = [initial_outline_id]
+    _rationale: list[str] = [""]
+
     @tool
     async def write_outline(
         title: str,
@@ -116,119 +124,108 @@ def _make_write_outline(db: Database, user_id: int, conv_id: int, outline_id: in
     ) -> str:
         """Write (create or replace) the outline and all its slides to the database.
 
-        This is the FINAL action — call this after you've finished researching and designing.
+        This is the FINAL action — call this after researching and designing.
 
         Parameters
         ----------
-        title : str
-            The outline title.
-        design_rationale : str
-            Your design rationale: why this structure, narrative thread, tradeoffs made.
-        slides : list[dict]
-            Each slide: {slide_index, title, content_json, layout_type, has_image, has_chart, notes}
-            - slide_index: 0-based index
-            - layout_type: title | content | section | summary | thanks
-            - content_json: {main_points, detailed_content, key_data, visual_note}
+        title : str — The outline title.
+        design_rationale : str — Your design rationale: narrative thread, tradeoffs.
+        slides : list[dict] — Each slide:
+            {slide_index, title, content_json, layout_type, has_image, has_chart, notes}
+            content_json MUST include: main_points, detailed_content, key_data,
+            visual_note, recommended_ppt_format (one of: bullet_list, two_column,
+            flowchart, chart, image_full, text_with_image, timeline, comparison,
+            table, big_number, quote, diagram, three_column, four_grid)
         """
-        nonlocal outline_id
-
-        if outline_id is None:
+        if _store[0] is None:
             outline = await db.create_outline(
-                user_id=user_id,
-                conversation_id=conv_id,
-                title=title,
-                slide_count=len(slides),
+                user_id=user_id, conversation_id=conv_id,
+                title=title, slide_count=len(slides),
             )
-            outline_id = outline.id
-            _log.info("created outline id=%d with %d slides", outline_id, len(slides))
+            _store[0] = outline.id
+            _log.info("created outline id=%d with %d slides", outline.id, len(slides))
         else:
-            await db.increment_outline_version(outline_id)
-            _log.info("revising outline id=%d (new version)", outline_id)
+            await db.increment_outline_version(_store[0])
+            _log.info("revising outline id=%d (new version)", _store[0])
 
-        await db.replace_outline_slides(outline_id, slides)
-        return json.dumps({"outline_id": outline_id, "slide_count": len(slides), "status": "ok"})
+        await db.replace_outline_slides(_store[0], slides)
+        _rationale[0] = design_rationale
+        return json.dumps({
+            "outline_id": _store[0], "slide_count": len(slides),
+            "design_rationale": design_rationale, "status": "ok",
+        })
 
-    return write_outline
+    def _get_ids() -> tuple[int | None, str]:
+        return _store[0], _rationale[0]
+
+    return write_outline, _get_ids
 
 
-# ── generator node ──────────────────────────────────────────────────────────
+# ── helpers ──────────────────────────────────────────────────────────────────
+
+
+def _extract_tool_result(messages: list, tool_name: str) -> dict | None:
+    """Search messages in reverse for the first ToolMessage matching *tool_name*.
+
+    create_agent's ToolMessages carry ``name`` matching the tool.
+    """
+    for msg in reversed(messages):
+        if isinstance(msg, ToolMessage) and getattr(msg, "name", None) == tool_name:
+            try:
+                return json.loads(str(msg.content))
+            except (json.JSONDecodeError, TypeError):
+                return None
+    return None
+
+
+# ── generator node ───────────────────────────────────────────────────────────
 
 
 async def generator_node(state: OutlineState, config: RunnableConfig) -> dict:
-    """Generator agent: research → design → write_outline.
-
-    Runs a tool-calling loop until ``write_outline`` is called (or max turns
-    exceeded).
-    """
+    """Generator: build agent with create_agent, invoke, extract results."""
     db: Database = config["configurable"]["db"]
     user_id = state["user_id"]
     conv_id = state["conversation_id"]
     outline_id = state.get("outline_id")
     is_revision = outline_id is not None and state.get("evaluated", False)
 
-    model = _get_model()
-
+    write_outline_tool, get_ids = _make_write_outline(db, user_id, conv_id, outline_id)
     tools = [
         _make_search_knowledge(user_id),
         _make_search_web(),
         _make_fetch_web(db, user_id, conv_id),
-        _make_write_outline(db, user_id, conv_id, outline_id),
+        write_outline_tool,
     ]
-    tools_by_name = {t.name: t for t in tools}
-    model_with_tools = model.bind_tools(tools)
 
+    previous_rationales = state.get("design_rationales", [])
     system_prompt = load_generator_system()
     user_prompt = build_generator_user_prompt(
         query=state["query"],
-        design_rationale=state.get("design_rationale", ""),
+        design_rationale="\n---\n".join(previous_rationales) if previous_rationales else "",
         eval_suggestions=state.get("eval_suggestions", ""),
         is_revision=is_revision,
     )
 
-    messages = [SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)]
+    agent = create_agent(
+        model=_get_model(),
+        tools=tools,
+        system_prompt=system_prompt,
+        middleware=[TokenCountingMiddleware(conv_id)],
+    )
 
-    final_outline_id: int | None = None
-    max_turns = 20
+    result = await agent.ainvoke(
+        {"messages": [HumanMessage(content=user_prompt)]},
+        config=config,
+    )
 
-    for _turn in range(max_turns):
-        response = await model_with_tools.ainvoke(messages)
-        messages.append(response)
-
-        if not response.tool_calls:
-            _log.warning("generator stopped without calling write_outline")
-            break
-
-        for tc in response.tool_calls:
-            tool_func = tools_by_name.get(tc["name"])
-            if tool_func is None:
-                messages.append(ToolMessage(
-                    content=f"Unknown tool: {tc['name']}", tool_call_id=tc["id"]
-                ))
-                continue
-
-            try:
-                result = await tool_func.ainvoke(tc["args"])
-            except Exception as exc:
-                _log.exception("tool %s failed", tc["name"])
-                result = f"Tool error: {exc}"
-
-            messages.append(ToolMessage(content=str(result), tool_call_id=tc["id"]))
-
-            if tc["name"] == "write_outline":
-                parsed = json.loads(str(result))
-                final_outline_id = parsed["outline_id"]
-                break
-
-        if final_outline_id is not None:
-            break
-    else:
-        _log.error("generator exceeded max turns (%d)", max_turns)
-
+    final_outline_id, rationale = get_ids()
     new_iteration = state.get("iteration", 0) + 1
 
     return {
         "outline_id": final_outline_id,
         "evaluated": False,
         "iteration": new_iteration,
-        "messages": messages,
+        "design_rationale": rationale,
+        "design_rationales": [rationale] if rationale else [],
+        "messages": result["messages"],
     }

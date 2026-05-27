@@ -1,8 +1,8 @@
 """Coordinator agent — intent classification + sub-agent dispatch.
 
-Analyses the user message and current conversation state, then routes to:
-- outline agent (generate / modify)
-- PPT agent (generate / modify — placeholder)
+Analyses the user message and current conversation state (loaded from DB),
+then routes to the outline agent or PPT agent.  Accumulates token usage,
+stores assistant messages, and emits full token + outline summaries.
 """
 
 from __future__ import annotations
@@ -11,15 +11,16 @@ import json
 from typing import AsyncGenerator, Literal
 
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
 from pptgenius.agent.common.langchain_adapter import apply_deepseek_patch
-from pptgenius.agent.outline import build_outline_graph, OutlineState
+from pptgenius.agent.outline import OutlineState, build_outline_graph
 from pptgenius.agent.ppt import build_ppt_graph
 from pptgenius.infrastructure.config import RESOURCES_DIR, get_settings
 from pptgenius.infrastructure.db import Database
-from pptgenius.infrastructure.utils import get_logger
+from pptgenius.infrastructure.utils import TokenCounter, get_logger
 
 apply_deepseek_patch()
 
@@ -33,10 +34,7 @@ _PROMPT_PATH = RESOURCES_DIR / "prompts" / "coordinator_system.txt"
 
 class CoordinatorDecision(BaseModel):
     task: Literal[
-        "generate_outline",
-        "modify_outline",
-        "generate_ppt",
-        "modify_ppt",
+        "generate_outline", "modify_outline", "generate_ppt", "modify_ppt",
     ] = Field(description="The task type to execute")
     reasoning: str = Field(description="Brief reasoning for this decision")
 
@@ -58,12 +56,45 @@ def _get_model():
 def _load_coordinator_prompt() -> str:
     if _PROMPT_PATH.exists():
         return _PROMPT_PATH.read_text(encoding="utf-8")
-    _log.warning("coordinator prompt not found at %s, using default", _PROMPT_PATH)
     return "You are a PPT assistant coordinator. Classify the user intent."
 
 
 def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+# ── conversation state tool ──────────────────────────────────────────────────
+
+
+def _make_get_state(db: Database, conversation_id: int):
+    @tool
+    async def get_conversation_state(dummy: str = "") -> str:
+        """Get the current conversation's PPT and outline status.
+
+        Use this to check what already exists before deciding the task.
+        Pass an empty string as the argument.
+        """
+        outlines = await db.list_outlines_by_conversation(conversation_id)
+        presentations = await db.list_presentations_by_conversation(conversation_id)
+
+        return json.dumps({
+            "has_outline": len(outlines) > 0,
+            "outline_count": len(outlines),
+            "latest_outline": {
+                "id": outlines[0].id, "title": outlines[0].title,
+                "version": outlines[0].version, "eval_score": outlines[0].eval_score,
+                "status": outlines[0].status, "slide_count": outlines[0].slide_count,
+            } if outlines else None,
+            "has_ppt": len(presentations) > 0,
+            "ppt_count": len(presentations),
+            "latest_ppt": {
+                "id": presentations[0].id, "status": presentations[0].status,
+                "file_path": presentations[0].file_path,
+                "slide_count": presentations[0].slide_count,
+            } if presentations else None,
+        }, ensure_ascii=False)
+
+    return get_conversation_state
 
 
 # ── intent classification ────────────────────────────────────────────────────
@@ -76,10 +107,9 @@ async def _classify_intent(
     outline_title: str = "",
     history_summary: str = "",
 ) -> CoordinatorDecision:
-    """Use LLM to classify the user's intent into one of 4 task types."""
+    """Use LLM (with conversation state context) to classify user intent."""
     model = _get_model()
     structured_model = model.with_structured_output(CoordinatorDecision)
-
     system = _load_coordinator_prompt()
 
     state_lines = [
@@ -93,7 +123,6 @@ async def _classify_intent(
         state_lines.append(f"\n## 最近对话历史\n{history_summary}")
 
     state_lines.append(f"\n## 用户最新消息\n{query}")
-
     user_msg = "\n".join(state_lines)
 
     result = await structured_model.ainvoke([
@@ -116,19 +145,31 @@ async def run_coordinator(
 
     Yields SSE-formatted strings for the chat endpoint.
     """
+    tc = TokenCounter.for_conversation(conversation_id)
     conv = await db.get_conversation(conversation_id)
     if conv is None:
         yield _sse("error", {"code": 40001, "message": "conversation not found", "retryable": False})
         return
 
     user_id = conv.user_id
-    cfg = get_settings().agent.outline
 
-    # --- load current state ---
+    # --- load current state from DB ---
     outlines = await db.list_outlines_by_conversation(conversation_id)
     presentations = await db.list_presentations_by_conversation(conversation_id)
     latest_outline = outlines[0] if outlines else None
     latest_ppt = presentations[0] if presentations else None
+
+    # --- load conversation history for cache / context ---
+    history_messages = await db.get_messages_by_conversation(conversation_id)
+    history_summary = ""
+    if history_messages:
+        recent = history_messages[-10:]  # last 10 messages
+        lines = []
+        for m in recent:
+            role = "用户" if m.role == "user" else "助手"
+            content_preview = (m.content or "")[:200]
+            lines.append(f"[{role}]: {content_preview}")
+        history_summary = "\n".join(lines)
 
     # --- classify intent ---
     decision = await _classify_intent(
@@ -136,9 +177,15 @@ async def run_coordinator(
         has_outline=latest_outline is not None,
         has_ppt=latest_ppt is not None,
         outline_title=latest_outline.title if latest_outline else "",
+        history_summary=history_summary,
     )
 
-    yield _sse("phase", {"phase": decision.task, "message": f"协调Agent判断: {decision.task}"})
+    yield _sse("progress", {
+        "step": "coordinator_decision",
+        "detail": f"协调Agent判断: {decision.task}",
+        "reasoning": decision.reasoning,
+        "pct": 5,
+    })
 
     # --- dispatch ---
     if decision.task in ("generate_outline", "modify_outline"):
@@ -147,24 +194,68 @@ async def run_coordinator(
             user_id=user_id,
             conversation_id=conversation_id,
             query=query,
-            existing_outline=latest_outline if decision.task == "modify_outline" else None,
-            cfg=cfg,
+            existing_outline=latest_outline,
+            is_modify=(decision.task == "modify_outline"),
         ):
             yield event
 
     elif decision.task in ("generate_ppt", "modify_ppt"):
         async for event in _run_ppt(
-            db=db,
-            user_id=user_id,
-            conversation_id=conversation_id,
-            query=query,
-            outline=latest_outline,
-            existing_ppt=latest_ppt,
+            db=db, user_id=user_id, conversation_id=conversation_id,
+            query=query, outline=latest_outline, existing_ppt=latest_ppt,
         ):
             yield event
 
+    # --- token summary ---
+    snapshot = tc.snapshot()
+    yield _sse("tokens", snapshot)
+
+    # --- store assistant message ---
+    design_rationales = list(_rationale_store) if _rationale_store else None
+    assistant_content = _build_assistant_content(decision, latest_outline, design_rationales)
+    await db.create_message(
+        conversation_id=conversation_id,
+        role="assistant",
+        content=assistant_content,
+        content_type="text",
+        estimated_cost=snapshot["estimated_cost_cny"],
+    )
+    yield _sse("message_stored", {"role": "assistant", "length": len(assistant_content)})
+
+
+# ── assistant content builder ────────────────────────────────────────────────
+
+
+def _build_assistant_content(
+    decision: CoordinatorDecision,
+    outline,
+    design_rationales: list[str] | None,
+) -> str:
+    """Build a readable assistant message summarising what was done."""
+    task_labels = {
+        "generate_outline": "大纲生成",
+        "modify_outline": "大纲修改",
+        "generate_ppt": "PPT生成",
+        "modify_ppt": "PPT修改",
+    }
+    label = task_labels.get(decision.task, decision.task)
+    parts = [f"## 协调Agent执行任务: {label}", "", f"**判断依据**: {decision.reasoning}"]
+
+    if outline:
+        parts.append(f"\n**大纲**: {outline.title} (ID={outline.id}, v{outline.version}, 评分={outline.eval_score})")
+
+    if design_rationales:
+        parts.append("\n### 设计思路")
+        for i, r in enumerate(design_rationales, 1):
+            parts.append(f"\n**第{i}轮**: {r}")
+
+    return "\n".join(parts)
+
 
 # ── outline sub-agent runner ─────────────────────────────────────────────────
+
+
+_rationale_store: list[str] = []
 
 
 async def _run_outline(
@@ -173,17 +264,17 @@ async def _run_outline(
     conversation_id: int,
     query: str,
     existing_outline,
-    cfg,
+    is_modify: bool,
 ) -> AsyncGenerator[str, None]:
-    """Run the outline generator-evaluator graph."""
-    is_modify = existing_outline is not None
+    """Run the outline generator-evaluator graph and stream events."""
+    cfg = get_settings().agent.outline
 
     state: OutlineState = {
         "user_id": user_id,
         "conversation_id": conversation_id,
         "query": query,
         "outline_id": existing_outline.id if existing_outline else None,
-        "evaluated": is_modify,  # True → generator (revision), False → evaluator first for new
+        "evaluated": is_modify,
         "iteration": 0,
         "eval_score": existing_outline.eval_score if existing_outline else None,
         "eval_suggestions": "",
@@ -191,18 +282,20 @@ async def _run_outline(
         "max_iterations": cfg.max_iterations,
         "pass_score": cfg.pass_score,
         "design_rationale": "",
+        "design_rationales": [],
+        "final_outline_data": None,
         "messages": [],
     }
 
     graph = build_outline_graph()
 
-    if is_modify:
-        yield _sse("phase", {"phase": "outline", "message": "开始修改大纲..."})
-    else:
-        yield _sse("phase", {"phase": "outline", "message": "开始生成大纲..."})
+    phase_msg = "开始修改大纲..." if is_modify else "开始生成大纲..."
+    yield _sse("phase", {"phase": "outline", "message": phase_msg})
 
     try:
-        async for event in graph.astream_events(state, config={"configurable": {"db": db}}, version="v2"):
+        async for event in graph.astream_events(
+            state, config={"configurable": {"db": db}}, version="v2",
+        ):
             kind = event["event"]
 
             if kind == "on_tool_start":
@@ -213,14 +306,47 @@ async def _run_outline(
                 async for sse in _tool_end_sse(event, db):
                     yield sse
 
-    except Exception:
-        _log.exception("outline agent error")
-        yield _sse("error", {"code": 40200, "message": "大纲生成失败", "retryable": True})
-        return
+            elif kind == "on_chain_end" and event["name"] == "finalize":
+                # Outline graph finished — emit final outline data directly
+                output = event["data"].get("output", {})
+                final_data = output.get("final_outline_data")
+                design_rationales = output.get("design_rationales", [])
+                _rationale_store.clear()
+                _rationale_store.extend(design_rationales)
 
-    # Emit final outline state
-    async for sse in _emit_final_outline(db, conversation_id):
-        yield sse
+                if final_data:
+                    yield _sse("outline", final_data)
+                yield _sse("phase", {
+                    "phase": "waiting_user",
+                    "message": "大纲已就绪，请确认或提出修改意见",
+                })
+
+    except Exception:
+        _log.exception("outline agent error — attempting recovery")
+        # Try to recover: read any outline that was created
+        outlines = await db.list_outlines_by_conversation(conversation_id)
+        if outlines:
+            o = outlines[0]
+            slides = await db.get_slides_by_outline_id(o.id)
+            yield _sse("outline", {
+                "outline_id": o.id, "title": o.title,
+                "version": o.version, "slide_count": o.slide_count,
+                "eval_score": o.eval_score,
+                "slides": [
+                    {
+                        "slide_index": s.slide_index, "title": s.title,
+                        "layout_type": s.layout_type, "content_json": s.content_json,
+                        "has_image": s.has_image, "has_chart": s.has_chart, "notes": s.notes,
+                    }
+                    for s in slides
+                ],
+            })
+            yield _sse("phase", {
+                "phase": "waiting_user",
+                "message": "大纲生成过程出错，已恢复最后保存的版本",
+            })
+        else:
+            yield _sse("error", {"code": 40200, "message": "大纲生成失败，请重试", "retryable": True})
 
 
 # ── PPT sub-agent runner (placeholder) ───────────────────────────────────────
@@ -249,16 +375,17 @@ async def _run_ppt(
 
 async def _tool_start_sse(event: dict):
     name = event["name"]
-    if name == "search_knowledge":
-        yield _sse("progress", {"step": "searching_knowledge", "detail": "检索知识库...", "pct": 10})
-    elif name == "search_web":
-        yield _sse("progress", {"step": "searching_web", "detail": "搜索网络...", "pct": 20})
-    elif name == "fetch_web":
-        yield _sse("progress", {"step": "fetching_web", "detail": "获取网页内容...", "pct": 30})
-    elif name == "write_outline":
-        yield _sse("progress", {"step": "writing_outline", "detail": "正在生成大纲...", "pct": 50})
-    elif name == "submit_evaluation":
-        yield _sse("progress", {"step": "evaluating", "detail": "评估中...", "pct": 70})
+    label_map = {
+        "search_knowledge": ("searching_knowledge", "检索知识库...", 10),
+        "search_web": ("searching_web", "搜索网络...", 20),
+        "fetch_web": ("fetching_web", "获取网页内容...", 30),
+        "write_outline": ("writing_outline", "正在生成大纲...", 50),
+        "submit_evaluation": ("evaluating", "评估中...", 70),
+        "get_conversation_state": ("loading_state", "加载会话状态...", 2),
+    }
+    if name in label_map:
+        step, detail, pct = label_map[name]
+        yield _sse("progress", {"step": step, "detail": detail, "pct": pct})
 
 
 async def _tool_end_sse(event: dict, db: Database):
@@ -274,19 +401,13 @@ async def _tool_end_sse(event: dict, db: Database):
                 slides = await db.get_slides_by_outline_id(outline_id)
                 if outline:
                     yield _sse("outline", {
-                        "outline_id": outline.id,
-                        "title": outline.title,
-                        "version": outline.version,
-                        "slide_count": outline.slide_count,
+                        "outline_id": outline.id, "title": outline.title,
+                        "version": outline.version, "slide_count": outline.slide_count,
                         "slides": [
                             {
-                                "slide_index": s.slide_index,
-                                "title": s.title,
-                                "layout_type": s.layout_type,
-                                "content_json": s.content_json,
-                                "has_image": s.has_image,
-                                "has_chart": s.has_chart,
-                                "notes": s.notes,
+                                "slide_index": s.slide_index, "title": s.title,
+                                "layout_type": s.layout_type, "content_json": s.content_json,
+                                "has_image": s.has_image, "has_chart": s.has_chart, "notes": s.notes,
                             }
                             for s in slides
                         ],
@@ -305,31 +426,3 @@ async def _tool_end_sse(event: dict, db: Database):
             })
         except (json.JSONDecodeError, TypeError):
             pass
-
-
-async def _emit_final_outline(db: Database, conversation_id: int):
-    """Emit the latest outline for this conversation."""
-    outlines = await db.list_outlines_by_conversation(conversation_id)
-    if not outlines:
-        return
-    outline = outlines[0]
-    slides = await db.get_slides_by_outline_id(outline.id)
-    yield _sse("outline", {
-        "outline_id": outline.id,
-        "title": outline.title,
-        "version": outline.version,
-        "slide_count": outline.slide_count,
-        "eval_score": outline.eval_score,
-        "slides": [
-            {
-                "slide_index": s.slide_index,
-                "title": s.title,
-                "layout_type": s.layout_type,
-                "content_json": s.content_json,
-                "has_image": s.has_image,
-                "has_chart": s.has_chart,
-                "notes": s.notes,
-            }
-            for s in slides
-        ],
-    })

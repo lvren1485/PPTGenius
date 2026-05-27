@@ -1,6 +1,6 @@
 {
   "name": "PPT大纲评分表",
-  "version": "1.0",
+  "version": "2.0",
   "total_max": 10.0,
   "dimensions": [
     {
@@ -44,8 +44,22 @@
         "4": "覆盖不足：仅涉及部分维度且内容单薄，多个关键方面完全缺失",
         "2": "严重缺失：仅触及主题皮毛，大部分关键内容缺失，无法构成完整汇报"
       }
+    },
+    {
+      "key": "visual_diversity",
+      "label": "可视化多样度",
+      "weight": 1.0,
+      "max_score": 10,
+      "description": "PPT是否使用了多样化的可视化元素编排，避免单调的纯文字布局",
+      "criteria": {
+        "10": "编排极其丰富：灵活运用两栏、流程图、图表、时间线、对比表、图示等多种布局交替呈现，每页的 recommended_ppt_format 选择恰当且不重复",
+        "8": "编排多样：使用了4-5种不同布局格式，大部分页面的排版建议合理，偶有重复但总体视觉节奏好",
+        "6": "编排一般：使用了2-3种布局格式，但存在较多连续相同格式的页面，视觉体验略显单调",
+        "4": "编排单一：大量页面使用相同布局格式（如全部 bullet_list），缺乏变化，观众易疲劳",
+        "2": "无编排意识：所有页面千篇一律，未考虑任何可视化呈现方式"
+      }
     }
   ],
-  "total_formula": "(structure_clarity + logic_coherence + comprehensiveness) / 3",
+  "total_formula": "(structure_clarity + logic_coherence + comprehensiveness + visual_diversity) / 4",
   "pass_threshold_note": "总分 >= pass_score 即为合格（默认 8.0/10）"
 }
