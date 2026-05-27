@@ -64,7 +64,8 @@ def _make_search_knowledge(user_id: int):
             return "知识库中未找到相关文档。"
         items = []
         for r in results:
-            items.append(f"[score={r['score']:.2f}] {r['text'][:500]}")
+            chunk_text = r.get("chunk", r.get("text", ""))
+            items.append(f"[score={r.get('score', 0):.2f}] {chunk_text[:500]}")
         return "\n\n---\n".join(items)
 
     return search_knowledge
@@ -110,11 +111,11 @@ def _make_fetch_web(db: Database, user_id: int, conv_id: int):
 
 
 def _make_write_outline(db: Database, user_id: int, conv_id: int, initial_outline_id: int | None):
-    """Returns (tool, get_ids).  Uses a mutable list wrapper so the tool can
-    communicate outline_id and rationale back to the caller after create_agent
-    completes."""
+    """Returns (tool, get_ids, was_called).  Uses mutable list wrappers to
+    communicate outline_id, rationale, and whether the tool was invoked."""
     _store: list[int | None] = [initial_outline_id]
     _rationale: list[str] = [""]
+    _called: list[bool] = [False]
 
     @tool
     async def write_outline(
@@ -150,32 +151,17 @@ def _make_write_outline(db: Database, user_id: int, conv_id: int, initial_outlin
 
         await db.replace_outline_slides(_store[0], slides)
         _rationale[0] = design_rationale
+        _called[0] = True
         return json.dumps({
             "outline_id": _store[0], "slide_count": len(slides),
             "design_rationale": design_rationale, "status": "ok",
         })
 
-    def _get_ids() -> tuple[int | None, str]:
-        return _store[0], _rationale[0]
+    def _get_result() -> tuple[int | None, str, bool]:
+        return _store[0], _rationale[0], _called[0]
 
-    return write_outline, _get_ids
+    return write_outline, _get_result
 
-
-# ── helpers ──────────────────────────────────────────────────────────────────
-
-
-def _extract_tool_result(messages: list, tool_name: str) -> dict | None:
-    """Search messages in reverse for the first ToolMessage matching *tool_name*.
-
-    create_agent's ToolMessages carry ``name`` matching the tool.
-    """
-    for msg in reversed(messages):
-        if isinstance(msg, ToolMessage) and getattr(msg, "name", None) == tool_name:
-            try:
-                return json.loads(str(msg.content))
-            except (json.JSONDecodeError, TypeError):
-                return None
-    return None
 
 
 # ── generator node ───────────────────────────────────────────────────────────
@@ -189,7 +175,7 @@ async def generator_node(state: OutlineState, config: RunnableConfig) -> dict:
     outline_id = state.get("outline_id")
     is_revision = outline_id is not None and state.get("evaluated", False)
 
-    write_outline_tool, get_ids = _make_write_outline(db, user_id, conv_id, outline_id)
+    write_outline_tool, get_result = _make_write_outline(db, user_id, conv_id, outline_id)
     tools = [
         _make_search_knowledge(user_id),
         _make_search_web(),
@@ -218,8 +204,19 @@ async def generator_node(state: OutlineState, config: RunnableConfig) -> dict:
         config=config,
     )
 
-    final_outline_id, rationale = get_ids()
+    final_outline_id, rationale, was_called = get_result()
     new_iteration = state.get("iteration", 0) + 1
+
+    # If write_outline wasn't called, retry once with an explicit instruction
+    if not was_called:
+        _log.warning("write_outline not called — retrying with explicit instruction")
+        retry_msg = HumanMessage(content="请立即调用 write_outline 工具保存大纲。不要再搜索或分析，直接保存。")
+        result2 = await agent.ainvoke(
+            {"messages": list(result["messages"]) + [retry_msg]},
+            config=config,
+        )
+        final_outline_id, rationale, was_called = get_result()
+        result = result2
 
     return {
         "outline_id": final_outline_id,

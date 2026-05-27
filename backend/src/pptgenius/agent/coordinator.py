@@ -109,7 +109,8 @@ async def _classify_intent(
 ) -> CoordinatorDecision:
     """Use LLM (with conversation state context) to classify user intent."""
     model = _get_model()
-    structured_model = model.with_structured_output(CoordinatorDecision)
+    # DeepSeek V4 Flash doesn't support json_schema mode; use json_mode
+    structured_model = model.with_structured_output(CoordinatorDecision, method="json_mode")
     system = _load_coordinator_prompt()
 
     state_lines = [

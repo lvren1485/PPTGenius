@@ -265,9 +265,9 @@ def test_fetch_web_tool_signature():
 
 def test_write_outline_tool_signature():
     mock_db = MagicMock()
-    tool, get_ids = _make_write_outline(mock_db, user_id=1, conv_id=1, initial_outline_id=None)
+    tool, get_result = _make_write_outline(mock_db, user_id=1, conv_id=1, initial_outline_id=None)
     assert tool.name == "write_outline"
-    assert callable(get_ids)
+    assert callable(get_result)
     schema = tool.args_schema.model_json_schema()
     props = schema.get("properties", {})
     assert "title" in props

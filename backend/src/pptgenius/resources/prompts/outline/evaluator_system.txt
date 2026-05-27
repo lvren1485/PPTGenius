@@ -26,11 +26,11 @@
 - 2分：严重缺失，仅触及主题皮毛
 
 ### 4. 可视化多样度 (visual_diversity)
-- 10分：编排极其丰富，灵活运用两栏、流程图、图表、时间线、对比表等多种布局交替呈现
-- 8分：编排多样，使用了4-5种不同布局格式，大部分页面的排版建议合理
-- 6分：编排一般，使用了2-3种布局格式，但存在较多连续相同格式，略显单调
-- 4分：编排单一，大量页面使用相同布局格式（如全部 bullet_list），缺乏变化
-- 2分：无编排意识，所有页面千篇一律
+- 10分：编排极其丰富：(a) layout_type 正确使用了 title/section/content/summary/thanks 至少4种，(b) recommended_ppt_format 使用了5+种不同格式，(c) has_chart/has_image 标记合理
+- 8分：编排多样：(a) layout_type 覆盖了 title/content/section 三种以上，(b) format 使用4-5种
+- 6分：编排一般：(a) layout_type 只有 title+content，缺少 section 分隔页，(b) format 仅2-3种
+- 4分：编排单一：(a) 绝大部分是 content 类型，(b) format 基本重复
+- 2分：无编排意识：全部 content，全部同一种 format
 
 ## 总分计算
 

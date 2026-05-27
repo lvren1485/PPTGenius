@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from pptgenius.infrastructure.db import Database
@@ -10,6 +12,12 @@ from .deps import get_db
 from .schemas import ApiResponse, OutlineBrief, OutlineDetail, OutlineSlideItem, PaginatedData
 
 router = APIRouter(prefix="/api", tags=["outlines"])
+
+
+def _orm_to_dict(obj) -> dict:
+    d = dict(obj.__dict__)
+    d.pop("_sa_instance_state", None)
+    return d
 
 
 @router.get("/outlines")
@@ -37,9 +45,19 @@ async def get_outline(
     if outline is None:
         raise HTTPException(404, {"code": 40001, "message": "outline not found"})
     slides = await db.get_slides_by_outline_id(outline_id)
+    od = _orm_to_dict(outline)
+    slide_items = []
+    for s in slides:
+        sd = _orm_to_dict(s)
+        if isinstance(sd.get("content_json"), str):
+            try:
+                sd["content_json"] = json.loads(sd["content_json"])
+            except (json.JSONDecodeError, TypeError):
+                sd["content_json"] = {}
+        slide_items.append(OutlineSlideItem(**sd))
     return ApiResponse(data=OutlineDetail(
-        **outline.__dict__,
-        slides=[OutlineSlideItem.model_validate(s) for s in slides],
+        **od,
+        slides=slide_items,
     ))
 
 
