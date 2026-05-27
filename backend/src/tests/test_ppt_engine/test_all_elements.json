@@ -388,7 +388,7 @@
         {
           "type": "picture",
           "position": { "left": 0.5, "top": 1.5, "width": 5.5, "height": 3.5 },
-          "path": "src/tests/resources/Front.png",
+          "path": "src/tests/resources/test.png",
           "fit": "aspect"
         },
         {
@@ -577,7 +577,7 @@
     {
       "layout": "blank",
       "notes": "背景测试: 图片背景 (使用 lxml set_slide_image_background)",
-      "background": { "type": "image", "color": "src/tests/resources/Front.png" },
+      "background": { "type": "image", "color": "src/tests/resources/test.png" },
       "elements": [
         {
           "type": "textbox",
@@ -651,7 +651,7 @@
         {
           "type": "picture",
           "position": { "left": 0.3, "top": 0.6, "width": 5.0, "height": 2.8, "parent": "right_col" },
-          "path": "src/tests/resources/Front.png",
+          "path": "src/tests/resources/test.png",
           "fit": "aspect"
         },
         {

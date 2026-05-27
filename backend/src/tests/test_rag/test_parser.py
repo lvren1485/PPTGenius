@@ -16,7 +16,7 @@ class TestMdParser:
 
     @classmethod
     def setup_class(cls):
-        cls.doc = parse_file(_RESOURCES / "dotnet-ai-agent-project.md")
+        cls.doc = parse_file(_RESOURCES / "test.md")
 
     def test_file_type(self):
         assert self.doc.file_type in ("md", "markdown")
@@ -34,7 +34,7 @@ class TestDocxParser:
 
     @classmethod
     def setup_class(cls):
-        cls.doc = parse_file(_RESOURCES / "dotnet-ai-agent-project.docx")
+        cls.doc = parse_file(_RESOURCES / "test.docx")
 
     def test_file_type(self):
         assert self.doc.file_type == "docx"
@@ -55,7 +55,7 @@ class TestPdfParser:
 
     @classmethod
     def setup_class(cls):
-        cls.doc = parse_file(_RESOURCES / "dotnet-ai-agent-project.pdf")
+        cls.doc = parse_file(_RESOURCES / "test.pdf")
 
     def test_file_type(self):
         assert self.doc.file_type == "pdf"
@@ -76,19 +76,19 @@ class TestCrossFormat:
 
     @classmethod
     def setup_class(cls):
-        cls.md = parse_file(_RESOURCES / "dotnet-ai-agent-project.md")
-        cls.docx = parse_file(_RESOURCES / "dotnet-ai-agent-project.docx")
-        cls.pdf = parse_file(_RESOURCES / "dotnet-ai-agent-project.pdf")
+        cls.md = parse_file(_RESOURCES / "test.md")
+        cls.docx = parse_file(_RESOURCES / "test.docx")
+        cls.pdf = parse_file(_RESOURCES / "test.pdf")
 
     def test_common_heading(self):
         """All three should contain the same course title."""
         for doc in [self.md, self.docx, self.pdf]:
-            assert ".NET 程序设计课程" in doc.text
+            assert "Workflow" in doc.text
 
     def test_common_keyword(self):
         """All three should mention AI Agent."""
         for doc in [self.md, self.docx, self.pdf]:
-            assert "AI Agent" in doc.text
+            assert "Agent" in doc.text
 
     def test_char_counts_similar(self):
         """Char counts should be in the same order of magnitude."""

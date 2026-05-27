@@ -19,7 +19,7 @@ class TestKnowledgeManager:
         wm = WorkspaceManager(root=tempfile.mkdtemp())
         km = KnowledgeService()
 
-        md_path = Path(__file__).parent.parent / "resources" / "dotnet-ai-agent-project.md"
+        md_path = Path(__file__).parent.parent / "resources" / "test.md"
         file_id = await km.ingest(db_obj, str(md_path), user.id)
         assert file_id is not None
 
@@ -55,7 +55,7 @@ class TestKnowledgeManager:
         km = KnowledgeService()
         wm = WorkspaceManager(root=tempfile.mkdtemp())
 
-        docx_path = Path(__file__).parent.parent / "resources" / "dotnet-ai-agent-project.docx"
+        docx_path = Path(__file__).parent.parent / "resources" / "test.docx"
         file_id = await km.ingest(db_obj, str(docx_path), user.id)
         assert file_id is not None, "ingest should succeed"
 

@@ -36,8 +36,5 @@ dist/
 build/
 release/
 
-# test resources
-backend/src/tests/resources/
-
 # BM25 index
 *.pkl
