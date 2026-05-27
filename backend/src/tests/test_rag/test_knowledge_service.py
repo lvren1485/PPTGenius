@@ -23,7 +23,7 @@ class TestKnowledgeManager:
         file_id = await km.ingest(db_obj, str(md_path), user.id)
         assert file_id is not None
 
-        results = await km.search(user.id, ".NET AI Agent", top_k=3)
+        results = await km.search(user.id, "LangGraph agent", top_k=3)
         assert len(results) > 0
 
         removed = await km.remove_file(db_obj, file_id)
@@ -50,7 +50,7 @@ class TestKnowledgeManager:
         assert km1 is km2
 
     async def test_docx_semantic_kernel(self, db, d):
-        """Ingest the real DOCX and search for 'Semantic Kernel' — chunks should be meaningful."""
+        """Ingest the real DOCX and search for 'LangGraph' — chunks should be meaningful."""
         db_obj, user = d
         km = KnowledgeService()
         wm = WorkspaceManager(root=tempfile.mkdtemp())
@@ -59,18 +59,18 @@ class TestKnowledgeManager:
         file_id = await km.ingest(db_obj, str(docx_path), user.id)
         assert file_id is not None, "ingest should succeed"
 
-        results = await km.search(user.id, "Semantic Kernel", top_k=3)
-        assert len(results) > 0, "should find chunks about Semantic Kernel"
+        results = await km.search(user.id, "LangGraph", top_k=3)
+        assert len(results) > 0, "should find chunks about LangGraph"
 
         for r in results:
             print(f"\n  score={r['score']:.4f}  [{len(r['chunk'])} chars]")
             print(f"  {r['chunk'][:300]}...")
 
-        # At least one chunk should mention Semantic Kernel
-        found = any("Semantic Kernel" in r["chunk"] for r in results)
-        assert found, f"search results must contain 'Semantic Kernel'"
+        # At least one chunk should mention LangGraph
+        found = any("LangGraph" in r["chunk"] for r in results)
+        assert found, f"search results must contain 'LangGraph'"
 
-        # Content should be meaningful — not just "Semantic Kernel" alone in a table cell
+        # Content should be meaningful — not just "LangGraph" alone in a table cell
         for r in results:
             c = r["chunk"]
             # Should have substantial content (not just a single line)

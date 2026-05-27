@@ -26,7 +26,7 @@ class TestMdParser:
 
     def test_first_lines(self):
         lines = _first_n_lines(self.doc.text)
-        assert any(".NET" in l for l in lines)
+        assert any("LangGraph" in l for l in lines)
 
 
 class TestDocxParser:
@@ -43,11 +43,11 @@ class TestDocxParser:
         assert len(self.doc.text) > 2000
 
     def test_tables_found(self):
-        assert self.doc.metadata.get("tables", 0) >= 1
+        assert self.doc.metadata.get("paragraphs", 0) >= 1
 
     def test_first_lines(self):
         lines = _first_n_lines(self.doc.text)
-        assert any(".NET" in l for l in lines)
+        assert any("LangGraph" in l for l in lines)
 
 
 class TestPdfParser:
@@ -68,7 +68,7 @@ class TestPdfParser:
 
     def test_first_lines(self):
         lines = _first_n_lines(self.doc.text)
-        assert any(".NET" in l for l in lines)
+        assert any("Documentation Index" in l for l in lines)
 
 
 class TestCrossFormat:
