@@ -89,6 +89,28 @@ async def supervisor_node(state: PPTState, config) -> dict:
         current + 1, total, slide.get("title", "?"), layout_name, agents_needed,
     )
 
+    # Create presentation_slide record (idempotent via try/except)
+    try:
+        await db.create_presentation_slide(
+            presentation_id=presentation_id,
+            slide_index=slide_index,
+            layout_name=layout_name,
+            color_scheme_id=state.get("color_scheme_id"),
+            template_id=state.get("template_id"),
+        )
+    except Exception:
+        pass
+
+    # Store outline slide notes for assembly (写入PPT演讲者备注)
+    outline_notes = slide.get("notes", "") or ""
+    if outline_notes:
+        await db.set_slide_agent_output(
+            presentation_id=presentation_id,
+            slide_index=slide_index,
+            agent_type="_notes",
+            output={"notes": outline_notes},
+        )
+
     writer({
         "type": "slide_start",
         "slide_index": current,

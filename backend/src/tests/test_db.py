@@ -200,8 +200,8 @@ class TestPresentationRepo:
         db_obj, user, conv = d
         pres = await db_obj.create_presentation(user.id, conv.id)
         slide = await db_obj.create_presentation_slide(pres.id, 0, "title_slide")
-        await db_obj.set_slide_agent_output(slide.id, "text", {"title": "Hello"})
-        await db_obj.set_slide_agent_output(slide.id, "layout", {"color": "blue"})
+        await db_obj.set_slide_agent_output(pres.id, 0, "text", {"title": "Hello"})
+        await db_obj.set_slide_agent_output(pres.id, 0, "layout", {"color": "blue"})
 
         fetched = await db_obj.get_presentation_slide(slide.id)
         assert fetched.agent_outputs["text"] == {"title": "Hello"}
@@ -212,7 +212,7 @@ class TestPresentationRepo:
         pres = await db_obj.create_presentation(user.id, conv.id)
         slide = await db_obj.create_presentation_slide(pres.id, 0, "content")
         assert (await db_obj.increment_slide_retry(slide.id)) == 1
-        await db_obj.update_slide_status(slide.id, "failed", "timeout")
+        await db_obj.update_slide_status(pres.id, 0, "failed", "timeout")
         fetched = await db_obj.get_presentation_slide(slide.id)
         assert fetched.status == "failed"
         assert fetched.retry_count == 1

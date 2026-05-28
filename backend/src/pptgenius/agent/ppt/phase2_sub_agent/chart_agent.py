@@ -12,7 +12,7 @@ from langchain_openai import ChatOpenAI
 
 from pptgenius.agent.common.langchain_adapter import apply_deepseek_patch
 from pptgenius.agent.outline.middleware import TokenCountingMiddleware
-from pptgenius.agent.ppt.common.instruction_loader import get_shared_instructions, list_chart_instructions
+from pptgenius.agent.ppt.common.instruction_loader import get_how_to_read, get_shared_instructions, list_chart_instructions
 from pptgenius.agent.ppt.common.tools import (
     _make_read_chart_instruction,
     _make_submit_chart_element,
@@ -70,13 +70,16 @@ async def run_chart_agent(
 
 
 def _build_chart_system_prompt() -> str:
+    howto = get_how_to_read()
     charts = list_chart_instructions()
     chart_list = "\n".join(
         f"- `{c['chart_type']}`: {c['description'][:80]}" for c in charts
     )
     shared = get_shared_instructions("position", "font")
 
-    return f"""你是 PPT 图表生成器。根据数据选择合适的图表类型并生成 chart 元素。
+    return f"""{howto}
+
+你是 PPT 图表生成器。根据数据选择合适的图表类型并生成 chart 元素。
 
 ## 可用图表类型
 

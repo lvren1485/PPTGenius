@@ -156,8 +156,8 @@ def _make_submit_text_elements(db: Database, presentation_id: int, slide_index: 
         await db.set_slide_agent_output(
             presentation_id=presentation_id,
             slide_index=slide_index,
-            agent_name="text",
-            output=elements,
+            agent_type="text",
+            output={"elements": elements},
         )
         return f"✅ 已保存 {len(elements)} 个文本/表格/图片元素。"
 
@@ -186,8 +186,8 @@ def _make_submit_chart_element(db: Database, presentation_id: int, slide_index: 
         await db.set_slide_agent_output(
             presentation_id=presentation_id,
             slide_index=slide_index,
-            agent_name="chart",
-            output=element,
+            agent_type="chart",
+            output={"element": element},
         )
         return f"✅ 已保存图表元素 (type={element.get('chart_type')})。"
 
@@ -217,8 +217,8 @@ def _make_submit_shape_elements(db: Database, presentation_id: int, slide_index:
         await db.set_slide_agent_output(
             presentation_id=presentation_id,
             slide_index=slide_index,
-            agent_name="shape",
-            output=elements,
+            agent_type="shape",
+            output={"elements": elements},
         )
         return f"✅ 已保存 {len(elements)} 个形状元素。"
 
@@ -250,8 +250,8 @@ def _make_submit_slide_elements(db: Database, presentation_id: int, slide_index:
         await db.set_slide_agent_output(
             presentation_id=presentation_id,
             slide_index=slide_index,
-            agent_name="freedom",
-            output=elements,
+            agent_type="freedom",
+            output={"elements": elements},
         )
         return f"✅ 已保存整页 {len(elements)} 个元素。"
 

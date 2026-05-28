@@ -144,9 +144,19 @@ async def get_slides_by_presentation_id(
 
 
 async def set_slide_agent_output(
-        db: AsyncSession, slide_id: int, agent_type: str, output: dict
+        db: AsyncSession,
+        presentation_id: int,
+        slide_index: int,
+        agent_type: str,
+        output: dict,
 ) -> bool:
-    s = await db.get(PresentationSlide, slide_id)
+    stmt = (
+        select(PresentationSlide)
+        .where(PresentationSlide.presentation_id == presentation_id)
+        .where(PresentationSlide.slide_index == slide_index)
+    )
+    result = await db.execute(stmt)
+    s = result.scalar_one_or_none()
     if s is None:
         return False
     outputs = s.agent_outputs or {}
@@ -157,9 +167,19 @@ async def set_slide_agent_output(
 
 
 async def update_slide_status(
-    db: AsyncSession, slide_id: int, status: str, error_message: str | None = None,
+    db: AsyncSession,
+    presentation_id: int,
+    slide_index: int,
+    status: str,
+    error_message: str | None = None,
 ) -> bool:
-    s = await db.get(PresentationSlide, slide_id)
+    stmt = (
+        select(PresentationSlide)
+        .where(PresentationSlide.presentation_id == presentation_id)
+        .where(PresentationSlide.slide_index == slide_index)
+    )
+    result = await db.execute(stmt)
+    s = result.scalar_one_or_none()
     if s is None:
         return False
     s.status = status

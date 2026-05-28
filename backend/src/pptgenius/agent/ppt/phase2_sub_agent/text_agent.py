@@ -13,7 +13,7 @@ from langchain_openai import ChatOpenAI
 
 from pptgenius.agent.common.langchain_adapter import apply_deepseek_patch
 from pptgenius.agent.outline.middleware import TokenCountingMiddleware
-from pptgenius.agent.ppt.common.instruction_loader import get_instruction, get_shared_instructions
+from pptgenius.agent.ppt.common.instruction_loader import get_how_to_read, get_instruction, get_shared_instructions
 from pptgenius.agent.ppt.common.tools import (
     _make_search_icons,
     _make_submit_text_elements,
@@ -73,12 +73,15 @@ async def run_text_agent(
 
 
 def _build_system_prompt() -> str:
+    howto = get_how_to_read()
     textbox_inst = get_instruction("textbox.json")
     table_inst = get_instruction("table.json")
     pic_inst = get_instruction("picture.json")
     shared = get_shared_instructions("position", "font", "line")
 
-    return f"""你是 PPT 文本内容生成器。根据大纲 slide 的 content_json 生成 textbox / table / picture (SVG icon) 元素。
+    return f"""{howto}
+
+你是 PPT 文本内容生成器。根据大纲 slide 的 content_json 生成 textbox / table / picture (SVG icon) 元素。
 
 ## 指令文件
 

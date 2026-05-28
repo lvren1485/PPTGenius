@@ -16,6 +16,7 @@ from langchain_openai import ChatOpenAI
 from pptgenius.agent.common.langchain_adapter import apply_deepseek_patch
 from pptgenius.agent.outline.middleware import TokenCountingMiddleware
 from pptgenius.agent.ppt.common.instruction_loader import (
+    get_how_to_read,
     get_instruction,
     get_shared_instructions,
     list_chart_instructions,
@@ -81,6 +82,7 @@ async def run_freedom_agent(
 
 def _build_freedom_system_prompt() -> str:
     """Build system prompt with ALL instruction summaries."""
+    howto = get_how_to_read()
     background = get_instruction("background.json")
     textbox = get_instruction("textbox.json")
     table = get_instruction("table.json")
@@ -94,7 +96,9 @@ def _build_freedom_system_prompt() -> str:
 
     shared = get_shared_instructions("position", "font", "fill", "line")
 
-    return f"""你是 PPT 整页生成器（Freedom 模式）。为一张幻灯片生成所有元素（textbox/table/chart/shape/picture）。
+    return f"""{howto}
+
+你是 PPT 整页生成器（Freedom 模式）。为一张幻灯片生成所有元素（textbox/table/chart/shape/picture）。
 
 ## 元素指令摘要
 

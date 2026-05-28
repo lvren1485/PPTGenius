@@ -13,7 +13,7 @@ from langchain_openai import ChatOpenAI
 
 from pptgenius.agent.common.langchain_adapter import apply_deepseek_patch
 from pptgenius.agent.outline.middleware import TokenCountingMiddleware
-from pptgenius.agent.ppt.common.instruction_loader import get_instruction, get_shared_instructions
+from pptgenius.agent.ppt.common.instruction_loader import get_how_to_read, get_instruction, get_shared_instructions
 from pptgenius.agent.ppt.common.tools import (
     _make_submit_shape_elements,
 )
@@ -68,6 +68,7 @@ async def run_shape_agent(
 
 
 def _build_system_prompt() -> str:
+    howto = get_how_to_read()
     shape_inst = get_instruction("shape.json")
     catalog = get_instruction("shape_catalog.json")
     shared = get_shared_instructions("position", "fill", "line", "font")
@@ -79,7 +80,9 @@ def _build_system_prompt() -> str:
         shapes = list(gdata.get("shapes", {}).keys())[:6]
         shape_summary.append(f"- {gdata['label']}: {', '.join(shapes)}")
 
-    return f"""你是 PPT 装饰形状生成器。为页面生成美观的装饰性 shape 元素。
+    return f"""{howto}
+
+你是 PPT 装饰形状生成器。为页面生成美观的装饰性 shape 元素。
 
 ## 指令文件
 
