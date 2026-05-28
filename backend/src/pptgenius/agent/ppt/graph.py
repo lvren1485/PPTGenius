@@ -11,12 +11,13 @@ from langgraph.graph import END, START, StateGraph
 
 from pptgenius.infrastructure.utils import get_logger
 
+from .phase1_style import style_agent_node
 from .state import PPTState
 
 _log = get_logger("pptgenius.agent.ppt")
 
 
-# ── placeholder nodes (implemented in separate modules) ──
+# ── nodes ─────────────────────────────────────────────────────────────────────
 
 
 async def _create_presentation_node(state: PPTState, config) -> dict:
@@ -25,7 +26,6 @@ async def _create_presentation_node(state: PPTState, config) -> dict:
     db: Database = config["configurable"]["db"]
 
     presentation_id = state.get("presentation_id")
-    files_created = False
     if presentation_id is None:
         outline = await db.get_outline(state["outline_id"])
         pres = await db.create_presentation(
@@ -36,7 +36,6 @@ async def _create_presentation_node(state: PPTState, config) -> dict:
             status="style_selecting",
         )
         presentation_id = pres.id
-        files_created = True
 
     # Load outline slides
     slides = await db.get_slides_by_outline_id(state["outline_id"])
@@ -59,14 +58,6 @@ async def _create_presentation_node(state: PPTState, config) -> dict:
         "total_slides": len(slides),
         "current_slide_index": 0,
     }
-
-
-async def _style_agent_node(state: PPTState, config) -> dict:
-    """Phase 1: StyleAgent — select color_scheme + layouts."""
-    # Built in phase1_style.py — placeholder for now
-    _log.info("StyleAgent: color_scheme_id=%s template_id=%s",
-              state.get("color_scheme_id"), state.get("template_id"))
-    return {}
 
 
 async def _supervisor_node(state: PPTState, config) -> dict:
@@ -112,7 +103,7 @@ def build_ppt_graph() -> StateGraph:
     builder = StateGraph(PPTState)
 
     builder.add_node("create_presentation", _create_presentation_node)
-    builder.add_node("style_agent", _style_agent_node)
+    builder.add_node("style_agent", style_agent_node)
     builder.add_node("supervisor", _supervisor_node)
     builder.add_node("assembly", _assembly_node)
 
