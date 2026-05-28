@@ -37,19 +37,29 @@
 - **big_number**：大字数据 | **quote**：引述 | **diagram**：示意图
 - **three_column**：三栏 | **four_grid**：四格
 
-### layout_type 必须多样化
+### layout_type 与 PPT 布局映射
 
-**严禁所有页面都使用 content 类型**。必须按如下规则分配：
+每个 slide 的 `layout_type` 直接决定 PPT 生成阶段使用的页面布局。**严禁所有页面都使用 content 类型**。
 
-| 页码 | layout_type | 用途 |
-|------|------------|------|
-| 第1页 | title | 封面/标题页 |
-| 每章节开头 | section | 章节分隔页（整个PPT至少2-3个section） |
-| 正文页 | content | 详细内容（不超过总页数60%） |
-| 倒数第2页或最后 | summary | 总结回顾 |
-| 最后一页（可选） | thanks | 致谢/结束页 |
+| layout_type | 对应 PPT 布局 | 用途 | 特点 |
+|-------------|-------------|------|------|
+| `title` | title_slide | 封面/标题页 | 大面积装饰 + 主副标题 |
+| `section` | section | 章节分隔页 | 章节号 + 标题 + 分隔线（2-3个） |
+| `content` | content_bullet | 单栏正文（默认） | 标题 + 要点/正文 |
+| `content` | content_two_column | 两栏内容 | 标题 + 左右两栏容器 |
+| `content` | content_three_column | 三栏内容 | 标题 + 三栏容器 |
+| `content` | content_grid_2x2 | 2×2 网格 | 标题 + 四格容器 |
+| `summary` | content_bullet | 总结回顾 | 单栏，常含要点回顾 + 展望 |
+| `thanks` | ending | 结尾/致谢 | 致谢文字 + 装饰 |
 
-### 推荐的大纲结构示例（10页）
+对于 `content` 类型的页面，通过 `recommended_ppt_format` 字段提示 PPT Agent 选择哪种布局：
+- `bullet_list` / `text_with_image` → content_bullet（单栏）
+- `two_column` / `comparison` → content_two_column（两栏）
+- `three_column` → content_three_column（三栏）
+- `four_grid` → content_grid_2x2（四格）
+- `chart` / `table` / `diagram` / `flowchart` → content_bullet（单栏中嵌入图表）
+
+### 推荐的 PPT 大纲结构示例（10页）
 
 - 第1页：title — 封面
 - 第2页：section — "第一部分：背景介绍"
@@ -66,3 +76,4 @@
 - 大纲页数 8-30 页，根据主题复杂度调整
 - 同一个 recommended_ppt_format 不应连续使用超过2页
 - section 页面的 content_json 可以简洁，主要起导航作用
+- **图片素材规则**：仅在确认有可用图片素材时才设置 has_image=true。可用素材列表会在 PPT 生成时提供（当前可能为空）。如果需要图片但预计无素材，在 notes 中说明"需要 [描述] 的图片素材"

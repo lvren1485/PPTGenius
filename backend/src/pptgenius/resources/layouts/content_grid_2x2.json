@@ -1,0 +1,105 @@
+{
+  "name": "content_grid_2x2",
+  "label": "标题 + 2x2 网格",
+  "background": {
+    "type": "solid",
+    "color": "{{bg}}"
+  },
+  "fixed_elements": [
+    {
+      "id": "title",
+      "type": "textbox",
+      "position": {"left": 0.8, "top": 0.4, "width": 11.7, "height": 0.9},
+      "style_ref": "title",
+      "placeholder": true
+    },
+    {
+      "id": "page_number",
+      "type": "textbox",
+      "position": {"left": 11.8, "top": 6.9, "width": 1.0, "height": 0.4},
+      "style_ref": "caption",
+      "text": "{page_num} / {total_pages}",
+      "placeholder": false
+    }
+  ],
+  "decorations": [
+    {
+      "id": "title_bar",
+      "type": "shape",
+      "shape_type": "rectangle",
+      "position": {"left": 0.8, "top": 0.35, "width": 0.08, "height": 0.55},
+      "fill": {"type": "solid", "color": "{{primary}}"},
+      "line": null
+    },
+    {
+      "id": "bottom_line",
+      "type": "shape",
+      "shape_type": "rectangle",
+      "position": {"left": 0.8, "top": 6.95, "width": 11.7, "height": 0.01},
+      "fill": {"type": "solid", "color": "{{border}}"},
+      "line": null
+    }
+  ],
+  "containers": [
+    {
+      "id": "grid_00",
+      "label": "左上格",
+      "position": {"left": 0.5, "top": 1.6, "width": 5.8, "height": 2.5},
+      "decorations": [
+        {
+          "id": "grid_00_bg",
+          "type": "shape",
+          "shape_type": "rounded_rectangle",
+          "position": {"left": 0, "top": 0, "width": 5.8, "height": 2.5},
+          "fill": {"type": "no_fill"},
+          "line": {"color": "{{border}}", "width_pt": 0.5}
+        }
+      ]
+    },
+    {
+      "id": "grid_01",
+      "label": "右上格",
+      "position": {"left": 6.8, "top": 1.6, "width": 5.8, "height": 2.5},
+      "decorations": [
+        {
+          "id": "grid_01_bg",
+          "type": "shape",
+          "shape_type": "rounded_rectangle",
+          "position": {"left": 0, "top": 0, "width": 5.8, "height": 2.5},
+          "fill": {"type": "no_fill"},
+          "line": {"color": "{{border}}", "width_pt": 0.5}
+        }
+      ]
+    },
+    {
+      "id": "grid_10",
+      "label": "左下格",
+      "position": {"left": 0.5, "top": 4.3, "width": 5.8, "height": 2.5},
+      "decorations": [
+        {
+          "id": "grid_10_bg",
+          "type": "shape",
+          "shape_type": "rounded_rectangle",
+          "position": {"left": 0, "top": 0, "width": 5.8, "height": 2.5},
+          "fill": {"type": "no_fill"},
+          "line": {"color": "{{border}}", "width_pt": 0.5}
+        }
+      ]
+    },
+    {
+      "id": "grid_11",
+      "label": "右下格",
+      "position": {"left": 6.8, "top": 4.3, "width": 5.8, "height": 2.5},
+      "decorations": [
+        {
+          "id": "grid_11_bg",
+          "type": "shape",
+          "shape_type": "rounded_rectangle",
+          "position": {"left": 0, "top": 0, "width": 5.8, "height": 2.5},
+          "fill": {"type": "no_fill"},
+          "line": {"color": "{{border}}", "width_pt": 0.5}
+        }
+      ]
+    }
+  ]
+}

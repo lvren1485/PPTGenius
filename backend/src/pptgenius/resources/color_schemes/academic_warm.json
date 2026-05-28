@@ -1,0 +1,28 @@
+{
+  "name": "academic_warm",
+  "label": "学术暖色",
+  "style_density": "moderate",
+  "colors": {
+    "primary": "b45309",
+    "accent": "d97706",
+    "text": "292524",
+    "text_secondary": "78716c",
+    "bg": "fafaf9",
+    "bg_dark": "f5f0eb",
+    "border": "d6d3d1"
+  },
+  "chart_colors": ["b45309", "d97706", "65a30d", "1d4ed8", "a21caf", "0891b2"],
+  "fonts": {
+    "title": {"name": "微软雅黑", "size": 28, "bold": true, "color": "b45309"},
+    "subtitle": {"name": "微软雅黑", "size": 18, "bold": false, "color": "78716c"},
+    "body": {"name": "微软雅黑", "size": 14, "bold": false, "color": "292524"},
+    "caption": {"name": "微软雅黑", "size": 10, "bold": false, "color": "78716c"}
+  },
+  "decoration": {
+    "title_accent_bar": true,
+    "section_divider_line": true,
+    "container_border": true,
+    "page_number_style": "right_bottom",
+    "corner_bracket": false
+  }
+}

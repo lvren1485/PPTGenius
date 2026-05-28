@@ -99,6 +99,13 @@ async def create_tables():
                     raise
 
 
+async def init_db() -> None:
+    """Full DB init: create tables then seed. Called once at startup."""
+    await create_tables()
+    from .seed import seed
+    await seed(_get_engine())
+
+
 async def get_db() -> AsyncSession:
     sm = get_sessionmaker()
     async with sm() as session:

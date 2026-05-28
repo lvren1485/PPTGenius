@@ -14,11 +14,11 @@ _log = get_logger(__name__)
 # -- lifespan ----------------------------------------------------------------
 
 async def _init_db() -> None:
-    """Ensure database tables exist (non-destructive)."""
-    from pptgenius.infrastructure.db import create_tables
+    """Ensure database tables exist + seed initial data (non-destructive)."""
+    from pptgenius.infrastructure.db import init_db
 
-    await create_tables()
-    _log.info("database tables ensured")
+    await init_db()
+    _log.info("database tables ensured + seeded")
 
 
 @asynccontextmanager

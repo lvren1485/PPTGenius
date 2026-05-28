@@ -1,6 +1,8 @@
-"""PPT agent — supervisor-subagent pipeline for slide generation.
+"""PPT agent — two-phase pipeline (Style → Per-Slide → Assembly).
 
-Placeholder — will be implemented after outline agent is stable.
+Two modes (code-isolated):
+  - sub_agent: Supervisor dispatches TextAgent + ChartAgent + ShapeAgent per slide
+  - freedom:   One FreedomAgent generates all elements at once per slide
 """
 
 from .graph import build_ppt_graph

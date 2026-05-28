@@ -1,0 +1,28 @@
+{
+  "name": "creative_vivid",
+  "label": "创意活力",
+  "style_density": "elaborate",
+  "colors": {
+    "primary": "7c3aed",
+    "accent": "f43f5e",
+    "text": "1e1b4b",
+    "text_secondary": "6b7280",
+    "bg": "faf5ff",
+    "bg_dark": "f3e8ff",
+    "border": "e9d5ff"
+  },
+  "chart_colors": ["7c3aed", "f43f5e", "06b6d4", "f59e0b", "10b981", "ec4899"],
+  "fonts": {
+    "title": {"name": "微软雅黑", "size": 30, "bold": true, "color": "7c3aed"},
+    "subtitle": {"name": "微软雅黑", "size": 18, "bold": false, "color": "6b7280"},
+    "body": {"name": "微软雅黑", "size": 14, "bold": false, "color": "1e1b4b"},
+    "caption": {"name": "微软雅黑", "size": 10, "bold": false, "color": "6b7280"}
+  },
+  "decoration": {
+    "title_accent_bar": true,
+    "section_divider_line": true,
+    "container_border": true,
+    "page_number_style": "right_bottom",
+    "corner_bracket": true
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "name": "content_two_column",
+  "label": "标题 + 两栏内容",
+  "background": {
+    "type": "solid",
+    "color": "{{bg}}"
+  },
+  "fixed_elements": [
+    {
+      "id": "title",
+      "type": "textbox",
+      "position": {"left": 0.8, "top": 0.4, "width": 11.7, "height": 0.9},
+      "style_ref": "title",
+      "placeholder": true
+    },
+    {
+      "id": "page_number",
+      "type": "textbox",
+      "position": {"left": 11.8, "top": 6.9, "width": 1.0, "height": 0.4},
+      "style_ref": "caption",
+      "text": "{page_num} / {total_pages}",
+      "placeholder": false
+    }
+  ],
+  "decorations": [
+    {
+      "id": "title_bar",
+      "type": "shape",
+      "shape_type": "rectangle",
+      "position": {"left": 0.8, "top": 0.35, "width": 0.08, "height": 0.55},
+      "fill": {"type": "solid", "color": "{{primary}}"},
+      "line": null
+    },
+    {
+      "id": "bottom_line",
+      "type": "shape",
+      "shape_type": "rectangle",
+      "position": {"left": 0.8, "top": 6.95, "width": 11.7, "height": 0.01},
+      "fill": {"type": "solid", "color": "{{border}}"},
+      "line": null
+    }
+  ],
+  "containers": [
+    {
+      "id": "left_col",
+      "label": "左栏",
+      "position": {"left": 0.5, "top": 1.6, "width": 5.8, "height": 5.1},
+      "decorations": [
+        {
+          "id": "left_col_bg",
+          "type": "shape",
+          "shape_type": "rounded_rectangle",
+          "position": {"left": 0, "top": 0, "width": 5.8, "height": 5.1},
+          "fill": {"type": "no_fill"},
+          "line": {"color": "{{border}}", "width_pt": 0.5}
+        }
+      ]
+    },
+    {
+      "id": "right_col",
+      "label": "右栏",
+      "position": {"left": 6.8, "top": 1.6, "width": 5.8, "height": 5.1},
+      "decorations": [
+        {
+          "id": "right_col_bg",
+          "type": "shape",
+          "shape_type": "rounded_rectangle",
+          "position": {"left": 0, "top": 0, "width": 5.8, "height": 5.1},
+          "fill": {"type": "no_fill"},
+          "line": {"color": "{{border}}", "width_pt": 0.5}
+        }
+      ]
+    }
+  ]
+}

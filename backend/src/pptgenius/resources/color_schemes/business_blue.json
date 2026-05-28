@@ -1,0 +1,28 @@
+{
+  "name": "business_blue",
+  "label": "商务蓝",
+  "style_density": "moderate",
+  "colors": {
+    "primary": "1a73e8",
+    "accent": "ea4335",
+    "text": "202124",
+    "text_secondary": "5f6368",
+    "bg": "f8f9fa",
+    "bg_dark": "e8eaed",
+    "border": "dadce0"
+  },
+  "chart_colors": ["1a73e8", "ea4335", "34a853", "fbbc04", "ff6d01", "46bdc6"],
+  "fonts": {
+    "title": {"name": "微软雅黑", "size": 28, "bold": true, "color": "1a73e8"},
+    "subtitle": {"name": "微软雅黑", "size": 18, "bold": false, "color": "5f6368"},
+    "body": {"name": "微软雅黑", "size": 14, "bold": false, "color": "202124"},
+    "caption": {"name": "微软雅黑", "size": 10, "bold": false, "color": "5f6368"}
+  },
+  "decoration": {
+    "title_accent_bar": true,
+    "section_divider_line": true,
+    "container_border": true,
+    "page_number_style": "right_bottom",
+    "corner_bracket": false
+  }
+}

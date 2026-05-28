@@ -118,6 +118,10 @@ class ColorScheme(Base):
     colors_json: Mapped[dict] = mapped_column(JSON, nullable=False)
     chart_colors_json: Mapped[dict] = mapped_column(JSON, nullable=False)
     fonts_json: Mapped[dict] = mapped_column(JSON, nullable=False)
+    style_density: Mapped[str | None] = mapped_column(
+        String(16), default="moderate", nullable=True
+    )
+    decoration_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     is_active: Mapped[bool | None] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

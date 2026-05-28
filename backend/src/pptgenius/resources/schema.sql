@@ -92,6 +92,8 @@ CREATE TABLE IF NOT EXISTS color_schemes (
     colors_json JSON NOT NULL COMMENT '{primary, accent, text, bg, ...}',
     chart_colors_json JSON NOT NULL COMMENT '图表配色序列',
     fonts_json JSON NOT NULL COMMENT '{title, subtitle, body, caption}',
+    style_density VARCHAR(16) DEFAULT 'moderate' COMMENT 'minimal|moderate|elaborate',
+    decoration_json JSON COMMENT '装饰开关 {title_accent_bar, section_divider_line, corner_bracket, ...}',
     is_active BOOLEAN DEFAULT TRUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP

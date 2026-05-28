@@ -2,18 +2,19 @@
 
 Usage::
 
-    from pptgenius.infrastructure.db import Database, create_tables
+    from pptgenius.infrastructure.db import Database, init_db
 
-    await create_tables()
+    await init_db()  # creates tables + seeds
     db = Database(async_session)
     user = await db.create_user("alice")
 """
 
 from .database import Database
-from .engine import create_tables, get_db
+from .engine import create_tables, get_db, init_db
 
 __all__ = [
     "Database",
     "create_tables",
+    "init_db",
     "get_db",
 ]

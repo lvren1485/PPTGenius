@@ -36,6 +36,8 @@ async def create_color_scheme(
     colors_json: dict,
     chart_colors_json: dict,
     fonts_json: dict,
+    style_density: str = "moderate",
+    decoration_json: dict | None = None,
 ) -> ColorScheme:
     cs = ColorScheme(
         name=name,
@@ -43,6 +45,8 @@ async def create_color_scheme(
         colors_json=colors_json,
         chart_colors_json=chart_colors_json,
         fonts_json=fonts_json,
+        style_density=style_density,
+        decoration_json=decoration_json or {},
     )
     db.add(cs)
     await db.commit()
