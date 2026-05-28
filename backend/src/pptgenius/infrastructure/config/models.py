@@ -27,6 +27,12 @@ class OutlineAgentConfig(BaseModel):
     evaluation_threshold: float = 0.7
 
 
+class PPTAgentConfig(BaseModel):
+    mode: str = "sub_agent"  # sub_agent | freedom
+    max_retries_per_slide: int = 3
+    slide_timeout_seconds: int = 120
+
+
 class CacheConfig(BaseModel):
     trim_max_tokens: int = 8000
     enable_node_cache: bool = True
@@ -34,6 +40,7 @@ class CacheConfig(BaseModel):
 
 class AgentConfig(BaseModel):
     outline: OutlineAgentConfig = OutlineAgentConfig()
+    ppt: PPTAgentConfig = PPTAgentConfig()
     cache: CacheConfig = CacheConfig()
 
 

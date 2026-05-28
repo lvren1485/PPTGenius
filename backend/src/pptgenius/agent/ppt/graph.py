@@ -12,6 +12,8 @@ from langgraph.graph import END, START, StateGraph
 from pptgenius.infrastructure.utils import get_logger
 
 from .phase1_style import style_agent_node
+from .phase2_sub_agent.supervisor import supervisor_node as sub_agent_supervisor
+from .phase2_freedom.supervisor import freedom_supervisor_node
 from .state import PPTState
 
 _log = get_logger("pptgenius.agent.ppt")
@@ -52,19 +54,28 @@ async def _create_presentation_node(state: PPTState, config) -> dict:
         for s in slides
     ]
 
+    # Load template layouts for supervisor
+    selected_layouts = state.get("selected_layouts", {})
+    if not selected_layouts:
+        templates = await db.list_active_templates()
+        if templates:
+            selected_layouts = templates[0].layouts_json or {}
+
     return {
         "presentation_id": presentation_id,
         "outline_slides": outline_slides,
         "total_slides": len(slides),
         "current_slide_index": 0,
+        "selected_layouts": selected_layouts,
     }
 
 
 async def _supervisor_node(state: PPTState, config) -> dict:
-    """Phase 2: Supervisor — per-slide dispatch."""
-    # Built in phase2_sub_agent/supervisor.py or phase2_freedom/supervisor.py
-    _log.info("Supervisor: slide %d/%d", state["current_slide_index"] + 1, state["total_slides"])
-    return {}
+    """Phase 2: Supervisor — per-slide dispatch, mode-aware."""
+    mode = state.get("ppt_mode", "sub_agent")
+    if mode == "freedom":
+        return await freedom_supervisor_node(state, config)
+    return await sub_agent_supervisor(state, config)
 
 
 async def _assembly_node(state: PPTState, config) -> dict:

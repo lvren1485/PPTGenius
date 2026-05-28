@@ -374,9 +374,79 @@ async def _run_ppt(
         yield _sse("error", {"code": 40301, "message": "请先生成大纲再生成PPT", "retryable": False})
         return
 
-    _log.warning("PPT agent not implemented — outline_id=%d", outline.id)
-    yield _sse("phase", {"phase": "ppt", "message": "PPT生成功能开发中..."})
-    yield _sse("progress", {"step": "pending", "detail": "PPT agent not yet implemented", "pct": 0})
+    from pptgenius.agent.ppt import build_ppt_graph
+    from pptgenius.agent.ppt.state import PPTState
+
+    cfg = get_settings().agent
+    ppt_mode = getattr(cfg, "ppt", None)
+    mode = getattr(ppt_mode, "mode", "sub_agent") if ppt_mode else "sub_agent"
+
+    state: PPTState = {
+        "user_id": user_id,
+        "conversation_id": conversation_id,
+        "query": query,
+        "outline_id": outline.id,
+        "is_modify": existing_ppt is not None,
+        "presentation_id": existing_ppt.id if existing_ppt else None,
+        "color_scheme_id": existing_ppt.color_scheme_id if existing_ppt else None,
+        "template_id": existing_ppt.template_id if existing_ppt else None,
+        "selected_layouts": {},
+        "style_rationale": "",
+        "current_slide_index": 0,
+        "total_slides": outline.slide_count or 0,
+        "ppt_mode": mode,
+        "outline_slides": [],
+        "design_rationales": [],
+        "file_path": f"output/{outline.title}.pptx",
+        "messages": [],
+    }
+
+    graph = build_ppt_graph()
+
+    yield _sse("phase", {"phase": "ppt", "message": "开始生成PPT..."})
+
+    import time as _time
+    t_start = _time.monotonic()
+
+    try:
+        async for event in graph.astream_events(
+            state, config={"configurable": {"db": db}}, version="v2",
+        ):
+            kind = event["event"]
+
+            if kind == "on_custom_event":
+                custom_data = event.get("data", {})
+                etype = custom_data.get("type", "")
+                if etype == "slide_start":
+                    yield _sse("progress", {
+                        "step": "slide_generating",
+                        "detail": f"第{custom_data['slide_index'] + 1}/{custom_data['total']}页: {custom_data.get('title', '')}",
+                        "pct": 10 + int(80 * (custom_data['slide_index'] + 1) / max(custom_data['total'], 1)),
+                    })
+                elif etype == "slide_end":
+                    yield _sse("progress", {
+                        "step": "slide_done",
+                        "detail": f"第{custom_data['slide_index'] + 1}页完成 ({custom_data.get('elapsed', 0)}s)",
+                        "pct": 10 + int(80 * (custom_data['slide_index'] + 1) / max(state['total_slides'], 1)),
+                    })
+
+            elif kind == "on_chain_end" and event["name"] == "assembly":
+                t_end = _time.monotonic()
+                output = event["data"].get("output", {})
+                yield _sse("phase", {
+                    "phase": "ppt_done",
+                    "message": f"PPT生成完成 (耗时 {t_end - t_start:.1f}s)",
+                })
+                yield _sse("ppt_done", {
+                    "presentation_id": state["presentation_id"],
+                    "file_path": state["file_path"],
+                    "elapsed_seconds": round(t_end - t_start, 1),
+                    "mode": mode,
+                })
+
+    except Exception:
+        _log.exception("PPT agent error")
+        yield _sse("error", {"code": 40400, "message": "PPT生成失败，请重试", "retryable": True})
 
 
 # ── SSE event helpers ────────────────────────────────────────────────────────
