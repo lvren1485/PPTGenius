@@ -1,7 +1,7 @@
 # PPTGenius API 设计
 
 > RESTful API，FastAPI 实现，SSE 流式响应
-> 日期：2026-06-03 · 最后更新：Agent supervisor 统一入口 + conversation 作用域
+> 日期：2026-06-04
 
 ---
 
@@ -170,7 +170,8 @@ data: {"presentation_id": 1, "file_path": "...", "slide_count": 12,
        "download_url": "/api/ppt/1/download"}
 
 event: done
-data: {"estimated_cost": 0.0062, "elapsed_seconds": 45.2}
+data: {"estimated_cost": 0.0062, "elapsed_seconds": 45.2,
+       "token_usage": {"input": 1234, "output": 567, "total": 1801}}
 
 # ── 错误 ──
 event: error
@@ -240,7 +241,11 @@ Response 200:
       {"id": 1, "idx": 1, "role": "user", "content": "做一个Python PPT",
        "content_type": "text", "estimated_cost": 0, "created_at": "..."},
       {"id": 2, "idx": 2, "role": "assistant", "content": "好的，我先生成大纲...",
-       "content_type": "text", "estimated_cost": 0.002, "created_at": "..."}
+       "content_type": "text", "estimated_cost": 0.002, "created_at": "..."},
+      {"id": 3, "idx": 3, "role": "file", "content": "[File uploaded: report.pdf]\nType: pdf | 10240 chars\n---\n# 数据分析报告\n...",
+       "content_type": "file", "estimated_cost": null, "created_at": "..."},
+      {"id": 4, "idx": 4, "role": "image", "content": "[Image uploaded: logo.png]\nPath: input/1687523456_logo.png\nType: png | 24530 bytes",
+       "content_type": "image", "estimated_cost": null, "created_at": "..."}
     ],
     "outlines": [
       {"id": 1, "title": "Python数据分析入门", "status": "confirmed",
@@ -256,7 +261,7 @@ Response 200:
 
 #### DELETE /api/conversations/{id}
 
-软删除（status=deleted）。可选 `?hard=true` 硬删除连带 workspace 文件。
+软删除（status=deleted）。可选 `?hard=true` 硬删除连带 workspace 文件（暂未实现）。
 
 ---
 
@@ -523,30 +528,67 @@ Response 200:
 
 #### POST /api/knowledge/upload
 
+支持两类文件，按后缀分流处理：
+
+**图片**（png, jpg, jpeg, gif, webp, svg, bmp, ico, tiff, tif）→ 存入 `input/` 目录、不入 BM25 索引：
+
+1. 保存到 `workspace/{conversation_id}/input/` 下
+2. 创建 `role="image"` 消息，内容包含文件名、相对路径、类型、大小
+
+**文档**（pdf, docx, xlsx, csv, txt, md, pptx 等）→ 存入 `knowledge/` 目录、入 BM25 索引：
+
+1. 保存到 `workspace/{conversation_id}/knowledge/` 下
+2. `parse_file()` → `chunk_text()` → DB 写入 chunks → 重建 BM25
+3. `parse_file()` 再次解析，取 `doc.text` 前 1000 字符创建 `role="file"` 消息（含文件预览）
+
 ```
 multipart/form-data:
   user_id: 1
-  conversation_id: 1          // 文件存入该 conversation 的 workspace/knowledge/
-  files: [file1.pdf, file2.docx]
+  conversation_id: 1
+  files: [logo.png, report.pdf, data.xlsx]
 
 Response 201:
 {
   "code": 0,
   "data": {
     "uploaded": [
-      {"id": 1, "conversation_id": 1, "filename": "report.pdf",
+      {"id": null, "conversation_id": 1, "filename": "logo.png",
+       "file_type": "png", "file_size": 24530,
+       "chunk_count": null, "status": "saved"},
+      {"id": 2, "conversation_id": 1, "filename": "report.pdf",
        "file_type": "pdf", "file_size": 102400,
-       "chunk_count": 15, "status": "indexed"}
+       "chunk_count": 15, "status": "indexed"},
+      {"id": 3, "conversation_id": 1, "filename": "data.xlsx",
+       "file_type": "xlsx", "file_size": 30720,
+       "chunk_count": 8, "status": "indexed"}
     ],
     "failed": []
   }
 }
 ```
 
-处理流程：
-1. 保存到 `workspace/{conversation_id}/knowledge/` 下
-2. `parse_file()` → `chunk_text()` → DB 写入 chunks
-3. `KnowledgeService.rebuild_user_index(user_id)` — 重建该用户全局 BM25 索引
+| 字段 | 图片 | 文档 |
+|------|------|------|
+| `id` | `null`（无 knowledge_file 行） | 数据库 knowledge_files.id |
+| `status` | `"saved"` | `"indexed"` |
+| `chunk_count` | `null` | 实际 chunk 数 |
+| 存储目录 | `workspace/{id}/input/` | `workspace/{id}/knowledge/` |
+| 自动创建消息 | image message | file message（含前1000字符预览） |
+
+**Message 格式 — file message：**
+```
+[File uploaded: report.pdf]
+Type: pdf | 10240 chars
+---
+<前1000字符的文本预览>
+```
+
+**Message 格式 — image message：**
+```
+[Image uploaded: logo.png]
+Path: input/1687523456_logo.png
+Type: png | 24530 bytes
+```
 
 #### GET /api/knowledge/files
 
@@ -619,10 +661,13 @@ Response 200:
 {
   "code": 0,
   "data": {
-    "rag": {"algorithm": "bm25", "top_k": 5},
-    "agent": {"outline": {"max_iterations": 5, "evaluation_threshold": 0.7}},
+    "rag": {"algorithm": "bm25", "top_k": 5, "supported_formats": ["pdf","docx","xlsx","csv","txt","md","pptx"]},
+    "agent": {
+      "outline": {"max_iterations": 5, "evaluation_threshold": 0.7},
+      "cache": {"trim_max_tokens": 20000, "enable_node_cache": true}
+    },
     "llm": {"provider": "deepseek", "model": "deepseek-v4-flash"},
-    "web_search": {"enabled": true, "engine": "duckduckgo"}
+    "web_search": {"enabled": true, "engine": "duckduckgo", "max_results": 5}
   }
 }
 ```
@@ -632,27 +677,11 @@ Response 200:
 ```
 Response 200:
 {
-  "status": "healthy",
-  "db": "connected",
-  "llm": "available",
-  "bm25": "ready"
+  "status": "healthy",    // healthy | degraded
+  "db": "connected",      // unknown | connected | disconnected
+  "llm": "configured",    // unknown | configured | unconfigured | error
+  "bm25": "empty"         // ready | empty
 }
 ```
 
 ---
-
-## 四、变更记录
-
-| 变更 | 说明 |
-|------|------|
-| 移除 `POST /api/outline/generate` | Agent supervisor 通过 `POST /api/chat/send` 统一决策 |
-| 移除 `PUT /api/outline/{id}` | 同上，用户反馈通过 chat/send 发送 |
-| 移除 `POST /api/ppt/generate` | 同上 |
-| 移除 `PUT /api/ppt/{id}` | 同上 |
-| 大纲/PPT 端点全部改为只读 | GET 系列仅用于查看历史 |
-| `POST /api/knowledge/upload` 新增 `conversation_id` | 文件存入 conversation workspace，索引全局 |
-| `GET /api/knowledge/files` 新增 `conversation_id` 筛选 | 可按会话过滤文件 |
-| 全部列表端点加 `user_id` | conversations / outlines / presentations / cost / knowledge files |
-| 移除 `GET /api/web-resources` | WebResource 表已删除，网页内容统一走 KnowledgeService |
-| Workspace BM25 路径 | `workspace/indexes/bm25_index_{user_id}.pkl` |
-| SSE vs WebSocket | 选用 SSE，request-response 模式天然匹配 |

@@ -1,7 +1,7 @@
 # PPTGenius 数据库设计
 
 > MySQL + asyncmy，SQLAlchemy async engine
-> 日期：2026-06-03
+> 日期：2026-06-04
 
 ---
 
@@ -30,16 +30,22 @@
          │
          │ 1:N
          │
-┌────────▼────────┐         ┌─────────────────┐
-│    outlines     │ 1     N │  outline_slides │
-│─────────────────│─────────│─────────────────│
-│ PK id           │         │ PK id           │
-│ FK conversation │         │ FK outline_id   │
-│ FK user_id      │         │    slide_index  │
-│    title        │         │    title        │
-│    status       │         │    content_json │
-│    eval_score   │         │    layout_type  │
-│    version      │         └─────────────────┘
+┌────────▼────────┐         ┌─────────────────────┐
+│    outlines     │ 1     N │  outline_slides     │
+│─────────────────│─────────│─────────────────────│
+│ PK id           │         │ PK id               │
+│ FK conversation │         │ FK outline_id       │
+│ FK user_id      │         │    slide_index      │
+│    title        │         │ UNIQUE(outline_id,  │
+│    status       │         │        slide_index) │
+│    eval_score   │         │    title            │
+│    version      │         │    content_json     │
+└────────┬────────┘         │    layout_type      │
+         │                  │    has_image        │
+         │ 1:N              │    has_chart        │
+         │                  │    notes            │
+         │                  │    created_at       │
+         │                  └─────────────────────┘
 └────────┬────────┘
          │
          │ 1:N
@@ -84,7 +90,11 @@
 │ PK id           │    │
 │ FK user_id      │    │
 │    filename     │    │
+│    file_path    │    │
 │    file_type    │    │
+│    file_size    │    │
+│    chunk_count  │    │
+│    source_type  │    │
 │    status       │    │
 └────────┬────────┘    │
          │ 1:N         │
@@ -95,17 +105,8 @@
 │ FK file_id (CASCADE)│
 │    chunk_index  │    │
 │    chunk_text   │    │
+│    token_count  │    │
 └─────────────────┘    │
-                       │
-┌──────────────────┐   │
-│  web_resources   │   │
-│──────────────────│   │
-│ PK id            │   │
-│ FK user_id       │   │
-│    url           │   │
-│    content_text  │   │
-│    source_domain │   │
-└──────────────────┘   │
                        └── color_schemes (同上 FK)
 ```
 
@@ -142,6 +143,11 @@ PPT 快照表，每次生成/修改后存入完整的 outline + presentation JSO
 | **templates / color_schemes** | 独立表存储模板和配色方案，layout_agent 选择已有方案或调用 create 新建 |
 | **users.password + users.other** | 预留多用户认证和扩展字段 |
 | **presentation_snapshots** | PPT 快照，存储每次生成/修改后的完整 outline + presentation JSON，version 自增 |
+| **web_resources 表已删除** | Web 内容统一走 KnowledgeService + knowledge_files |
+| **图片不入 BM25** | 图片上传后存入 `workspace/{id}/input/`，创建 image message，不进入 knowledge_files |
+| **文件上传自动预览** | 文档上传后取前1000字符创建 file message (role="file")，LLM 即可直接阅读 |
+| **message role 扩展** | 新增 file / image 两种角色，content_type 字段区分消息类型 |
+| **outline_slides 唯一约束** | (outline_id, slide_index) 联合唯一 |
 
 ---
 
@@ -173,13 +179,45 @@ PPT 快照表，每次生成/修改后存入完整的 outline + presentation JSO
 | `colors_json` | JSON | NOT NULL | {primary, accent, text, bg, ...} |
 | `chart_colors_json` | JSON | NOT NULL | 图表配色序列 |
 | `fonts_json` | JSON | NOT NULL | {title, subtitle, body, caption} |
+| `style_density` | VARCHAR(16) | DEFAULT 'moderate' | minimal / moderate / elaborate |
+| `decoration_json` | JSON | | 装饰开关 {title_accent_bar, section_divider_line, corner_bracket, ...} |
 | `is_active` | BOOLEAN | DEFAULT TRUE | |
 | `created_at` | DATETIME | DEFAULT CURRENT_TIMESTAMP | |
 | `updated_at` | DATETIME | ON UPDATE CURRENT_TIMESTAMP | |
 
 ---
 
-## 四、presentations / presentation_slides 变更
+## 四、知识库表
+
+### knowledge_files
+
+| 列名 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| `id` | INT | PK, AUTO_INCREMENT | |
+| `user_id` | INT | FK → users.id, NOT NULL | |
+| `filename` | VARCHAR(256) | NOT NULL | 原始文件名 |
+| `file_path` | VARCHAR(512) | NOT NULL | 实际存储路径 |
+| `file_type` | VARCHAR(16) | NOT NULL | pdf / docx / xlsx / csv / txt / md / pptx |
+| `file_size` | INT | | 文件大小 (bytes) |
+| `chunk_count` | INT | DEFAULT 0 | |
+| `source_type` | VARCHAR(16) | DEFAULT 'upload' | upload / web |
+| `status` | VARCHAR(32) | DEFAULT 'indexed' | indexed / deleted |
+| `created_at` | DATETIME | DEFAULT CURRENT_TIMESTAMP | |
+
+### knowledge_chunks
+
+| 列名 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| `id` | INT | PK, AUTO_INCREMENT | |
+| `file_id` | INT | FK → knowledge_files.id, ON DELETE CASCADE | |
+| `chunk_index` | INT | NOT NULL | 文件内 chunk 序号 |
+| `chunk_text` | TEXT | NOT NULL | chunk 文本内容 |
+| `token_count` | INT | | 估算 token 数 |
+| `created_at` | DATETIME | DEFAULT CURRENT_TIMESTAMP | |
+
+---
+
+## 五、presentations / presentation_slides 变更
 
 ### presentations 新增字段
 
@@ -209,10 +247,28 @@ PPT 快照表，每次生成/修改后存入完整的 outline + presentation JSO
 
 ---
 
-## 五、索引
+## 六、outline_slides 补充 & messages 角色
+
+### outline_slides 约束
+
+| 约束 | 说明 |
+|------|------|
+| `UNIQUE KEY uk_outline_slide (outline_id, slide_index)` | 同一 outline 内 slide_index 唯一 |
+
+### messages 角色 (role)
+
+| role | 说明 | content_type |
+|------|------|-------------|
+| `user` | 用户消息 | text |
+| `assistant` | AI 回复 | text |
+| `file` | 文件上传后自动创建，含前1000字符预览 | file |
+| `image` | 图片上传后自动创建，含路径、类型、大小 | image |
+
+---
+
+## 七、索引
 
 ```sql
-CREATE INDEX idx_snap_pres ON presentation_snapshots(presentation_id, version DESC);
 CREATE INDEX idx_conv_user ON conversations(user_id);
 CREATE INDEX idx_msg_conv_idx ON messages(conversation_id, idx);
 CREATE INDEX idx_out_conv ON outlines(conversation_id, version DESC);
@@ -224,8 +280,7 @@ CREATE INDEX idx_pslide_status ON presentation_slides(status);
 CREATE INDEX idx_pslide_outline ON presentation_slides(outline_slide_id);
 CREATE INDEX idx_template_cat ON templates(category);
 CREATE INDEX idx_colorscheme_name ON color_schemes(name);
+CREATE INDEX idx_snap_pres ON presentation_snapshots(presentation_id, version DESC);
 CREATE INDEX idx_know_user ON knowledge_files(user_id);
 CREATE INDEX idx_kchunk_file ON knowledge_chunks(file_id, chunk_index);
-CREATE UNIQUE INDEX idx_web_url ON web_resources(url);
-CREATE INDEX idx_web_user ON web_resources(user_id);
 ```
