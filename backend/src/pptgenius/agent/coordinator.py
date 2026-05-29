@@ -163,13 +163,27 @@ async def run_coordinator(
     # --- load conversation history for cache / context ---
     history_messages = await db.get_messages_by_conversation(conversation_id)
     history_summary = ""
+    image_paths: list[str] = []
+    file_contexts: list[str] = []
     if history_messages:
         recent = history_messages[-10:]  # last 10 messages
         lines = []
         for m in recent:
-            role = "用户" if m.role == "user" else "助手"
-            content_preview = (m.content or "")[:200]
-            lines.append(f"[{role}]: {content_preview}")
+            content = m.content or ""
+            if m.role == "image":
+                # Parse image message: extract path
+                for line in content.split("\n"):
+                    if line.startswith("Path:"):
+                        image_paths.append(line.split(":", 1)[1].strip())
+                        break
+                lines.append(f"[用户上传图片]: {content[:100]}")
+            elif m.role == "file":
+                file_contexts.append(content)
+                lines.append(f"[用户上传文件]: {content[:150]}")
+            else:
+                role = "用户" if m.role == "user" else "助手"
+                content_preview = content[:200]
+                lines.append(f"[{role}]: {content_preview}")
         history_summary = "\n".join(lines)
 
     # --- classify intent ---
@@ -180,6 +194,16 @@ async def run_coordinator(
         outline_title=latest_outline.title if latest_outline else "",
         history_summary=history_summary,
     )
+
+    # Build augmented query with image/file context
+    augmented_query = query
+    extra_parts = []
+    if image_paths:
+        extra_parts.append("## 可用图片素材\n" + "\n".join(f"- {p}" for p in image_paths))
+    if file_contexts:
+        extra_parts.append("## 已上传文件内容\n" + "\n\n---\n".join(file_contexts))
+    if extra_parts:
+        augmented_query = query + "\n\n" + "\n\n".join(extra_parts)
 
     yield _sse("progress", {
         "step": "coordinator_decision",
@@ -194,7 +218,7 @@ async def run_coordinator(
             db=db,
             user_id=user_id,
             conversation_id=conversation_id,
-            query=query,
+            query=augmented_query,
             existing_outline=latest_outline,
             is_modify=(decision.task == "modify_outline"),
         ):
@@ -203,7 +227,7 @@ async def run_coordinator(
     elif decision.task in ("generate_ppt", "modify_ppt"):
         async for event in _run_ppt(
             db=db, user_id=user_id, conversation_id=conversation_id,
-            query=query, outline=latest_outline, existing_ppt=latest_ppt,
+            query=augmented_query, outline=latest_outline, existing_ppt=latest_ppt,
         ):
             yield event
 

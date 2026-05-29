@@ -239,7 +239,7 @@ class KnowledgeFileItem(BaseModel):
 
 
 class KnowledgeUploadedFile(BaseModel):
-    id: int
+    id: int | None = None  # None for images (saved to input/ dir, not knowledge DB)
     conversation_id: int | None = None
     filename: str
     file_type: str

@@ -129,6 +129,37 @@ def _make_read_file(db: Database):
     return read_file
 
 
+def _make_list_input_images(conv_id: int):
+    @tool
+    async def list_input_images(dummy: str = "") -> str:
+        """List all image files available in this conversation's input directory.
+
+        These are images uploaded by the user that can be referenced in the PPT.
+        Pass an empty string as the argument.
+        """
+        from pathlib import Path
+        from pptgenius.infrastructure.config import get_settings
+
+        cfg = get_settings().workspace
+        input_dir = Path(cfg.root) / str(conv_id) / cfg.input_dir
+        if not input_dir.exists():
+            return "没有上传的图片素材。"
+
+        image_suffixes = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp"}
+        images = []
+        for f in sorted(input_dir.iterdir()):
+            if f.suffix.lower() in image_suffixes:
+                size_kb = f.stat().st_size / 1024
+                images.append(f"- {f.name} ({size_kb:.1f} KB)")
+
+        if not images:
+            return "没有上传的图片素材。"
+
+        return "可用图片素材:\n" + "\n".join(images)
+
+    return list_input_images
+
+
 def _make_fetch_web(db: Database, user_id: int, conv_id: int):
     @tool
     async def fetch_web(url: str) -> str:
@@ -223,6 +254,7 @@ async def generator_node(state: OutlineState, config: RunnableConfig) -> dict:
     tools = [
         _make_list_files(db, user_id),
         _make_read_file(db),
+        _make_list_input_images(conv_id),
         _make_search_knowledge(user_id),
         _make_search_web(),
         _make_fetch_web(db, user_id, conv_id),
