@@ -299,7 +299,7 @@ async def _run_outline(
         "conversation_id": conversation_id,
         "query": query,
         "outline_id": existing_outline.id if existing_outline else None,
-        "evaluated": is_modify,
+        "evaluated": False,  # always start with generator
         "iteration": 0,
         "eval_score": existing_outline.eval_score if existing_outline else None,
         "eval_suggestions": "",

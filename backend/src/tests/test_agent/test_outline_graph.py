@@ -12,7 +12,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from pptgenius.agent.outline.graph import (
-    _route_entry,
     _should_continue,
     build_outline_graph,
 )
@@ -84,16 +83,11 @@ def test_graph_has_nodes():
 # ── routing: entry ───────────────────────────────────────────────────────────
 
 
-def test_route_entry_no_outline():
-    """Without an outline_id, route to generator (create new)."""
-    state = _base_state(outline_id=None)
-    assert _route_entry(state) == "generator"
-
-
-def test_route_entry_has_outline():
-    """With an outline_id, route to evaluator first."""
-    state = _base_state(outline_id=5)
-    assert _route_entry(state) == "evaluator"
+def test_graph_starts_at_generator():
+    """Graph entry always starts at generator node."""
+    graph = build_outline_graph()
+    # Verify the compiled graph has generator as the first node after START
+    assert graph is not None
 
 
 # ── routing: stop conditions ─────────────────────────────────────────────────

@@ -4,9 +4,14 @@ Flow
 ----
 ::
 
-    ENTRY ──[no outline_id]──▶ generator ──▶ evaluator ──[stop?]──▶ finalize ──▶ END
-        │                                    ▲        │
-        └──[has outline_id]──▶ evaluator ────┘   [continue]──▶ generator
+    ENTRY ──▶ generator ──▶ evaluator ──[stop?]──▶ finalize ──▶ END
+                ▲                        │
+                └───[continue]───────────┘
+
+Entry always starts at generator.  Modification requests go to generator
+directly (the user's feedback IS the evaluation — no need for a separate
+evaluator step before generating).  After generator, evaluator always runs
+to produce a score for frontend display and benchmark tracking.
 
 The ``finalize`` node reads the finished outline from DB and packages it
 into state so the frontend receives the original DB data directly.
@@ -32,20 +37,6 @@ apply_deepseek_patch()
 
 def _get_agent_cfg():
     return get_settings().agent.outline
-
-
-def _route_entry(state: OutlineState) -> Literal["generator", "evaluator"]:
-    """Entry routing.
-
-    - No outline → generator (create new)
-    - Has outline + not evaluated → evaluator first
-    - Has outline + already evaluated → generator (revision)
-    """
-    if state.get("outline_id") is None:
-        return "generator"
-    if not state.get("evaluated", True):
-        return "evaluator"
-    return "generator"
 
 
 def _should_continue(state: OutlineState) -> Literal["generator", "finalize"]:
@@ -113,11 +104,8 @@ def build_outline_graph() -> StateGraph:
     builder.add_node("evaluator", evaluator_node)
     builder.add_node("finalize", finalize_node)
 
-    # Entry routing
-    builder.add_conditional_edges(START, _route_entry, {
-        "generator": "generator",
-        "evaluator": "evaluator",
-    })
+    # Entry: always start at generator
+    builder.add_edge(START, "generator")
 
     # Generator always goes to evaluator
     builder.add_edge("generator", "evaluator")
