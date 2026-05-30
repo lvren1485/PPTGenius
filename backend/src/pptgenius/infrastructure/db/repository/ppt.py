@@ -75,6 +75,21 @@ async def update_presentation_status(
     return True
 
 
+async def update_presentation_style(
+    db: AsyncSession,
+    pres_id: int,
+    color_scheme_id: int,
+    template_id: int = 1,
+) -> bool:
+    pres = await db.get(Presentation, pres_id)
+    if pres is None or pres.status == "deleted":
+        return False
+    pres.color_scheme_id = color_scheme_id
+    pres.template_id = template_id
+    await db.commit()
+    return True
+
+
 async def set_presentation_output(
     db: AsyncSession,
     pres_id: int,
@@ -143,6 +158,16 @@ async def get_slides_by_presentation_id(
     return list(result.scalars().all())
 
 
+async def _get_slide(db: AsyncSession, presentation_id: int, slide_index: int):
+    """Look up a presentation_slide by (presentation_id, slide_index)."""
+    stmt_result = await db.execute(
+        select(PresentationSlide)
+        .where(PresentationSlide.presentation_id == presentation_id)
+        .where(PresentationSlide.slide_index == slide_index)
+    )
+    return stmt_result.scalar_one_or_none()
+
+
 async def set_slide_agent_output(
         db: AsyncSession,
         presentation_id: int,
@@ -150,6 +175,9 @@ async def set_slide_agent_output(
         agent_type: str,
         output: dict,
 ) -> bool:
+    """Accumulative: merges output into agent_outputs[agent_type] without
+    overwriting other agent_types.  Safe for concurrent calls from different
+    sessions (last-write-wins per key, never deletes other keys)."""
     stmt = (
         select(PresentationSlide)
         .where(PresentationSlide.presentation_id == presentation_id)
@@ -159,9 +187,10 @@ async def set_slide_agent_output(
     s = result.scalar_one_or_none()
     if s is None:
         return False
-    outputs = s.agent_outputs or {}
-    outputs[agent_type] = output
-    s.agent_outputs = outputs
+    # Merge into existing: read current + add new key
+    current = dict(s.agent_outputs or {})
+    current[agent_type] = output
+    s.agent_outputs = current
     await db.commit()
     return True
 
@@ -198,8 +227,10 @@ async def increment_slide_retry(db: AsyncSession, slide_id: int) -> int | None:
     return s.retry_count
 
 
-async def set_slide_chart_data(db: AsyncSession, slide_id: int, chart_data: dict) -> bool:
-    s = await db.get(PresentationSlide, slide_id)
+async def set_slide_chart_data(
+    db: AsyncSession, presentation_id: int, slide_index: int, chart_data: dict,
+) -> bool:
+    s = await _get_slide(db, presentation_id, slide_index)
     if s is None:
         return False
     s.chart_data = chart_data
@@ -207,8 +238,10 @@ async def set_slide_chart_data(db: AsyncSession, slide_id: int, chart_data: dict
     return True
 
 
-async def set_slide_table_data(db: AsyncSession, slide_id: int, table_data: dict) -> bool:
-    s = await db.get(PresentationSlide, slide_id)
+async def set_slide_table_data(
+    db: AsyncSession, presentation_id: int, slide_index: int, table_data: dict,
+) -> bool:
+    s = await _get_slide(db, presentation_id, slide_index)
     if s is None:
         return False
     s.table_data = table_data
@@ -216,8 +249,10 @@ async def set_slide_table_data(db: AsyncSession, slide_id: int, table_data: dict
     return True
 
 
-async def set_slide_image_paths(db: AsyncSession, slide_id: int, image_paths: dict) -> bool:
-    s = await db.get(PresentationSlide, slide_id)
+async def set_slide_image_paths(
+    db: AsyncSession, presentation_id: int, slide_index: int, image_paths: dict,
+) -> bool:
+    s = await _get_slide(db, presentation_id, slide_index)
     if s is None:
         return False
     s.image_paths = image_paths

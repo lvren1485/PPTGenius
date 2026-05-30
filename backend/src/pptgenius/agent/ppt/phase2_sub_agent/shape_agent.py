@@ -120,8 +120,11 @@ def _build_user_prompt(slide: dict, layout_name: str, container_bounds: dict) ->
         f"标题: {slide.get('title', '')}",
         f"layout_type: {slide.get('layout_type', '')}",
         f"PPT 布局: {layout_name}",
-        f"\n请根据页面类型生成合适的装饰形状元素。",
     ]
+    neighbor = slide.get("_neighbor_context", "")
+    if neighbor:
+        parts.append(f"\n## 相邻页面上下文\n{neighbor}")
+    parts.append(f"\n请根据页面类型生成合适的装饰形状元素。")
     return "\n".join(parts)
 
 

@@ -9,7 +9,6 @@ import pytest
 
 from pptgenius.agent.ppt.graph import (
     _route_style,
-    _should_continue_phase2,
     build_ppt_graph,
 )
 from pptgenius.agent.ppt.state import PPTState
@@ -55,7 +54,7 @@ class TestGraphCompilation:
         nodes = graph.nodes
         assert "create_presentation" in nodes
         assert "style_agent" in nodes
-        assert "supervisor" in nodes
+        assert "dispatcher" in nodes
         assert "assembly" in nodes
 
 
@@ -75,9 +74,9 @@ class TestRouteStyle:
         state = _base_state(color_scheme_id=None, template_id=1)
         assert _route_style(state) == "style_agent"
 
-    def test_both_style_selected_skips_to_supervisor(self):
+    def test_both_style_selected_skips_to_dispatcher(self):
         state = _base_state(color_scheme_id=1, template_id=1)
-        assert _route_style(state) == "supervisor"
+        assert _route_style(state) == "dispatcher"
 
     def test_modify_with_existing_style_skips(self):
         """User is modifying a slide, not changing style."""
@@ -86,29 +85,7 @@ class TestRouteStyle:
             color_scheme_id=2,
             template_id=1,
         )
-        assert _route_style(state) == "supervisor"
-
-
-class TestShouldContinuePhase2:
-    def test_more_slides_continue(self):
-        state = _base_state(current_slide_index=2, total_slides=5)
-        assert _should_continue_phase2(state) == "supervisor"
-
-    def test_last_slide_goes_to_assembly(self):
-        state = _base_state(current_slide_index=5, total_slides=5)
-        assert _should_continue_phase2(state) == "assembly"
-
-    def test_past_last_slide_goes_to_assembly(self):
-        state = _base_state(current_slide_index=6, total_slides=5)
-        assert _should_continue_phase2(state) == "assembly"
-
-    def test_zero_slides_goes_to_assembly(self):
-        state = _base_state(current_slide_index=0, total_slides=0)
-        assert _should_continue_phase2(state) == "assembly"
-
-    def test_single_slide_first_visit_continues(self):
-        state = _base_state(current_slide_index=0, total_slides=1)
-        assert _should_continue_phase2(state) == "supervisor"
+        assert _route_style(state) == "dispatcher"
 
 
 # ── state defaults ────────────────────────────────────────────────────────────
@@ -159,10 +136,10 @@ class TestGraphEdges:
         # START → create_presentation edge exists
         assert compiled is not None
 
-    def test_style_to_supervisor_edge_exists(self):
+    def test_style_to_dispatcher_edge_exists(self):
         graph = build_ppt_graph()
         compiled = graph.get_graph()
-        # style_agent → supervisor is a direct edge
+        # style_agent → dispatcher is a direct edge
         assert compiled is not None
 
     def test_assembly_to_end(self):

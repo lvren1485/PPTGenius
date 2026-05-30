@@ -166,6 +166,11 @@ def _build_user_prompt(slide: dict, layout_name: str, container_bounds: dict) ->
     else:
         parts.append("无容器分区，使用绝对坐标（整个 slide 13.333×7.5 英寸）。")
 
+    # Neighbor context for cross-slide awareness
+    neighbor = slide.get("_neighbor_context", "")
+    if neighbor:
+        parts.append(f"\n## 相邻页面上下文\n{neighbor}")
+
     parts.append(f"\n请生成该页的文本/表格/图标元素。如果数据适合表格展示，优先使用 table。")
     return "\n".join(parts)
 

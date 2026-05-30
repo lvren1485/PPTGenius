@@ -12,7 +12,6 @@ import pytest
 
 from pptgenius.agent.ppt.phase2_sub_agent.supervisor import (
     _determine_agents,
-    _run_with_timing,
     Phase2Timing,
 )
 from pptgenius.agent.ppt.phase2_sub_agent.text_agent import (
@@ -76,16 +75,16 @@ class TestDetermineAgents:
             {"has_chart": False, "layout_type": "content"},
             "content_bullet",
         )
-        assert agents == ["text"]
+        assert "text" in agents and "shape" in agents
 
-    def test_content_slide_with_chart_needs_text_and_chart(self):
+    def test_content_slide_with_chart_needs_all_three(self):
         agents = _determine_agents(
             {"has_chart": True, "layout_type": "content"},
             "content_bullet",
         )
         assert "text" in agents
         assert "chart" in agents
-        assert "shape" not in agents
+        assert "shape" in agents  # every slide needs shape
 
     def test_title_slide_needs_text_and_shape(self):
         agents = _determine_agents(
@@ -115,14 +114,14 @@ class TestDetermineAgents:
             {"has_chart": False, "layout_type": "content"},
             "content_two_column",
         )
-        assert agents == ["text"]
+        assert "text" in agents and "shape" in agents
 
     def test_summary_slide_needs_only_text(self):
         agents = _determine_agents(
             {"has_chart": False, "layout_type": "summary"},
             "content_bullet",
         )
-        assert agents == ["text"]
+        assert "text" in agents and "shape" in agents
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -163,27 +162,6 @@ class TestFreedomTiming:
 # ═══════════════════════════════════════════════════════════════════════════════
 # Supervisor — _run_with_timing
 # ═══════════════════════════════════════════════════════════════════════════════
-
-
-class TestRunWithTiming:
-    @pytest.mark.asyncio
-    async def test_returns_agent_name_and_time(self):
-        async def dummy_agent(**kwargs):
-            return None
-
-        name, elapsed, exc = await _run_with_timing(dummy_agent, some_arg=1)
-        assert name == "dummy_agent"
-        assert elapsed >= 0
-        assert exc is None
-
-    @pytest.mark.asyncio
-    async def test_captures_exception(self):
-        async def failing_agent(**kwargs):
-            raise ValueError("test error")
-
-        name, elapsed, exc = await _run_with_timing(failing_agent)
-        assert name == "failing_agent"
-        assert isinstance(exc, ValueError)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -375,6 +353,7 @@ class TestSubmitTools:
 
         db = MagicMock()
         db.set_slide_agent_output = AsyncMock()
+        db.set_slide_table_data = AsyncMock()
 
         tool = _make_submit_text_elements(db, presentation_id=1, slide_index=0)
 
@@ -394,6 +373,7 @@ class TestSubmitTools:
 
         db = MagicMock()
         db.set_slide_agent_output = AsyncMock()
+        db.set_slide_chart_data = AsyncMock()
 
         tool = _make_submit_chart_element(db, presentation_id=1, slide_index=0)
 
@@ -417,6 +397,7 @@ class TestSubmitTools:
 
         db = MagicMock()
         db.set_slide_agent_output = AsyncMock()
+        db.set_slide_chart_data = AsyncMock()
 
         tool = _make_submit_chart_element(db, presentation_id=1, slide_index=0)
 
@@ -436,6 +417,7 @@ class TestSubmitTools:
 
         db = MagicMock()
         db.set_slide_agent_output = AsyncMock()
+        db.set_slide_image_paths = AsyncMock()
 
         tool = _make_submit_shape_elements(db, presentation_id=1, slide_index=0)
 

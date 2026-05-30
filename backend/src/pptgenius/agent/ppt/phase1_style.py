@@ -217,7 +217,10 @@ def _make_set_presentation_style(db: Database, presentation_id: int):
         color_scheme_id : int — The selected color scheme ID.
         design_rationale : str — Why you chose this scheme and style.
         """
-        # Update presentation record
+        # Update presentation record with style selections
+        await db.update_presentation_style(
+            presentation_id, color_scheme_id=color_scheme_id,
+        )
         await db.update_presentation_status(presentation_id, "slides_generating")
         _log.info(
             "Style selected for presentation %d: cs=%d rationale=%s",

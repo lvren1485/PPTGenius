@@ -202,6 +202,7 @@ class TestSetPresentationStyle:
     async def test_sets_and_returns_id(self):
         db = MagicMock()
         db.update_presentation_status = AsyncMock()
+        db.update_presentation_style = AsyncMock()
         tool, get_result = _make_set_presentation_style(db, presentation_id=10)
 
         result = await tool.ainvoke({
@@ -217,6 +218,7 @@ class TestSetPresentationStyle:
     async def test_get_result_returns_captured_values(self):
         db = MagicMock()
         db.update_presentation_status = AsyncMock()
+        db.update_presentation_style = AsyncMock()
         tool, get_result = _make_set_presentation_style(db, presentation_id=10)
 
         cs_id, rationale, was_called = get_result()
@@ -237,6 +239,7 @@ class TestSetPresentationStyle:
     async def test_updates_presentation_status(self):
         db = MagicMock()
         db.update_presentation_status = AsyncMock()
+        db.update_presentation_style = AsyncMock()
         tool, _ = _make_set_presentation_style(db, presentation_id=10)
 
         await tool.ainvoke({
@@ -244,4 +247,7 @@ class TestSetPresentationStyle:
             "design_rationale": "test",
         })
 
+        db.update_presentation_style.assert_called_once_with(
+            10, color_scheme_id=1,
+        )
         db.update_presentation_status.assert_called_once_with(10, "slides_generating")

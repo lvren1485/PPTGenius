@@ -152,12 +152,17 @@ def _make_submit_text_elements(db: Database, presentation_id: int, slide_index: 
                 f"请根据错误修正后重新提交。"
             )
 
-        # Save to agent_outputs
+        # Save to agent_outputs + table_data column
         await db.set_slide_agent_output(
             presentation_id=presentation_id,
             slide_index=slide_index,
             agent_type="text",
             output={"elements": elements},
+        )
+        await db.set_slide_table_data(
+            presentation_id=presentation_id,
+            slide_index=slide_index,
+            table_data={"elements": elements},
         )
         return f"✅ 已保存 {len(elements)} 个文本/表格/图片元素。"
 
@@ -183,12 +188,20 @@ def _make_submit_chart_element(db: Database, presentation_id: int, slide_index: 
                 f"请根据错误修正后重新提交。比如检查 chart_type 是否合法、series 数量是否匹配等。"
             )
 
+        # Store chart element in agent_outputs + raw data in chart_data column
         await db.set_slide_agent_output(
             presentation_id=presentation_id,
             slide_index=slide_index,
             agent_type="chart",
             output={"element": element},
         )
+        # Also store raw chart data in dedicated column
+        if "data" in element:
+            await db.set_slide_chart_data(
+                presentation_id=presentation_id,
+                slide_index=slide_index,
+                chart_data=element["data"],
+            )
         return f"✅ 已保存图表元素 (type={element.get('chart_type')})。"
 
     return submit_chart_element
@@ -219,6 +232,11 @@ def _make_submit_shape_elements(db: Database, presentation_id: int, slide_index:
             slide_index=slide_index,
             agent_type="shape",
             output={"elements": elements},
+        )
+        await db.set_slide_image_paths(
+            presentation_id=presentation_id,
+            slide_index=slide_index,
+            image_paths={"elements": elements},
         )
         return f"✅ 已保存 {len(elements)} 个形状元素。"
 

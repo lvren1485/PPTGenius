@@ -64,6 +64,7 @@ class Database:
     async def list_presentations_by_conversation(self, *a, **kw): return await ppt_repo.list_presentations_by_conversation(self.db, *a, **kw)
     async def list_presentations_by_user(self, *a, **kw): return await ppt_repo.list_presentations_by_user(self.db, *a, **kw)
     async def update_presentation_status(self, *a, **kw): return await ppt_repo.update_presentation_status(self.db, *a, **kw)
+    async def update_presentation_style(self, *a, **kw): return await ppt_repo.update_presentation_style(self.db, *a, **kw)
     async def set_presentation_output(self, *a, **kw): return await ppt_repo.set_presentation_output(self.db, *a, **kw)
     async def soft_delete_presentation(self, *a, **kw): return await ppt_repo.soft_delete_presentation(self.db, *a, **kw)
     # presentation_slide

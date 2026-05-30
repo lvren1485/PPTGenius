@@ -1,28 +1,26 @@
-"""Phase 2 Supervisor (Sub-Agent mode) — dispatches TextAgent + ChartAgent + ShapeAgent
-concurrently per slide using asyncio.gather.
+"""Phase 2 per-slide processor (Sub-Agent mode) — parallel sub-agent dispatch.
 
-Each slide is processed sequentially, but within each slide the sub-agents
-run in parallel to reduce total wall-clock time.
+Each sub-agent gets its own independent DB session via SessionManager,
+so they can run concurrently within a slide without session conflicts.
 
-Timing is recorded per-slide and aggregated.
+process_single_slide() is called by the Dispatcher for each slide in parallel.
 """
 
 from __future__ import annotations
 
-import json
+import asyncio
 import time
 from dataclasses import dataclass, field
 
 from langgraph.config import get_stream_writer
 
-from pptgenius.infrastructure.db import Database
+from pptgenius.infrastructure.db import Database, get_session_manager
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.layout_resolver import (
     get_container_bounds,
     select_layout,
 )
-from ..state import PPTState
 from .text_agent import run_text_agent
 from .chart_agent import run_chart_agent
 from .shape_agent import run_shape_agent
@@ -32,7 +30,6 @@ _log = get_logger("pptgenius.agent.ppt.supervisor")
 
 @dataclass
 class Phase2Timing:
-    """Timing stats for Phase 2."""
     total_start: float = 0.0
     total_end: float = 0.0
     slide_times: list[float] = field(default_factory=list)
@@ -53,149 +50,171 @@ class Phase2Timing:
         }
 
 
-async def supervisor_node(state: PPTState, config) -> dict:
-    """Phase 2 Supervisor: iterate slides, dispatch sub-agents concurrently per slide."""
-    db: Database = config["configurable"]["db"]
-    timing = Phase2Timing(total_start=time.monotonic())
+def _build_neighbor_context(all_slides: list[dict], slide_index: int, window: int = 2) -> str:
+    """Build a context string from neighboring slides (1-2 before/after)."""
+    parts = []
+    for i in range(max(0, slide_index - window), slide_index):
+        s = all_slides[i]
+        parts.append(f"前{i - slide_index}页: \"{s.get('title', '')}\" "
+                     f"(layout={s.get('layout_type', 'content')})")
+    for i in range(slide_index + 1, min(len(all_slides), slide_index + window + 1)):
+        s = all_slides[i]
+        parts.append(f"后{i - slide_index}页: \"{s.get('title', '')}\" "
+                     f"(layout={s.get('layout_type', 'content')})")
+    return "\n".join(parts) if parts else "（独立页面，无相邻页）"
 
-    try:
-        writer = get_stream_writer()
-    except RuntimeError:
-        writer = lambda _: None
 
-    presentation_id = state["presentation_id"]
-    slides = state["outline_slides"]
-    total = state["total_slides"]
-    current = state["current_slide_index"]
+async def process_single_slide(
+    *,
+    db: Database,
+    slide: dict,
+    all_slides: list[dict],
+    selected_layouts: dict[str, dict],
+    presentation_id: int,
+    color_scheme_id: int | None,
+    template_id: int | None,
+    conv_id: int,
+    config,
+    sm,
+) -> dict:
+    """Process ONE slide: determine agents, dispatch in parallel, store results.
 
-    if current >= total:
-        return {}
-
-    # Get the current slide
-    slide = slides[current]
+    Returns timing dict for this slide.
+    """
     slide_index = slide["slide_index"]
     layout_name = select_layout(slide)
-
-    # Load layout and color scheme for context
-    selected_layouts = state.get("selected_layouts", {})
     layout_def = selected_layouts.get(layout_name, {})
     container_bounds = get_container_bounds(layout_def)
 
-    # Determine which agents are needed
     agents_needed = _determine_agents(slide, layout_name)
+    neighbor_ctx = _build_neighbor_context(all_slides, slide_index)
+
     _log.info(
-        "Slide %d/%d (%s): layout=%s, agents=%s",
-        current + 1, total, slide.get("title", "?"), layout_name, agents_needed,
+        "Slide %d (%s): layout=%s, agents=%s",
+        slide_index + 1, slide.get("title", "?"), layout_name, agents_needed,
     )
 
-    # Ensure presentation_slide exists (check first to avoid duplicates)
-    existing_slides = await db.get_slides_by_presentation_id(presentation_id)
-    if not any(s.slide_index == slide_index for s in existing_slides):
-        await db.create_presentation_slide(
-            presentation_id=presentation_id,
-            slide_index=slide_index,
-            layout_name=layout_name,
-            color_scheme_id=state.get("color_scheme_id"),
-            template_id=state.get("template_id"),
-        )
+    # Emit slide_start SSE
+    try:
+        writer = get_stream_writer()
+        writer({
+            "type": "slide_start", "slide_index": slide_index, "total": len(all_slides),
+            "title": slide.get("title", ""), "layout": layout_name,
+            "agents": agents_needed,
+        })
+    except RuntimeError:
+        pass
 
-    # Store outline slide notes for assembly (写入PPT演讲者备注)
+    # Store outline notes
     outline_notes = slide.get("notes", "") or ""
     if outline_notes:
         try:
             await db.set_slide_agent_output(
-                presentation_id=presentation_id,
-                slide_index=slide_index,
-                agent_type="_notes",
-                output={"notes": outline_notes},
+                presentation_id=presentation_id, slide_index=slide_index,
+                agent_type="_notes", output={"notes": outline_notes},
             )
         except Exception:
-            pass  # slide may not exist yet or notes already stored
+            pass
 
-    writer({
-        "type": "slide_start",
-        "slide_index": current,
-        "total": total,
-        "title": slide.get("title", ""),
-        "layout": layout_name,
-        "agents": agents_needed,
-    })
+    # Enrich slide with neighbor context for sub-agents
+    enriched_slide = {**slide, "_neighbor_context": neighbor_ctx}
 
-    # ---- sequential sub-agent dispatch (sequential to avoid DB session conflicts) ----
+    # ---- parallel sub-agent dispatch ----
     slide_start = time.monotonic()
-    results: list[tuple[str, float, Exception | None]] = []
+    tasks = []
+    agent_names: list[str] = []
 
-    for agent_name in agents_needed:
-        writer({"type": "agent_start", "agent": agent_name, "slide_index": current})
-        _log.info("Slide %d: starting %s_agent", current, agent_name)
+    base_kwargs = dict(
+        sm=sm, slide=enriched_slide, container_bounds=container_bounds,
+        presentation_id=presentation_id, slide_index=slide_index,
+        color_scheme_id=color_scheme_id, conv_id=conv_id, config=config,
+    )
 
-        fn = {"text": run_text_agent, "chart": run_chart_agent, "shape": run_shape_agent}[agent_name]
-        kwargs = dict(
-            db=db, slide=slide, container_bounds=container_bounds,
-            presentation_id=presentation_id, slide_index=slide_index,
-            color_scheme_id=state.get("color_scheme_id"),
-            conv_id=state["conversation_id"], config=config,
-        )
-        if agent_name == "text":
-            kwargs["layout_name"] = layout_name
-        elif agent_name == "shape":
-            kwargs["layout_name"] = layout_name
+    if "text" in agents_needed:
+        agent_names.append("text")
+        tasks.append(_run_agent_with_session(
+            run_text_agent, "text", layout_name=layout_name, **base_kwargs,
+        ))
+    if "chart" in agents_needed:
+        agent_names.append("chart")
+        tasks.append(_run_agent_with_session(
+            run_chart_agent, "chart", **base_kwargs,
+        ))
+    if "shape" in agents_needed:
+        agent_names.append("shape")
+        tasks.append(_run_agent_with_session(
+            run_shape_agent, "shape", layout_name=layout_name, **base_kwargs,
+        ))
 
-        result = await _run_with_timing(fn, **kwargs)
-        results.append(result)
-
-        name, elapsed, exc = result
-        writer({"type": "agent_end", "agent": agent_name,
-                "elapsed": round(elapsed, 2),
-                "ok": exc is None})
-        _log.info("Slide %d: %s_agent done in %.1fs (err=%s)", current, agent_name, elapsed, exc)
+    results = await asyncio.gather(*tasks, return_exceptions=True)
 
     slide_elapsed = time.monotonic() - slide_start
-    timing.slide_times.append(slide_elapsed)
+    agent_times: dict[str, float] = {}
+    has_error = False
 
-    for agent_name, agent_time, exc in results:
-        if agent_name not in timing.agent_times:
-            timing.agent_times[agent_name] = []
-        timing.agent_times[agent_name].append(agent_time)
+    for i, name in enumerate(agent_names):
+        result = results[i] if i < len(results) else (name, 0, RuntimeError("missing"))
+        if isinstance(result, Exception):
+            result = (name, 0, result)
+
+        a_name, elapsed, exc = result
+        agent_times[a_name] = elapsed
         if exc:
-            _log.error("Agent %s failed on slide %d: %s", agent_name, current, exc)
+            has_error = True
+            _log.error("Agent %s failed on slide %d: %s", a_name, slide_index, exc)
 
-    writer({
-        "type": "slide_end",
-        "slide_index": current,
-        "elapsed": round(slide_elapsed, 2),
-    })
+    # Update slide status
+    if has_error:
+        try:
+            await db.update_slide_status(
+                presentation_id, slide_index, "error",
+                error_message="One or more agents failed",
+            )
+        except Exception:
+            pass
+    else:
+        try:
+            await db.update_slide_status(presentation_id, slide_index, "completed")
+        except Exception:
+            pass
 
-    timing.total_end = time.monotonic()
-    next_index = current + 1
+    # Emit slide_end SSE
+    try:
+        writer = get_stream_writer()
+        writer({
+            "type": "slide_end", "slide_index": slide_index,
+            "elapsed": round(slide_elapsed, 2),
+            "agents": agent_times,
+        })
+    except RuntimeError:
+        pass
 
     return {
-        "current_slide_index": next_index,
-        "messages": [],  # each sub-agent manages its own messages
+        "slide_index": slide_index,
+        "elapsed": slide_elapsed,
+        "agent_times": agent_times,
+        "has_error": has_error,
     }
 
 
 def _determine_agents(slide: dict, layout_name: str) -> list[str]:
-    """Determine which agents are needed for this slide."""
-    agents = ["text"]  # always need text
-
-    has_chart = slide.get("has_chart", False)
-    if has_chart:
+    agents = ["text", "shape"]  # every slide needs text + decorations
+    if slide.get("has_chart", False):
         agents.append("chart")
-
-    # Shape agent needed for decorative pages
-    if layout_name in ("title_slide", "section", "ending"):
-        agents.append("shape")
-
     return agents
 
 
-async def _run_with_timing(run_fn, **kwargs) -> tuple[str, float, Exception | None]:
-    """Run a sub-agent and return (agent_name, elapsed_seconds, exception_or_none)."""
-    agent_name = run_fn.__name__.replace("run_", "")
+async def _run_agent_with_session(run_fn, agent_name: str, sm, layout_name=None, **kwargs):
+    """Run a sub-agent with its own isolated DB session, return (name, elapsed, exc)."""
+    sub_db = sm.new_session()
     t0 = time.monotonic()
     try:
-        await run_fn(**kwargs)
+        extra = {}
+        if layout_name is not None and agent_name in ("text", "shape"):
+            extra["layout_name"] = layout_name
+        await run_fn(db=sub_db, **kwargs, **extra)
         return (agent_name, time.monotonic() - t0, None)
     except Exception as exc:
         return (agent_name, time.monotonic() - t0, exc)
+    finally:
+        await sm.close(sub_db)

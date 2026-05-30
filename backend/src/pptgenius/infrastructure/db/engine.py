@@ -106,6 +106,44 @@ async def init_db() -> None:
     await seed(_get_engine())
 
 
+class SessionManager:
+    """Provides independent DB sessions for parallel agent execution.
+
+    Each call to ``new_session()`` returns a Database backed by a fresh
+    AsyncSession from the connection pool.  Sessions are isolated —
+    commits in one session do not affect others.  Callers must close
+    each session via ``close()`` or ``async with``.
+    """
+
+    def __init__(self) -> None:
+        self._sm = get_sessionmaker()
+
+    def new_session(self) -> "Database":
+        """Create a new independent Database + AsyncSession for an agent."""
+        from .database import Database
+        session = self._sm()
+        return Database(session)
+
+    async def close(self, db: "Database") -> None:
+        """Close a session returned by new_session()."""
+        try:
+            await db.db.rollback()
+        except Exception:
+            pass
+        await db.db.close()
+
+
+# Singleton — shared across the app
+_session_manager: SessionManager | None = None
+
+
+def get_session_manager() -> SessionManager:
+    global _session_manager
+    if _session_manager is None:
+        _session_manager = SessionManager()
+    return _session_manager
+
+
 async def get_db() -> AsyncSession:
     sm = get_sessionmaker()
     async with sm() as session:

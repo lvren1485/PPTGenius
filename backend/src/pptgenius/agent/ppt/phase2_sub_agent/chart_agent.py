@@ -156,6 +156,10 @@ def _build_chart_user_prompt(slide: dict, container_bounds: dict) -> str:
     if not any(cid != "slide" for cid in container_bounds):
         parts.append("无容器分区。图表适合放在: left=0.8, top=1.6, width=8.5, height=5.0")
 
+    neighbor = slide.get("_neighbor_context", "")
+    if neighbor:
+        parts.append(f"\n## 相邻页面上下文\n{neighbor}")
+
     parts.append(f"\n请选择合适的图表类型，读取对应指令文件，生成图表元素。")
     return "\n".join(parts)
 

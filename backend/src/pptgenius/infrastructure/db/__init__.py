@@ -10,11 +10,12 @@ Usage::
 """
 
 from .database import Database
-from .engine import create_tables, get_db, init_db
+from .engine import create_tables, get_db, get_session_manager, init_db
 
 __all__ = [
     "Database",
     "create_tables",
-    "init_db",
     "get_db",
+    "get_session_manager",
+    "init_db",
 ]
