@@ -57,7 +57,43 @@ def _mock_outline(topic: str, num_slides: int) -> Outline:
 
 
 def _parse_llm_json(raw: str) -> Outline:
-    data = json.loads(raw)
+    original_raw = raw
+    # 尝试清理输出，只保留 JSON 部分
+    raw = raw.strip()
+    # 尝试找到 JSON 开始和结束位置
+    if raw.startswith("```"):
+        # 移除 Markdown 代码块标记
+        lines = raw.split("\n")
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].startswith("```"):
+            lines = lines[:-1]
+        raw = "\n".join(lines).strip()
+    
+    # 尝试从第一个 { 开始解析
+    start_idx = raw.find("{")
+    end_idx = raw.rfind("}")
+    if start_idx >= 0 and end_idx > start_idx:
+        raw = raw[start_idx:end_idx+1]
+    
+    data = None
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        try:
+            # 如果解析失败，尝试更宽松的清理
+            import re
+            # 移除控制字符
+            raw = re.sub(r'[\x00-\x1F\x7F]', '', raw)
+            # 尝试修复常见问题
+            raw = raw.replace("，", ",").replace("。", ".")
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            # 如果还是失败，回退到 mock
+            print("LLM 返回的 JSON 解析失败，使用占位大纲")
+            print(f"原始输出（前500字符）: {repr(original_raw[:500])}")
+            raise
+    
     slides_raw = data.get("slides") or []
     slides: List[SlideSpec] = []
     for item in slides_raw:

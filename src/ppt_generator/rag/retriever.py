@@ -4,7 +4,7 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Optional, Sequence
+from typing import Iterable, List, Optional, Sequence, Tuple
 
 from rank_bm25 import BM25Okapi
 
@@ -39,6 +39,12 @@ class CorpusChunk:
     from_user: bool = False
 
 
+@dataclass(frozen=True)
+class ScoredChunk:
+    chunk: CorpusChunk
+    score: float
+
+
 class BM25Retriever:
     def __init__(self, chunks: Sequence[CorpusChunk]) -> None:
         self.chunks: List[CorpusChunk] = list(chunks)
@@ -68,6 +74,10 @@ class BM25Retriever:
         return cls(chunks)
 
     def retrieve(self, query: str, top_k: int = 6) -> List[CorpusChunk]:
+        scored = self.retrieve_with_scores(query, top_k)
+        return [s.chunk for s in scored]
+
+    def retrieve_with_scores(self, query: str, top_k: int = 6) -> List[ScoredChunk]:
         if not self.chunks or top_k <= 0 or self._bm25 is None:
             return []
         q_tokens = tokenize_for_bm25(query)
@@ -79,14 +89,14 @@ class BM25Retriever:
         pool = ranked[:pool_n]
         pool_sorted = sorted(pool, key=lambda i: (self.chunks[i].from_user, scores[i]), reverse=True)
         seen = set()
-        out: List[CorpusChunk] = []
+        out: List[ScoredChunk] = []
         for idx in pool_sorted:
             ch = self.chunks[idx]
             key = (ch.source_id, ch.text[:80])
             if key in seen:
                 continue
             seen.add(key)
-            out.append(ch)
+            out.append(ScoredChunk(chunk=ch, score=float(scores[idx])))
             if len(out) >= top_k:
                 break
         return out

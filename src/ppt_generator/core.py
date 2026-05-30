@@ -3,6 +3,20 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from typing import List, Optional, Union
+from dotenv import load_dotenv
+
+# 尝试自动加载 .env 文件
+def _try_load_dotenv() -> None:
+    try:
+        # 从项目根目录加载 .env
+        repo_root = Path(__file__).resolve().parents[2]
+        env_file = repo_root / ".env"
+        if env_file.exists():
+            load_dotenv(env_file)
+    except Exception:
+        pass
+
+_try_load_dotenv()
 
 from ppt_generator.export.pptx_export import export_outline_to_pptx
 from ppt_generator.llm.client import OutlineLLMClient

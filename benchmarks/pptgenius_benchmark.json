@@ -1,0 +1,149 @@
+[
+    {
+        "id": "rag_teaching",
+        "scenario": "教学",
+        "topic": "检索增强生成（RAG）教学介绍",
+        "num_slides": 8,
+        "expected_sources": [
+            "rag_intro"
+        ],
+        "keywords": [
+            "检索增强生成",
+            "RAG",
+            "知识库",
+            "幻觉",
+            "溯源"
+        ],
+        "style": "教学"
+    },
+    {
+        "id": "medical_ai",
+        "scenario": "学术",
+        "topic": "医学人工智能的应用与挑战",
+        "num_slides": 10,
+        "expected_sources": [
+            "med_ai_survey"
+        ],
+        "keywords": [
+            "医学影像",
+            "深度学习",
+            "临床决策",
+            "可解释性",
+            "监管"
+        ],
+        "style": "学术"
+    },
+    {
+        "id": "presentation_story",
+        "scenario": "商业",
+        "topic": "如何构建有说服力的商业演示",
+        "num_slides": 8,
+        "expected_sources": [
+            "ppt_story"
+        ],
+        "keywords": [
+            "叙事结构",
+            "金字塔原理",
+            "行动呼吁",
+            "演示技巧"
+        ],
+        "style": "商业"
+    },
+    {
+        "id": "cloud_computing",
+        "scenario": "技术",
+        "topic": "云计算架构与服务模式",
+        "num_slides": 9,
+        "expected_sources": [
+            "cloud_computing"
+        ],
+        "keywords": [
+            "IaaS",
+            "PaaS",
+            "SaaS",
+            "容器化",
+            "微服务"
+        ],
+        "style": "正式"
+    },
+    {
+        "id": "sustainability",
+        "scenario": "商业",
+        "topic": "企业可持续发展战略",
+        "num_slides": 10,
+        "expected_sources": [
+            "sustainability"
+        ],
+        "keywords": [
+            "ESG",
+            "碳中和",
+            "绿色供应链",
+            "可持续发展"
+        ],
+        "style": "商业"
+    },
+    {
+        "id": "ai_ethics",
+        "scenario": "学术",
+        "topic": "人工智能伦理与治理",
+        "num_slides": 8,
+        "expected_sources": [
+            "ai_ethics"
+        ],
+        "keywords": [
+            "算法偏见",
+            "隐私保护",
+            "AI治理",
+            "伦理框架"
+        ],
+        "style": "学术"
+    },
+    {
+        "id": "data_analytics",
+        "scenario": "教学",
+        "topic": "数据分析基础与方法",
+        "num_slides": 10,
+        "expected_sources": [
+            "data_analytics"
+        ],
+        "keywords": [
+            "描述性统计",
+            "预测分析",
+            "数据可视化",
+            "机器学习"
+        ],
+        "style": "教学"
+    },
+    {
+        "id": "product_launch",
+        "scenario": "商业",
+        "topic": "新产品上市策略与执行",
+        "num_slides": 9,
+        "expected_sources": [
+            "product_launch"
+        ],
+        "keywords": [
+            "市场定位",
+            "上市计划",
+            "渠道策略",
+            "KPI"
+        ],
+        "style": "商业"
+    },
+    {
+        "id": "cybersecurity",
+        "scenario": "技术",
+        "topic": "网络安全威胁与防护",
+        "num_slides": 10,
+        "expected_sources": [
+            "cybersecurity"
+        ],
+        "keywords": [
+            "安全漏洞",
+            "零信任",
+            "加密",
+            "入侵检测"
+        ],
+        "style": "正式"
+    }
+]
