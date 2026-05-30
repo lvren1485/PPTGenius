@@ -99,3 +99,24 @@ uv run python src/benchmark.py
 ```
 
 报告生成后浏览器打开 `docs/benchmark_report.html` 查看图表和逐会话明细。
+
+## 前端
+
+Vue 3 + Element Plus + TypeScript，Vite 构建，开发时通过代理转发 API。
+
+```bash
+cd frontend
+npm install
+npm run dev                    # 启动开发服务器 (http://localhost:5173)
+```
+
+访问 `http://localhost:5173`，API 请求自动代理至 `http://localhost:8000`。
+
+**前置条件：** 后端已启动（`cd backend && uv run python main.py`）。
+
+### 构建
+
+```bash
+cd frontend
+npm run build                  # 输出到 frontend/dist/
+```
