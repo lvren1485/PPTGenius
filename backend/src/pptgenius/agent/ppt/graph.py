@@ -29,13 +29,10 @@ async def _create_presentation_node(state: PPTState, config) -> dict:
 
     presentation_id = state.get("presentation_id")
     if presentation_id is None:
-        outline = await db.get_outline(state["outline_id"])
         pres = await db.create_presentation(
             user_id=state["user_id"],
             conversation_id=state["conversation_id"],
             outline_id=state["outline_id"],
-            file_path=state["file_path"],
-            status="style_selecting",
         )
         presentation_id = pres.id
 
@@ -79,12 +76,59 @@ async def _supervisor_node(state: PPTState, config) -> dict:
 
 
 async def _assembly_node(state: PPTState, config) -> dict:
-    """Assembly: merge layout + agent outputs → validate → render .pptx."""
+    """Assembly: merge layout + agent outputs → validate → render .pptx, then snapshot."""
     from pptgenius.infrastructure.db import Database
     db: Database = config["configurable"]["db"]
 
-    _log.info("Assembly: presentation_id=%d", state["presentation_id"])
-    await db.update_presentation_status(state["presentation_id"], "completed")
+    pres_id = state["presentation_id"]
+    _log.info("Assembly: presentation_id=%d", pres_id)
+
+    # Collect outline + presentation data for snapshot
+    outline = await db.get_outline(state["outline_id"])
+    pres = await db.get_presentation(pres_id)
+    slides = await db.get_slides_by_presentation_id(pres_id)
+
+    outline_data = None
+    if outline:
+        outline_slides = await db.get_slides_by_outline_id(outline.id)
+        outline_data = {
+            "id": outline.id, "title": outline.title, "version": outline.version,
+            "slide_count": outline.slide_count, "eval_score": outline.eval_score,
+            "slides": [
+                {"slide_index": s.slide_index, "title": s.title,
+                 "layout_type": s.layout_type, "content_json": s.content_json}
+                for s in outline_slides
+            ],
+        }
+
+    presentation_data = {
+        "id": pres.id if pres else pres_id,
+        "slide_count": len(slides),
+        "color_scheme_id": state.get("color_scheme_id"),
+        "template_id": state.get("template_id"),
+        "slides": [
+            {"slide_index": s.slide_index, "layout_name": s.layout_name,
+             "agent_outputs": s.agent_outputs, "status": s.status}
+            for s in slides
+        ],
+    }
+
+    await db.create_snapshot(
+        presentation_id=pres_id,
+        user_id=state["user_id"],
+        conversation_id=state["conversation_id"],
+        outline_json=outline_data or {},
+        presentation_json=presentation_data,
+    )
+    _log.info("Snapshot saved for presentation %d", pres_id)
+
+    await db.set_presentation_output(
+        pres_id,
+        file_path=state["file_path"],
+        file_size=0,  # will be updated after actual render
+        slide_count=len(slides),
+    )
+    await db.update_presentation_status(pres_id, "completed")
     return {}
 
 

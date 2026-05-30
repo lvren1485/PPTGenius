@@ -441,11 +441,32 @@ async def _run_ppt(
             if kind == "on_custom_event":
                 custom_data = event.get("data", {})
                 etype = custom_data.get("type", "")
-                if etype == "slide_start":
+                if etype == "style_agent_start":
+                    yield _sse("progress", {"step": "style_selecting", "detail": "正在选择配色方案...", "pct": 8})
+                elif etype == "style_agent_end":
+                    yield _sse("progress", {"step": "style_done", "detail": "配色方案已选定", "pct": 10})
+                elif etype == "slide_start":
                     yield _sse("progress", {
                         "step": "slide_generating",
                         "detail": f"第{custom_data['slide_index'] + 1}/{custom_data['total']}页: {custom_data.get('title', '')}",
                         "pct": 10 + int(80 * (custom_data['slide_index'] + 1) / max(custom_data['total'], 1)),
+                    })
+                elif etype == "agent_start":
+                    slide_i = custom_data.get("slide_index", 0)
+                    agent_label = {"text": "文本", "chart": "图表", "shape": "形状"}.get(custom_data.get("agent", ""), custom_data.get("agent", ""))
+                    yield _sse("progress", {
+                        "step": "agent_generating",
+                        "detail": f"  └ {agent_label}生成中...",
+                        "pct": 10 + int(80 * (slide_i + 0.3) / max(state['total_slides'], 1)),
+                    })
+                elif etype == "agent_end":
+                    slide_i = custom_data.get("slide_index", 0)
+                    agent_label = {"text": "文本", "chart": "图表", "shape": "形状"}.get(custom_data.get("agent", ""), custom_data.get("agent", ""))
+                    ok = custom_data.get("ok", True)
+                    yield _sse("progress", {
+                        "step": "agent_done",
+                        "detail": f"  └ {agent_label}{'完成' if ok else '失败'} ({custom_data.get('elapsed', 0)}s)",
+                        "pct": 10 + int(80 * (slide_i + 0.6) / max(state['total_slides'], 1)),
                     })
                 elif etype == "slide_end":
                     yield _sse("progress", {

@@ -42,23 +42,29 @@
 
 每个 slide 的 `layout_type` 直接决定 PPT 生成阶段使用的页面布局。**严禁所有页面都使用 content 类型**。
 
-| layout_type | 对应 PPT 布局 | 用途 | 特点 |
-|-------------|-------------|------|------|
-| `title` | title_slide | 封面/标题页 | 大面积装饰 + 主副标题 |
-| `section` | section | 章节分隔页 | 章节号 + 标题 + 分隔线（2-3个） |
-| `content` | content_bullet | 单栏正文（默认） | 标题 + 要点/正文 |
-| `content` | content_two_column | 两栏内容 | 标题 + 左右两栏容器 |
-| `content` | content_three_column | 三栏内容 | 标题 + 三栏容器 |
-| `content` | content_grid_2x2 | 2×2 网格 | 标题 + 四格容器 |
-| `summary` | content_bullet | 总结回顾 | 单栏，常含要点回顾 + 展望 |
-| `thanks` | ending | 结尾/致谢 | 致谢文字 + 装饰 |
+PPT 引擎提供 7 种页面布局，每种有不同的固定元素和装饰：
 
-对于 `content` 类型的页面，通过 `recommended_ppt_format` 字段提示 PPT Agent 选择哪种布局：
-- `bullet_list` / `text_with_image` → content_bullet（单栏）
-- `two_column` / `comparison` → content_two_column（两栏）
-- `three_column` → content_three_column（三栏）
-- `four_grid` → content_grid_2x2（四格）
-- `chart` / `table` / `diagram` / `flowchart` → content_bullet（单栏中嵌入图表）
+| layout_type | PPT 布局 | 视觉效果 | 适用场景 |
+|-------------|---------|---------|---------|
+| `title` | **title_slide** 封面 | 主标题区 + 副标题区 + 左侧竖条装饰（primary色） | 第1页——开场封面 |
+| `section` | **section** 章节页 | 大号章节编号区（渐变填充 primary→accent）+ 章节标题 + 副标题 + 底部分隔线 | 每个大章节的开始页 |
+| `content` | **content_bullet** 单栏 | 左侧竖条标题装饰 + 标题文本区 + 正文区(10.9×5.1英寸) + 底部分隔线 + 右下页码 | 要点列举、正文阐述 |
+| `content` | **content_two_column** 两栏 | 标题 + 左栏(5.8×5.1in 圆角边框) + 右栏(5.8×5.1in 圆角边框) | 对比分析、图文并排 |
+| `content` | **content_three_column** 三栏 | 标题 + 三栏(各3.9×5.1in 圆角边框) | 三个并列要点、产品对比 |
+| `content` | **content_grid_2x2** 四格 | 标题 + 2×2网格(各5.8×2.5in 圆角边框) | 四个模块、SWOT分析、象限图 |
+| `summary` | **content_bullet** 单栏 | 同单栏 | 总结回顾 + 展望 |
+| `thanks` | **ending** 结尾页 | 致谢文字居中 + 圆角矩形外框装饰(primary色2pt边框) | 最后一页——致谢 |
+
+所有布局共享的固定元素：标题装饰条（左侧 primary 色竖条）、底部分隔线（border 色细线）、页码（右下角）。
+
+对于 `content` 类型页面，通过 `recommended_ppt_format` 提示引擎选择子布局：
+- `bullet_list` / `text_with_image` → content_bullet（单栏正文）
+- `two_column` / `comparison` → content_two_column（两栏对比）
+- `three_column` → content_three_column（三栏并列）
+- `four_grid` → content_grid_2x2（四格模块）
+- `chart` / `table` / `diagram` / `flowchart` → content_bullet（单栏嵌入图表/表格）
+- `big_number` / `quote` → content_bullet（单栏大字/引述）
+- `timeline` → content_bullet（单栏时间线）
 
 ### 推荐的 PPT 大纲结构示例（10页）
 

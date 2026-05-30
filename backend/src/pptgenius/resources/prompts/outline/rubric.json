@@ -50,13 +50,13 @@
       "label": "可视化多样度",
       "weight": 1.0,
       "max_score": 10,
-      "description": "PPT是否使用了多样化的可视化元素编排，避免单调的纯文字布局",
+      "description": "PPT是否使用了多样化的 layout_type 和 recommended_ppt_format，避免单调的纯文字布局。PPT引擎支持7种页面布局：title_slide(封面) / section(章节页) / content_bullet(单栏) / content_two_column(两栏) / content_three_column(三栏) / content_grid_2x2(四格) / ending(结尾)。content 类型通过 recommended_ppt_format 选择子布局：bullet_list / two_column / three_column / four_grid / comparison / chart / table / diagram / flowchart / big_number / quote / timeline",
       "criteria": {
-        "10": "编排极其丰富：灵活运用两栏、流程图、图表、时间线、对比表、图示等多种布局交替呈现，每页的 recommended_ppt_format 选择恰当且不重复",
-        "8": "编排多样：使用了4-5种不同布局格式，大部分页面的排版建议合理，偶有重复但总体视觉节奏好",
-        "6": "编排一般：使用了2-3种布局格式，但存在较多连续相同格式的页面，视觉体验略显单调",
-        "4": "编排单一：大量页面使用相同布局格式（如全部 bullet_list），缺乏变化，观众易疲劳",
-        "2": "无编排意识：所有页面千篇一律，未考虑任何可视化呈现方式"
+        "10": "编排极其丰富：layout_type 覆盖 title/section/content/summary/thanks 五种以上，recommended_ppt_format 使用4-5种不同格式，两栏/三栏/四格等非单栏布局至少出现2次，连续相同格式不超过2页",
+        "8": "编排多样：layout_type 覆盖4种以上，recommended_ppt_format 使用3-4种格式，至少使用1次非单栏布局（两栏/三栏/四格），连续相同格式不超过3页",
+        "6": "编排一般：仅有 title/content/thanks 三种 layout_type，recommended_ppt_format 仅2-3种且以 bullet_list 为主，缺少 section 分隔页，连续相同格式超过3页",
+        "4": "编排单一：大量页面全用 content+bullet_list，缺少 title/section/thanks 页类型，整体视觉无节奏变化",
+        "2": "无编排意识：所有页面千篇一律，未区分页面类型，未考虑任何可视化呈现方式"
       }
     }
   ],

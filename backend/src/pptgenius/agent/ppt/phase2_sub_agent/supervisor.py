@@ -9,7 +9,6 @@ Timing is recorded per-slide and aggregated.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import time
 from dataclasses import dataclass, field
@@ -89,8 +88,9 @@ async def supervisor_node(state: PPTState, config) -> dict:
         current + 1, total, slide.get("title", "?"), layout_name, agents_needed,
     )
 
-    # Create presentation_slide record (idempotent via try/except)
-    try:
+    # Ensure presentation_slide exists (check first to avoid duplicates)
+    existing_slides = await db.get_slides_by_presentation_id(presentation_id)
+    if not any(s.slide_index == slide_index for s in existing_slides):
         await db.create_presentation_slide(
             presentation_id=presentation_id,
             slide_index=slide_index,
@@ -98,18 +98,19 @@ async def supervisor_node(state: PPTState, config) -> dict:
             color_scheme_id=state.get("color_scheme_id"),
             template_id=state.get("template_id"),
         )
-    except Exception:
-        pass
 
     # Store outline slide notes for assembly (写入PPT演讲者备注)
     outline_notes = slide.get("notes", "") or ""
     if outline_notes:
-        await db.set_slide_agent_output(
-            presentation_id=presentation_id,
-            slide_index=slide_index,
-            agent_type="_notes",
-            output={"notes": outline_notes},
-        )
+        try:
+            await db.set_slide_agent_output(
+                presentation_id=presentation_id,
+                slide_index=slide_index,
+                agent_type="_notes",
+                output={"notes": outline_notes},
+            )
+        except Exception:
+            pass  # slide may not exist yet or notes already stored
 
     writer({
         "type": "slide_start",
@@ -120,53 +121,35 @@ async def supervisor_node(state: PPTState, config) -> dict:
         "agents": agents_needed,
     })
 
-    # ---- concurrent sub-agent dispatch ----
+    # ---- sequential sub-agent dispatch (sequential to avoid DB session conflicts) ----
     slide_start = time.monotonic()
-    tasks = []
+    results: list[tuple[str, float, Exception | None]] = []
 
-    if "text" in agents_needed:
-        tasks.append(_run_with_timing(
-            run_text_agent,
-            db=db,
-            slide=slide,
-            layout_name=layout_name,
-            container_bounds=container_bounds,
-            presentation_id=presentation_id,
-            slide_index=slide_index,
-            color_scheme_id=state.get("color_scheme_id"),
-            conv_id=state["conversation_id"],
-            config=config,
-        ))
-    if "chart" in agents_needed:
-        tasks.append(_run_with_timing(
-            run_chart_agent,
-            db=db,
-            slide=slide,
-            container_bounds=container_bounds,
-            presentation_id=presentation_id,
-            slide_index=slide_index,
-            color_scheme_id=state.get("color_scheme_id"),
-            conv_id=state["conversation_id"],
-            config=config,
-        ))
-    if "shape" in agents_needed:
-        tasks.append(_run_with_timing(
-            run_shape_agent,
-            db=db,
-            slide=slide,
-            layout_name=layout_name,
-            container_bounds=container_bounds,
-            presentation_id=presentation_id,
-            slide_index=slide_index,
-            color_scheme_id=state.get("color_scheme_id"),
-            conv_id=state["conversation_id"],
-            config=config,
-        ))
+    for agent_name in agents_needed:
+        writer({"type": "agent_start", "agent": agent_name, "slide_index": current})
+        _log.info("Slide %d: starting %s_agent", current, agent_name)
 
-    # Run all sub-agents concurrently
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+        fn = {"text": run_text_agent, "chart": run_chart_agent, "shape": run_shape_agent}[agent_name]
+        kwargs = dict(
+            db=db, slide=slide, container_bounds=container_bounds,
+            presentation_id=presentation_id, slide_index=slide_index,
+            color_scheme_id=state.get("color_scheme_id"),
+            conv_id=state["conversation_id"], config=config,
+        )
+        if agent_name == "text":
+            kwargs["layout_name"] = layout_name
+        elif agent_name == "shape":
+            kwargs["layout_name"] = layout_name
 
-    # Collect results and record timing
+        result = await _run_with_timing(fn, **kwargs)
+        results.append(result)
+
+        name, elapsed, exc = result
+        writer({"type": "agent_end", "agent": agent_name,
+                "elapsed": round(elapsed, 2),
+                "ok": exc is None})
+        _log.info("Slide %d: %s_agent done in %.1fs (err=%s)", current, agent_name, elapsed, exc)
+
     slide_elapsed = time.monotonic() - slide_start
     timing.slide_times.append(slide_elapsed)
 
