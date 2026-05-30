@@ -61,6 +61,10 @@ http://localhost:8000/api
 # ── 对话（唯一写入口）──
 POST   /api/chat/send                  发送消息（SSE 流式）
 
+# ── 认证 ──
+POST   /api/auth/register               注册
+POST   /api/auth/login                  登录（返回 JWT）
+
 # ── 会话 ──
 POST   /api/conversations              创建会话
 GET    /api/conversations              会话列表
@@ -102,7 +106,62 @@ GET    /api/health                     健康检查
 
 ## 三、详细接口
 
-### 3.1 对话 — POST /api/chat/send
+### 3.1 认证 — POST /api/auth/register · POST /api/auth/login
+
+**密码**: PBKDF2-SHA256 哈希（60 万次迭代，32 字节随机盐），格式 `salt$hash`。**Token**: HS256 JWT，7 天有效期，签名密钥派生自 `llm.api_key`。
+
+除以下端点外，所有 `/api/*` 请求须携带 `Authorization: Bearer <token>`：
+
+| 端点 | 公开 |
+|------|------|
+| `POST /api/auth/register` | 是 |
+| `POST /api/auth/login` | 是 |
+| `GET /api/health` | 是 |
+| `GET /api/config` | 是 |
+| 其他所有 `/api/*` | 否（401） |
+
+#### POST /api/auth/register
+
+```
+Request:  { "name": "alice", "password": "123456" }
+
+Response 201:
+{
+  "code": 0,
+  "data": {
+    "token": "eyJhbGci...",
+    "user_id": 1,
+    "name": "alice"
+  }
+}
+
+Errors:
+  409 — { "code": 40101, "message": "用户名已存在" }
+  422 — 校验失败 (name 2-64 字符, password ≥6 字符)
+```
+
+#### POST /api/auth/login
+
+```
+Request:  { "name": "alice", "password": "123456" }
+
+Response 200:
+{
+  "code": 0,
+  "data": {
+    "token": "eyJhbGci...",
+    "user_id": 1,
+    "name": "alice"
+  }
+}
+
+Errors:
+  401 — { "code": 40102, "message": "用户名或密码错误" }
+```
+
+---
+
+### 3.2 对话 — POST /api/chat/send
 
 **唯一写入口。** 所有用户消息都通过此端点发送，Agent supervisor 自行判断当前阶段并驱动流程。
 
@@ -186,7 +245,7 @@ data: {"code": 40201, "message": "LLM timeout", "retryable": true}
 
 ---
 
-### 3.2 会话
+### 3.3 会话
 
 #### POST /api/conversations
 
@@ -265,7 +324,7 @@ Response 200:
 
 ---
 
-### 3.3 大纲（只读）
+### 3.4 大纲（只读）
 
 > Agent 负责生成/修改大纲。前端通过 `POST /api/chat/send` 发送用户反馈即可。
 > 以下端点仅用于**查看**。
@@ -329,7 +388,7 @@ Response 200:
 
 ---
 
-### 3.4 PPT（只读）
+### 3.5 PPT（只读）
 
 > Agent 负责生成/修改 PPT。前端通过 `POST /api/chat/send` 发送用户反馈即可。
 > 以下端点仅用于**查看**和**下载**。
@@ -410,7 +469,7 @@ Content-Disposition: attachment; filename="Python数据分析入门.pptx"
 
 ---
 
-### 3.5 快照（只读）
+### 3.6 快照（只读）
 
 PPT 每次成功生成/修改后保存完整快照，用于版本回溯。
 
@@ -458,7 +517,7 @@ Response 200:
 
 ---
 
-### 3.6 费用统计
+### 3.7 费用统计
 
 所有端点按 `user_id` 筛选。
 
@@ -521,7 +580,7 @@ Response 200:
 
 ---
 
-### 3.7 知识库（文件管理）
+### 3.8 知识库（文件管理）
 
 > BM25 检索由 Agent 内部调用（`KnowledgeService.search()`）。前端只需管理文件。
 > **文件存储**：文件放入 conversation 的 workspace 子目录，物理隔离。**索引**：BM25 按 user 全局索引（跨 conversation 共享检索）。
@@ -626,7 +685,7 @@ Response 200:
 
 ---
 
-### 3.8 工作空间 & 系统
+### 3.9 工作空间 & 系统
 
 #### GET /api/workspace/status
 

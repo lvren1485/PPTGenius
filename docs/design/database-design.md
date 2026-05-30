@@ -141,7 +141,8 @@ PPT 快照表，每次生成/修改后存入完整的 outline + presentation JSO
 | **message 创建自动累加 cost** | `estimated_cost` 为本次 LLM 调用的 CNY 费用，自动累加到 conversation.estimated_cost |
 | **presentation_slides.agent_outputs** | 每个 sub-agent 独立写入 JSON checkpoint，supervisor 重试时只重试失败的 agent |
 | **templates / color_schemes** | 独立表存储模板和配色方案，layout_agent 选择已有方案或调用 create 新建 |
-| **users.password + users.other** | 预留多用户认证和扩展字段 |
+| **users.password** | PBKDF2-SHA256 哈希存储，格式 `salt$hash`（60万迭代，32字节随机盐） |
+| **users.other** | JSON 扩展字段 |
 | **presentation_snapshots** | PPT 快照，存储每次生成/修改后的完整 outline + presentation JSON，version 自增 |
 | **web_resources 表已删除** | Web 内容统一走 KnowledgeService + knowledge_files |
 | **图片不入 BM25** | 图片上传后存入 `workspace/{id}/input/`，创建 image message，不进入 knowledge_files |
