@@ -308,6 +308,25 @@ class HealthData(BaseModel):
     bm25: str = "unknown"
 
 
+# ──────────────────────── auth ────────────────────────
+
+
+class RegisterRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=64)
+    password: str = Field(min_length=6, max_length=256)
+
+
+class LoginRequest(BaseModel):
+    name: str
+    password: str
+
+
+class AuthTokenData(BaseModel):
+    token: str
+    user_id: int
+    name: str
+
+
 # ──────────────────────── sse events (not for API, for doc) ────────────────────────
 
 

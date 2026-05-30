@@ -49,6 +49,10 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Auth middleware (after CORS so preflight passes)
+    from pptgenius.api.auth_middleware import AuthMiddleware
+    app.add_middleware(AuthMiddleware)
+
     # Register API routes
     from pptgenius.api.router import api_router
     app.include_router(api_router)

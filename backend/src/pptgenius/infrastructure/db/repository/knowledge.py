@@ -24,8 +24,28 @@ async def create_knowledge_file(
         source_type=source_type,
     )
     db.add(kf)
-    await db.commit()
-    await db.refresh(kf)
+    try:
+        await db.commit()
+        await db.refresh(kf)
+    except Exception:
+        await db.rollback()
+        # Re-query by file_path (commit failed, likely duplicate)
+        from sqlalchemy import select as _sel
+        result = await db.execute(
+            _sel(KnowledgeFile).where(KnowledgeFile.file_path == file_path)
+        )
+        existing = result.scalar_one_or_none()
+        if existing is not None:
+            return existing
+        # Retry once with flush-only
+        kf2 = KnowledgeFile(
+            user_id=user_id, filename=filename, file_path=file_path,
+            file_type=file_type, file_size=file_size, source_type=source_type,
+        )
+        db.add(kf2)
+        await db.flush()
+        await db.refresh(kf2)
+        return kf2
     return kf
 
 

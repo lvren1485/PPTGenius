@@ -16,6 +16,8 @@ from __future__ import annotations
 
 from typing import AsyncGenerator
 
+from fastapi import Request
+
 from pptgenius.infrastructure.db import Database
 from pptgenius.infrastructure.db import get_db as _get_db_session
 from pptgenius.infrastructure.rag import (
@@ -24,6 +26,13 @@ from pptgenius.infrastructure.rag import (
 )
 from pptgenius.infrastructure.rag import WebSearchService, web_search_service
 from pptgenius.infrastructure.workspace import WorkspaceManager
+
+
+# -- auth --------------------------------------------------------------------
+
+def get_current_user_id(request: Request) -> int:
+    """Extract the authenticated user_id from request.state (set by AuthMiddleware)."""
+    return getattr(request.state, "user_id", 1)  # fallback 1 for dev without auth
 
 
 # -- DB ----------------------------------------------------------------------

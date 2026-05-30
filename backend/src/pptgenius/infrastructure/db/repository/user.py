@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import User
@@ -23,6 +23,11 @@ async def create_user(
 
 async def get_user(db: AsyncSession, user_id: int) -> User | None:
     return await db.get(User, user_id)
+
+
+async def get_user_by_name(db: AsyncSession, name: str) -> User | None:
+    result = await db.execute(select(User).where(User.name == name))
+    return result.scalar_one_or_none()
 
 
 async def get_or_create_default_user(db: AsyncSession) -> User:

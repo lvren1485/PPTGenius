@@ -22,6 +22,7 @@ class Database:
     # ─── user ───
     async def create_user(self, *a, **kw): return await user_repo.create_user(self.db, *a, **kw)
     async def get_user(self, *a, **kw): return await user_repo.get_user(self.db, *a, **kw)
+    async def get_user_by_name(self, *a, **kw): return await user_repo.get_user_by_name(self.db, *a, **kw)
     async def get_or_create_default_user(self): return await user_repo.get_or_create_default_user(self.db)
     async def delete_user(self, *a, **kw): return await user_repo.delete_user(self.db, *a, **kw)
 
