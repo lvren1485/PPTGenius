@@ -44,29 +44,44 @@ async def dispatcher_node(state: PPTState, config) -> dict:
         _log.warning("No slides to process")
         return {}
 
+    # Sync style selections to all presentation_slides (set after slide creation)
+    cs_id = state.get("color_scheme_id")
+    tpl_id = state.get("template_id")
+    if cs_id and tpl_id:
+        try:
+            updated = await db.update_slides_style(
+                state["presentation_id"], color_scheme_id=cs_id, template_id=tpl_id,
+            )
+            _log.info("Synced style (cs=%d, tpl=%d) to %d slides", cs_id, tpl_id, updated or 0)
+        except Exception as exc:
+            _log.warning("Failed to sync slides style: %s", exc)
+
     _log.info("Dispatcher: %d slides, mode=%s, concurrency=%d",
               total, mode, _MAX_CONCURRENT_SLIDES)
 
     sem = asyncio.Semaphore(_MAX_CONCURRENT_SLIDES)
 
     async def _process_one(slide: dict) -> dict | None:
-        """Process one slide through the appropriate mode pipeline."""
+        """Process one slide through the appropriate mode pipeline.
+        Each slide gets its OWN DB session to avoid concurrent-access corruption."""
         async with sem:
             slide_index = slide["slide_index"]
             _log.info("Dispatching slide %d/%d: %s", slide_index + 1, total,
                       slide.get("title", "?")[:40])
 
+            # Each slide gets its own isolated DB session
+            slide_db = sm.new_session()
             t0 = time.monotonic()
             try:
                 result: dict[str, Any]
                 if mode == "freedom":
                     result = await _process_freedom_slide(
-                        db=db, sm=sm, slide=slide, all_slides=slides,
+                        db=slide_db, sm=sm, slide=slide, all_slides=slides,
                         state=state, config=config,
                     )
                 else:
                     result = await process_single_slide(
-                        db=db, sm=sm, slide=slide, all_slides=slides,
+                        db=slide_db, sm=sm, slide=slide, all_slides=slides,
                         selected_layouts=state.get("selected_layouts", {}),
                         presentation_id=state["presentation_id"],
                         color_scheme_id=state.get("color_scheme_id"),
@@ -85,6 +100,8 @@ async def dispatcher_node(state: PPTState, config) -> dict:
                            slide_index + 1, total, elapsed, exc)
                 return {"slide_index": slide_index, "elapsed": elapsed,
                         "has_error": True, "error": str(exc)}
+            finally:
+                await sm.close(slide_db)
 
     # Fan out all slides (semaphore limits actual concurrency)
     tasks = [_process_one(s) for s in slides]

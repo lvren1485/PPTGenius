@@ -142,6 +142,29 @@ async def create_presentation_slide(
     return s
 
 
+async def create_presentation_slides_batch(
+    db: AsyncSession,
+    slides: list[dict],
+) -> list[PresentationSlide]:
+    """Create multiple presentation slides in a single commit."""
+    objs = []
+    for s in slides:
+        obj = PresentationSlide(
+            presentation_id=s["presentation_id"],
+            slide_index=s["slide_index"],
+            layout_name=s["layout_name"],
+            outline_slide_id=s.get("outline_slide_id"),
+            template_id=s.get("template_id"),
+            color_scheme_id=s.get("color_scheme_id"),
+        )
+        db.add(obj)
+        objs.append(obj)
+    await db.commit()
+    for obj in objs:
+        await db.refresh(obj)
+    return objs
+
+
 async def get_presentation_slide(db: AsyncSession, slide_id: int) -> PresentationSlide | None:
     return await db.get(PresentationSlide, slide_id)
 
@@ -193,6 +216,25 @@ async def set_slide_agent_output(
     s.agent_outputs = current
     await db.commit()
     return True
+
+
+async def update_slides_style(
+    db: AsyncSession,
+    presentation_id: int,
+    color_scheme_id: int,
+    template_id: int = 1,
+) -> int:
+    """Update color_scheme_id and template_id on all slides of a presentation.
+    Returns the number of slides updated."""
+    from sqlalchemy import update
+    stmt = (
+        update(PresentationSlide)
+        .where(PresentationSlide.presentation_id == presentation_id)
+        .values(color_scheme_id=color_scheme_id, template_id=template_id)
+    )
+    result = await db.execute(stmt)
+    await db.commit()
+    return result.rowcount
 
 
 async def update_slide_status(

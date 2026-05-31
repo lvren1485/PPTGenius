@@ -69,10 +69,12 @@ class Database:
     async def soft_delete_presentation(self, *a, **kw): return await ppt_repo.soft_delete_presentation(self.db, *a, **kw)
     # presentation_slide
     async def create_presentation_slide(self, *a, **kw): return await ppt_repo.create_presentation_slide(self.db, *a, **kw)
+    async def create_presentation_slides_batch(self, *a, **kw): return await ppt_repo.create_presentation_slides_batch(self.db, *a, **kw)
     async def get_presentation_slide(self, *a, **kw): return await ppt_repo.get_presentation_slide(self.db, *a, **kw)
     async def get_slides_by_presentation_id(self, *a, **kw): return await ppt_repo.get_slides_by_presentation_id(self.db, *a, **kw)
     async def set_slide_agent_output(self, *a, **kw): return await ppt_repo.set_slide_agent_output(self.db, *a, **kw)
     async def update_slide_status(self, *a, **kw): return await ppt_repo.update_slide_status(self.db, *a, **kw)
+    async def update_slides_style(self, *a, **kw): return await ppt_repo.update_slides_style(self.db, *a, **kw)
     async def increment_slide_retry(self, *a, **kw): return await ppt_repo.increment_slide_retry(self.db, *a, **kw)
     async def set_slide_chart_data(self, *a, **kw): return await ppt_repo.set_slide_chart_data(self.db, *a, **kw)
     async def set_slide_table_data(self, *a, **kw): return await ppt_repo.set_slide_table_data(self.db, *a, **kw)

@@ -60,22 +60,24 @@ async def _create_presentation_node(state: PPTState, config) -> dict:
         if templates:
             selected_layouts = templates[0].layouts_json or {}
 
-    # Create ALL presentation_slides upfront (with outline_slide_id)
+    # Create ALL presentation_slides upfront in a single batch commit
     existing_slides = await db.get_slides_by_presentation_id(presentation_id)
     existing_indices = {s.slide_index for s in existing_slides}
+    new_slides = []
     for s in outline_slide_objs:
         if s.slide_index not in existing_indices:
-            layout_name = select_layout({
-                "layout_type": s.layout_type or "content",
+            new_slides.append({
+                "presentation_id": presentation_id,
+                "slide_index": s.slide_index,
+                "layout_name": select_layout({
+                    "layout_type": s.layout_type or "content",
+                }),
+                "outline_slide_id": s.id,
+                "color_scheme_id": state.get("color_scheme_id"),
+                "template_id": state.get("template_id"),
             })
-            await db.create_presentation_slide(
-                presentation_id=presentation_id,
-                slide_index=s.slide_index,
-                layout_name=layout_name,
-                outline_slide_id=s.id,
-                color_scheme_id=state.get("color_scheme_id"),
-                template_id=state.get("template_id"),
-            )
+    if new_slides:
+        await db.create_presentation_slides_batch(new_slides)
 
     _log.info("Created presentation %d with %d slides upfront",
               presentation_id, len(outline_slides))
