@@ -123,8 +123,10 @@ def get_colored_svg(icon_name: str, color: str, workspace: str) -> str:
     return os.path.relpath(str(out_path), workspace)
 
 
-def cleanup_temp_icons(workspace: str) -> None:
+def cleanup_temp_icons(workspace: str | None) -> None:
     """Remove the .temp_icons directory after PPT generation."""
+    if workspace is None:
+        return
     temp_dir = Path(workspace) / ".temp_icons"
     if temp_dir.exists():
         shutil.rmtree(temp_dir)

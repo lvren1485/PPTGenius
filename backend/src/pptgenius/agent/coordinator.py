@@ -433,10 +433,17 @@ async def _run_ppt(
     t_start = _time.monotonic()
 
     try:
+        captured_pres_id = state["presentation_id"]
         async for event in graph.astream_events(
             state, config={"configurable": {"db": db}}, version="v2",
         ):
             kind = event["event"]
+
+            # capture presentation_id from create_presentation node output
+            if kind == "on_chain_end" and event["name"] == "create_presentation":
+                output = event["data"].get("output", {})
+                if output.get("presentation_id"):
+                    captured_pres_id = output["presentation_id"]
 
             if kind == "on_custom_event":
                 custom_data = event.get("data", {})
@@ -483,7 +490,7 @@ async def _run_ppt(
                     "message": f"PPT生成完成 (耗时 {t_end - t_start:.1f}s)",
                 })
                 yield _sse("ppt_done", {
-                    "presentation_id": state["presentation_id"],
+                    "presentation_id": captured_pres_id,
                     "file_path": state["file_path"],
                     "elapsed_seconds": round(t_end - t_start, 1),
                     "mode": mode,

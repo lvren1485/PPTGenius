@@ -7,6 +7,8 @@ Assembly: merge all agent outputs → validate → render .pptx → snapshot
 
 from __future__ import annotations
 
+import os
+
 from langgraph.graph import END, START, StateGraph
 
 from pptgenius.infrastructure.utils import get_logger
@@ -92,18 +94,90 @@ async def _create_presentation_node(state: PPTState, config) -> dict:
 
 
 async def _assembly_node(state: PPTState, config) -> dict:
-    """Assembly: merge layout + agent outputs → validate → render .pptx, then snapshot."""
+    """Assembly: merge layout + agent outputs → validate → render .pptx → snapshot."""
     from pptgenius.infrastructure.db import Database
-    db: Database = config["configurable"]["db"]
+    from pptgenius.agent.ppt.common.layout_resolver import interpolate_layout
+    from pptgenius.infrastructure.config import RESOURCES_DIR
 
+    db: Database = config["configurable"]["db"]
     pres_id = state["presentation_id"]
     _log.info("Assembly: presentation_id=%d", pres_id)
 
-    # Collect outline + presentation data for snapshot
-    outline = await db.get_outline(state["outline_id"])
     pres = await db.get_presentation(pres_id)
+    outline = await db.get_outline(state["outline_id"])
     slides = await db.get_slides_by_presentation_id(pres_id)
 
+    # ── load color scheme & layouts ──
+    cs_id = state.get("color_scheme_id") or (pres.color_scheme_id if pres else None)
+    color_scheme = await db.get_color_scheme(cs_id) if cs_id else None
+    cs_data = {"colors": color_scheme.colors_json} if color_scheme else {}
+
+    selected_layouts = state.get("selected_layouts", {})
+
+    # ── build instruction JSON for PPT generator ──
+    ppt_slides: list[dict] = []
+    for s in sorted(slides, key=lambda x: x.slide_index):
+        layout_def = selected_layouts.get(s.layout_name, {})
+        if not layout_def:
+            layout_def = _load_layout_file(s.layout_name)
+        layout = interpolate_layout(layout_def, cs_data)
+
+        # Collect elements: layout decorations + agent outputs
+        # (fixed_elements are templates; agents generate actual content)
+        elements: list[dict] = []
+
+        # Layout-level decorations (background shapes)
+        for dec in layout.get("decorations", []):
+            elements.append({**dec, "type": dec.get("type", "shape")})
+
+        # Container decorations
+        for container in layout.get("containers", []):
+            for dec in container.get("decorations", []):
+                elements.append({**dec, "type": "shape"})
+
+        # Agent outputs: text + chart + shape (or freedom)
+        outputs = s.agent_outputs or {}
+        for agent_type, output in outputs.items():
+            if agent_type == "_notes":
+                continue
+            agent_elements = output.get("elements") or output.get("element")
+            if agent_elements:
+                if isinstance(agent_elements, dict):
+                    agent_elements = [agent_elements]
+                elements.extend(agent_elements)
+
+        ppt_slides.append({
+            "layout": layout.get("ppt_layout", "blank"),
+            "background": layout.get("background"),
+            "notes": outputs.get("_notes", {}).get("notes") if "_notes" in outputs else "",
+            "elements": elements,
+        })
+
+    instruction = {
+        "meta": {"slide_width": 13.333, "slide_height": 7.5, "language": "zh"},
+        "slides": ppt_slides,
+    }
+
+    # ── render .pptx ──
+    from pptgenius.infrastructure.ppt_engine.generator import generate_ppt
+    from pptgenius.infrastructure.workspace.manager import WorkspaceManager
+
+    wm = WorkspaceManager()
+    output_dir = wm.get_output_dir(state["conversation_id"])
+    os.makedirs(output_dir, exist_ok=True)
+    filename = (outline.title if outline else "presentation") + ".pptx"
+    file_path = os.path.join(output_dir, filename)
+
+    result = await generate_ppt(instruction, file_path)
+
+    file_size = 0
+    if result.get("ok"):
+        file_size = result.get("file_size", 0)
+        _log.info("PPTX saved: %s (%d bytes)", file_path, file_size)
+    else:
+        _log.error("PPTX generation failed: %s", result.get("errors", "unknown"))
+
+    # ── snapshot ──
     outline_data = None
     if outline:
         outline_slides = await db.get_slides_by_outline_id(outline.id)
@@ -111,21 +185,20 @@ async def _assembly_node(state: PPTState, config) -> dict:
             "id": outline.id, "title": outline.title, "version": outline.version,
             "slide_count": outline.slide_count, "eval_score": outline.eval_score,
             "slides": [
-                {"slide_index": s.slide_index, "title": s.title,
-                 "layout_type": s.layout_type, "content_json": s.content_json}
-                for s in outline_slides
+                {"slide_index": os.slide_index, "title": os.title,
+                 "layout_type": os.layout_type, "content_json": os.content_json}
+                for ol_s in outline_slides
             ],
         }
-
     presentation_data = {
         "id": pres.id if pres else pres_id,
         "slide_count": len(slides),
         "color_scheme_id": state.get("color_scheme_id"),
         "template_id": state.get("template_id"),
         "slides": [
-            {"slide_index": s.slide_index, "layout_name": s.layout_name,
-             "agent_outputs": s.agent_outputs, "status": s.status}
-            for s in slides
+            {"slide_index": ps.slide_index, "layout_name": ps.layout_name,
+             "agent_outputs": ps.agent_outputs, "status": ps.status}
+            for ps in slides
         ],
     }
 
@@ -138,14 +211,23 @@ async def _assembly_node(state: PPTState, config) -> dict:
     )
     _log.info("Snapshot saved for presentation %d", pres_id)
 
-    file_path = state.get("file_path", "") or ""
     await db.set_presentation_output(
         pres_id,
         file_path=file_path,
-        file_size=0,  # updated after actual render
+        file_size=file_size,
         slide_count=len(slides),
     )
     await db.update_presentation_status(pres_id, "completed")
+    return {}
+
+
+def _load_layout_file(layout_name: str) -> dict:
+    """Load a layout JSON file from the resources directory."""
+    import json
+    from pptgenius.infrastructure.config import RESOURCES_DIR
+    path = RESOURCES_DIR / "layouts" / f"{layout_name}.json"
+    if path.exists():
+        return json.loads(path.read_text(encoding="utf-8"))
     return {}
 
 

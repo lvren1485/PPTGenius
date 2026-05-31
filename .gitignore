@@ -41,3 +41,6 @@ release/
 
 # Tabler icons (downloaded via npm, see README)
 backend/src/pptgenius/resources/tabler/
+
+# temp
+.temp_icons/

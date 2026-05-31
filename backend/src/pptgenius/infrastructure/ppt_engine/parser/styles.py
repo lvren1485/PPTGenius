@@ -400,7 +400,7 @@ def apply_shape_line(
         dash_map = {
             "solid": MSO_LINE_DASH_STYLE.SOLID,
             "dash": MSO_LINE_DASH_STYLE.DASH,
-            "dot": MSO_LINE_DASH_STYLE.SYS_DOT,
+            "dot": MSO_LINE_DASH_STYLE.ROUND_DOT,
             "dash_dot": MSO_LINE_DASH_STYLE.DASH_DOT,
         }
         if style := dash_map.get(dash_style):
