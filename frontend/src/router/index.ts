@@ -27,9 +27,19 @@ const router = createRouter({
       component: () => import('../views/ChatView.vue'),
     },
     {
+      path: '/outlines',
+      name: 'OutlineList',
+      component: () => import('../views/OutlineListView.vue'),
+    },
+    {
       path: '/outline/:id',
       name: 'OutlineDetail',
       component: () => import('../views/OutlineDetail.vue'),
+    },
+    {
+      path: '/presentations',
+      name: 'PptList',
+      component: () => import('../views/PptListView.vue'),
     },
     {
       path: '/ppt/:id',

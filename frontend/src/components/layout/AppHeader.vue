@@ -22,6 +22,11 @@ function handleLogout() {
         @select="(k: string) => router.push(k)"
       >
         <el-menu-item index="/">首页</el-menu-item>
+        <el-sub-menu index="works">
+          <template #title>作品</template>
+          <el-menu-item index="/outlines">大纲列表</el-menu-item>
+          <el-menu-item index="/presentations">PPT 列表</el-menu-item>
+        </el-sub-menu>
         <el-menu-item index="/cost">费用</el-menu-item>
         <el-menu-item index="/knowledge">知识库</el-menu-item>
       </el-menu>

@@ -52,13 +52,14 @@ function formatTime(d: string) {
   margin-bottom: 4px;
 }
 .msg-body {
-  padding: 12px 16px;
+  padding: 16px 24px 16px 28px;
   border-radius: 12px;
-  line-height: 1.6;
+  line-height: 1.7;
 }
 .is-user .msg-body {
   background: #409eff;
   color: #fff;
+  padding: 12px 20px;
 }
 .is-assistant .msg-body {
   background: #fff;
@@ -66,6 +67,14 @@ function formatTime(d: string) {
 }
 .msg-content :deep(p) { margin: 0 0 8px; }
 .msg-content :deep(p:last-child) { margin: 0; }
+.msg-content :deep(ol), .msg-content :deep(ul) {
+  padding-left: 0;
+  margin-left: 0;
+  list-style-position: inside;
+}
+.msg-content :deep(ol li), .msg-content :deep(ul li) {
+  margin-bottom: 4px;
+}
 .msg-content :deep(pre) {
   background: #f5f7fa;
   border-radius: 6px;

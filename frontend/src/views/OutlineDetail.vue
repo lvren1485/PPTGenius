@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { CopyDocument } from '@element-plus/icons-vue'
 import api from '../api/client'
 import EmptyState from '../components/common/EmptyState.vue'
 
@@ -37,6 +38,21 @@ onMounted(async () => {
   }
 })
 
+function copyOutline() {
+  if (!outline.value) return
+  const lines: string[] = [`大纲: ${outline.value.title}`, '']
+  slides.value.forEach((s, i) => {
+    lines.push(`Slide ${i + 1}: ${s.title}`)
+    const content = formatContent(s.content_json)
+    if (content) lines.push(`  ${content}`)
+    if (s.notes) lines.push(`  备注: ${s.notes}`)
+    lines.push('')
+  })
+  navigator.clipboard.writeText(lines.join('\n')).then(() => {
+    ElMessage.success('已复制到剪贴板')
+  })
+}
+
 function formatContent(c: Record<string, any> | null) {
   if (!c) return ''
   const parts: string[] = []
@@ -59,6 +75,7 @@ function formatContent(c: Record<string, any> | null) {
           评分 {{ outline.eval_score }}
         </el-tag>
         <span>{{ slides.length }} 页</span>
+        <el-button text :icon="CopyDocument" size="small" @click="copyOutline">复制</el-button>
       </div>
     </div>
 
