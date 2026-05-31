@@ -65,6 +65,10 @@ function formatTime(d: string) {
   background: #fff;
   border: 1px solid #e4e7ed;
 }
+.msg-content {
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
 .msg-content :deep(p) { margin: 0 0 8px; }
 .msg-content :deep(p:last-child) { margin: 0; }
 .msg-content :deep(ol), .msg-content :deep(ul) {
@@ -74,6 +78,7 @@ function formatTime(d: string) {
 }
 .msg-content :deep(ol li), .msg-content :deep(ul li) {
   margin-bottom: 4px;
+  word-break: break-word;
 }
 .msg-content :deep(pre) {
   background: #f5f7fa;

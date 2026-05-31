@@ -92,8 +92,8 @@ function formatSize(bytes: number) {
           </el-descriptions-item>
           <el-descriptions-item label="页数">{{ pres.slide_count || slides.length }}</el-descriptions-item>
           <el-descriptions-item label="大小">{{ formatSize(pres.file_size) }}</el-descriptions-item>
-          <el-descriptions-item label="模板">ID: {{ pres.template_id || 'default' }}</el-descriptions-item>
-          <el-descriptions-item label="配色">ID: {{ pres.color_scheme_id || 'default' }}</el-descriptions-item>
+          <el-descriptions-item label="模板">{{ pres.template_name || ('#' + pres.template_id) || '默认' }}</el-descriptions-item>
+          <el-descriptions-item label="配色">{{ pres.color_scheme_name || ('#' + pres.color_scheme_id) || '默认' }}</el-descriptions-item>
         </el-descriptions>
       </div>
       <el-button type="primary" @click="download" style="margin-top:12px">下载 .pptx</el-button>

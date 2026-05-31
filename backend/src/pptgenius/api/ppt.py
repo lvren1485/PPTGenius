@@ -54,7 +54,23 @@ async def get_presentation(
     pres = await db.get_presentation(pres_id)
     if pres is None:
         raise HTTPException(404, {"code": 40001, "message": "presentation not found"})
-    return ApiResponse(data=PresentationDetail(**_orm_to_dict(pres)))
+
+    data = _orm_to_dict(pres)
+
+    # Resolve template / color_scheme names
+    if pres.template_id:
+        tpl = await db.get_template(pres.template_id)
+        data["template_name"] = tpl.label if tpl else None
+    else:
+        data["template_name"] = None
+
+    if pres.color_scheme_id:
+        cs = await db.get_color_scheme(pres.color_scheme_id)
+        data["color_scheme_name"] = cs.label if cs else None
+    else:
+        data["color_scheme_name"] = None
+
+    return ApiResponse(data=PresentationDetail(**data))
 
 
 @router.get("/ppt/{pres_id}/slides")

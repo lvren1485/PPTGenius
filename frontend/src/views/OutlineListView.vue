@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { Download } from '@element-plus/icons-vue'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 
@@ -25,21 +26,87 @@ onMounted(async () => {
 
 <template>
   <div class="lp">
-    <h2>大纲列表 ({{ outlines.length }})</h2>
-    <p v-if="loading">加载中...</p>
-    <p v-else-if="outlines.length === 0">暂无大纲</p>
-    <div v-else v-for="o in outlines" :key="o.id" class="card" @click="router.push('/outline/' + o.id)">
-      <strong>{{ o.title || '未命名' }}</strong>
-      <span>v{{ o.version }} · {{ o.slide_count ?? 0 }}页 · {{ o.eval_score?.toFixed(2) ?? '-' }}</span>
-      <span class="date">{{ new Date(o.created_at).toLocaleDateString('zh-CN') }}</span>
+    <h2 class="lp-title">大纲列表</h2>
+    <p class="lp-sub">共 {{ outlines.length }} 个大纲</p>
+
+    <div v-if="loading" class="loading">加载中...</div>
+    <div v-else-if="outlines.length === 0" class="empty">暂无大纲</div>
+
+    <div v-else class="cards">
+      <div v-for="o in outlines" :key="o.id" class="card" @click="router.push('/outline/' + o.id)">
+        <div class="card-body">
+          <strong class="card-title">{{ o.title || '未命名大纲' }}</strong>
+          <div class="card-meta">
+            <span>v{{ o.version }}</span>
+            <span>{{ o.slide_count ?? 0 }} 页</span>
+            <span v-if="o.eval_score != null">评分 {{ o.eval_score.toFixed(2) }}</span>
+            <el-tag size="small" :type="o.status === 'confirmed' ? 'success' : 'info'">{{ o.status }}</el-tag>
+          </div>
+        </div>
+        <span class="card-date">{{ new Date(o.created_at).toLocaleDateString('zh-CN') }}</span>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.lp { max-width:800px; margin:0 auto; padding:24px; }
-.card { background:#fff; padding:16px; margin-bottom:10px; border-radius:8px; cursor:pointer;
-  display:flex; align-items:center; gap:16px; }
-.card:hover { box-shadow:0 2px 8px rgba(0,0,0,.1); }
-.date { margin-left:auto; color:#c0c4cc; font-size:13px; }
+.lp {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 40px 24px;
+}
+.lp-title {
+  font-size: 22px;
+  margin-bottom: 6px;
+}
+.lp-sub {
+  color: #909399;
+  font-size: 14px;
+  margin-bottom: 28px;
+}
+.loading, .empty {
+  text-align: center;
+  padding: 60px 0;
+  color: #909399;
+}
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.card {
+  background: #fff;
+  padding: 20px 24px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid #ebeef5;
+  transition: box-shadow .2s, border-color .2s;
+}
+.card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,.08);
+  border-color: #c6e2ff;
+}
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.card-title {
+  font-size: 15px;
+}
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: #909399;
+}
+.card-date {
+  font-size: 13px;
+  color: #c0c4cc;
+  white-space: nowrap;
+}
 </style>

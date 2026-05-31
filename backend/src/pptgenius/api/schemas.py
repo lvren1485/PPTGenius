@@ -140,7 +140,9 @@ class PresentationBrief(BaseModel):
 
 class PresentationDetail(PresentationBrief):
     template_id: int | None = None
+    template_name: str | None = None
     color_scheme_id: int | None = None
+    color_scheme_name: str | None = None
     error_msg: str | None = None
 
 

@@ -5,6 +5,7 @@ Public paths (no auth required):
   - POST /api/auth/login
   - GET  /api/health
   - GET  /api/config
+  - GET  /api/ppt/{id}/download
   - OPTIONS (CORS preflight)
 """
 
@@ -16,31 +17,41 @@ from starlette.responses import JSONResponse
 
 from pptgenius.infrastructure.auth import decode_token
 
-_PUBLIC_PATHS: set[tuple[str, str]] = {
+_PUBLIC_EXACT: set[tuple[str, str]] = {
     ("POST", "/api/auth/register"),
     ("POST", "/api/auth/login"),
     ("GET",  "/api/health"),
     ("GET",  "/api/config"),
 }
 
+_PUBLIC_PATTERNS: list[tuple[str, str]] = [
+    ("GET", "/api/ppt/"),
+]
+
 
 def _strip_query(path: str) -> str:
     return path.split("?")[0]
 
 
+def _is_public(method: str, path: str) -> bool:
+    p = _strip_query(path)
+    if (method, p) in _PUBLIC_EXACT:
+        return True
+    for m, prefix in _PUBLIC_PATTERNS:
+        if method == m and p.startswith(prefix) and p.endswith("/download"):
+            return True
+    return False
+
+
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        # Only intercept /api/*
         if not request.url.path.startswith("/api"):
             return await call_next(request)
 
-        # CORS preflight
         if request.method == "OPTIONS":
             return await call_next(request)
 
-        # Public paths
-        key = (request.method, _strip_query(request.url.path))
-        if key in _PUBLIC_PATHS:
+        if _is_public(request.method, request.url.path):
             return await call_next(request)
 
         # Validate token
