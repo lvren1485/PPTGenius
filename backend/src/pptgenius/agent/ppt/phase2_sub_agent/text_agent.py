@@ -107,6 +107,7 @@ def _build_system_prompt() -> str:
 1. 分析 outline slide 的 content_json（main_points, detailed_content, key_data）
 2. 如果数据适合表格展示 → 生成 table 元素
 3. 如果要点适合用图标装饰 → search_icons 搜索 → 选 icon name → picture 元素
+   ⚠️ SVG 图标尺寸限制: width/height 均 ≤0.79 inch (2cm)。更大装饰用 textbox 特殊字符或交给 shape agent 处理。
 4. 生成 textbox 元素放置标题和正文
 5. **必须调用 submit_text_elements 提交**
 

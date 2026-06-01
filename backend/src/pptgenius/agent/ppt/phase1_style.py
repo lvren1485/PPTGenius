@@ -128,7 +128,10 @@ def _make_save_color_scheme(db: Database):
         colors : dict — {primary, accent, text, text_secondary, bg, bg_dark, border}
             All values are 6-char hex strings WITHOUT '#' prefix.
         chart_colors : list[str] — 4-6 hex colors for chart series.
-        fonts : dict — {title, subtitle, body, caption}, each with {name, size, bold, color}.
+        fonts : dict — {h1, h2, h3, h4, body, caption, min_size}.
+            h1(36pt)封面/h2(28pt)页标题/h3(22pt)二级/h4(18pt)三级,
+            body(16pt)正文/caption(14pt)图注, min_size 固定 14.
+            Each: {name, size, bold, color}. ALL sizes MUST be >=14pt.
         style_density : str — 'minimal' | 'moderate' | 'elaborate'. Default 'moderate'.
         decoration : dict — Decoration toggles. Default {}.
         """

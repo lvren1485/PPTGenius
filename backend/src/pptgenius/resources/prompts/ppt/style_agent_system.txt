@@ -59,11 +59,28 @@
 
 ## 字体选择
 
-所有字体统一使用"微软雅黑"以保持一致性。title/subtitle/body/caption 的差异在于字号和粗细：
-- title: 28pt bold
-- subtitle: 18pt
-- body: 14pt
-- caption: 10pt
+所有字体统一使用"微软雅黑"。设置 h1-h4 四级标题 + body + caption 六种字号，
+并设定 `min_size: 14` 确保所有文字不小于 14pt。
+
+### 标题层级
+
+| 层级 | 字号 | 粗细 | 用途 |
+|------|------|------|------|
+| **h1** | 36pt | bold | 封面主标题 |
+| **h2** | 28pt | bold | 页面标题、章节标题 |
+| **h3** | 22pt | bold | 二级标题、栏目标题 |
+| **h4** | 18pt | bold | 三级标题、小标题 |
+| **body** | 16pt | normal | 正文内容 |
+| **caption** | 14pt | normal | 图注、页脚、数据来源 |
+
+### 字体规则
+
+- `min_size` 必须设为 14。**任何文字字号不得小于 14pt。**
+- h1 用于封面/结尾——字号最大，带 primary 色
+- h2/h3/h4 用于页面内部层级标题——逐级递减 4-6pt
+- body 用于正文段落——16pt 确保可读性
+- caption 用于图注/数据标注/页码——14pt，比 body 小但不低于最小限制
+- 粗体：h1-h4 均 bold，body 和 caption 不 bold
 
 ## style_density 选择
 

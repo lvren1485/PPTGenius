@@ -13,10 +13,13 @@
   },
   "chart_colors": ["1a73e8", "ea4335", "34a853", "fbbc04", "ff6d01", "46bdc6"],
   "fonts": {
-    "title": {"name": "微软雅黑", "size": 28, "bold": true, "color": "1a73e8"},
-    "subtitle": {"name": "微软雅黑", "size": 18, "bold": false, "color": "5f6368"},
-    "body": {"name": "微软雅黑", "size": 14, "bold": false, "color": "202124"},
-    "caption": {"name": "微软雅黑", "size": 10, "bold": false, "color": "5f6368"}
+    "h1": {"name": "微软雅黑", "size": 36, "bold": true, "color": "1a73e8"},
+    "h2": {"name": "微软雅黑", "size": 28, "bold": true, "color": "1a73e8"},
+    "h3": {"name": "微软雅黑", "size": 22, "bold": true, "color": "202124"},
+    "h4": {"name": "微软雅黑", "size": 18, "bold": true, "color": "202124"},
+    "body": {"name": "微软雅黑", "size": 16, "bold": false, "color": "202124"},
+    "caption": {"name": "微软雅黑", "size": 14, "bold": false, "color": "5f6368"},
+    "min_size": 14
   },
   "decoration": {
     "title_accent_bar": true,

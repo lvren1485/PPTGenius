@@ -11,7 +11,8 @@
     "path 模式: 相对路径(相对于 workspace 根)。例如 'images/photo.png'。height 可省略(自动等比)。",
     "name+color 模式: 不需要 path 字段。引擎自动生成着色 SVG→PNG(生成后清理),LLM 无需关心路径。",
     "color: hex 颜色字符串,如 '3B82F6' 或 '#3B82F6'。仅当 name 不为空时必填。",
-    "fit='aspect' 时如果同时指定 width 和 height 仍保持比例。"
+    "fit='aspect' 时如果同时指定 width 和 height 仍保持比例。",
+    "⚠️ SVG 图标尺寸限制: width/height 均不得超过 2cm (≈0.79 inch)。如需更大装饰元素，请使用 shape 代替。"
   ],
   "fields": {
     "type": "固定值 'picture'",
@@ -30,9 +31,9 @@
       "fit": "aspect"
     },
     {
-      "_comment": "图标库模式 (先调 search_icons('growth') → 选 chart-line → 蓝色着色)",
+      "_comment": "图标库模式 (先调 search_icons('growth') → 选 chart-line → 蓝色着色, 尺寸≤0.79inch)",
       "type": "picture",
-      "position": { "left": 10.0, "top": 2.0, "width": 2.0, "height": 2.0 },
+      "position": { "left": 10.0, "top": 2.0, "width": 0.6, "height": 0.6 },
       "name": "chart-line",
       "color": "3B82F6",
       "fit": "aspect"

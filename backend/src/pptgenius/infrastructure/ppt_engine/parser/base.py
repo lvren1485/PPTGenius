@@ -34,6 +34,13 @@ class FontSpec(BaseModel):
     shadow: FontShadow | None = None
     glow: FontGlow | None = None
 
+    @field_validator("size")
+    @classmethod
+    def _check_size(cls, v: int | None) -> int | None:
+        if v is not None and v < 14:
+            raise ValueError(f"Font size must be >= 14pt, got {v}")
+        return v
+
     @field_validator("color")
     @classmethod
     def _check_color(cls, v: str | None) -> str | None:

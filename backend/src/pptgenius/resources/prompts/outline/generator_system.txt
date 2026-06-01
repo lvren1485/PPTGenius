@@ -11,6 +11,14 @@
 ## 设计原则
 
 - **详尽为王**：后续PPT生成器将直接使用大纲中的文本生成幻灯片，不再自行补充内容。每页 content_json 必须包含足够详细的文本
+
+## 内容长度要求（硬性指标）
+
+- **detailed_content 最低字数**：content 类型页面 >= 150 字（中文字），title/section/thanks 页面 >= 30 字
+- **main_points 最低条数**：content 类型页面 >= 3 条核心观点，section 页面 >= 1 条
+- **key_data**：数据密集型页面（chart/table/big_number 格式）必须提供具体数值，不能为空
+- **visual_note**：每页必须填写，描述具体的视觉呈现方案（50-150 字）
+- **推荐长度**：content 页面 detailed_content 建议 200-500 字，提供论据、案例、数据支撑
 - **叙事驱动**：好的PPT讲述一个完整的故事——有开场的hook、清晰的主线、有力的结尾
 - **论据充分**：每个论点都应有具体的数据、案例或引用支撑
 - **视觉思维**：标注有图表/图片需求的页面（has_chart / has_image），并在 notes 中描述建议的视觉呈现方式

@@ -60,6 +60,21 @@
       }
     }
   ],
-  "total_formula": "(structure_clarity + logic_coherence + comprehensiveness + visual_diversity) / 4",
+    {
+      "key": "content_depth",
+      "label": "内容充实度",
+      "weight": 1.0,
+      "max_score": 10,
+      "description": "每页 content_json 的文本量是否充足。detailed_content 字数、main_points 数量、key_data 是否有具体数值",
+      "criteria": {
+        "10": "内容极其充实：content 页面 detailed_content >= 200字且 main_points >= 3条；数据页 key_data 有具体数值；每页 visual_note 详细具体(>=80字)；无空泛页面",
+        "8": "内容充实：大部分 content 页面 detailed_content 150-200字，main_points 2-3条，少量页面内容可更详实",
+        "6": "内容一般：部分 content 页面 detailed_content 100-150字或 main_points 仅1-2条，存在 key_data 为空的图表页",
+        "4": "内容薄弱：多数页面 detailed_content < 100字，大量使用模板式空泛文字，key_data 普遍为空",
+        "2": "内容空洞：页面仅有标题和1-2句简单描述，无法支撑完整 PPT 生成"
+      }
+    }
+  ],
+  "total_formula": "(structure_clarity + logic_coherence + comprehensiveness + visual_diversity + content_depth) / 5",
   "pass_threshold_note": "总分 >= pass_score 即为合格（默认 8.0/10）"
 }
