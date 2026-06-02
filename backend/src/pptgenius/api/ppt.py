@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 
 from pptgenius.infrastructure.db import Database
 
-from .deps import get_db
+from .deps import get_db, get_workspace_manager
 
 
 def _orm_to_dict(obj) -> dict:
@@ -92,18 +92,24 @@ async def get_presentation_slides(
 async def download_presentation(
     pres_id: int,
     db: Database = Depends(get_db),
+    wm = Depends(get_workspace_manager),
 ) -> FileResponse:
     pres = await db.get_presentation(pres_id)
     if pres is None:
         raise HTTPException(404, {"code": 40001, "message": "presentation not found"})
     if pres.status != "completed" or not pres.file_path:
         raise HTTPException(400, {"code": 40401, "message": "presentation not ready for download"})
-    if not os.path.isfile(pres.file_path):
-        raise HTTPException(404, {"code": 40402, "message": "file not found on disk"})
 
-    filename = os.path.basename(pres.file_path)
+    # file_path may be relative (e.g. output/xxx.pptx) or absolute
+    file_path = pres.file_path
+    if not os.path.isabs(file_path):
+        file_path = os.path.join(str(wm.get_path(pres.conversation_id)), file_path)
+    if not os.path.isfile(file_path):
+        raise HTTPException(404, {"code": 40402, "message": f"file not found: {os.path.basename(file_path)}"})
+
+    filename = os.path.basename(file_path)
     return FileResponse(
-        path=pres.file_path,
+        path=file_path,
         filename=filename,
         media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
     )

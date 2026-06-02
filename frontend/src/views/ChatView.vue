@@ -8,6 +8,7 @@ import { streamChat } from '../api/sse'
 import MessageBubble from '../components/chat/MessageBubble.vue'
 import FileCard from '../components/chat/FileCard.vue'
 import ImageCard from '../components/chat/ImageCard.vue'
+import DocumentCard from '../components/chat/DocumentCard.vue'
 import OutlineCard from '../components/chat/OutlineCard.vue'
 import PptCard from '../components/chat/PptCard.vue'
 import ChatInput from '../components/chat/ChatInput.vue'
@@ -18,6 +19,7 @@ interface MsgItem {
   idx: number
   role: string
   content: string
+  metadata_json: Record<string, any> | null
   content_type: string | null
   estimated_cost: number | null
   created_at: string
@@ -68,7 +70,7 @@ async function sendMessage(text: string) {
   messages.value.push({
     id: 0, idx: messages.value.length + 1,
     role: 'user', content: text, content_type: 'text',
-    estimated_cost: null, created_at: new Date().toISOString(),
+    metadata_json: null, estimated_cost: null, created_at: new Date().toISOString(),
   })
   await nextTick()
   scrollBottom()
@@ -106,27 +108,27 @@ function handleSseEvent(evt: { event: string; data: Record<string, any> }) {
       }
       break
     case 'outline':
-      // Insert outline card
-      messages.value.push({
-        id: 0, idx: messages.value.length + 1,
-        role: 'assistant', content: JSON.stringify(d),
-        content_type: 'outline', estimated_cost: null,
-        created_at: new Date().toISOString(),
-      })
-      scrollBottom()
-      break
     case 'ppt_done':
     case 'ppt_ready':
-      messages.value.push({
-        id: 0, idx: messages.value.length + 1,
-        role: 'assistant', content: JSON.stringify(d),
-        content_type: 'ppt', estimated_cost: null,
-        created_at: new Date().toISOString(),
-      })
-      scrollBottom()
+      // Handled via 'document' event; ignore old-format inline data
       break
     case 'knowledge':
       // Knowledge sources — log only
+      break
+    case 'document':
+      // Document message (outline/ppt) — same rendering path as history
+      messages.value.push({
+        id: 0, idx: messages.value.length + 1,
+        role: 'document',
+        content: d.title || '',
+        content_type: d.doc_type,
+        metadata_json: d.doc_type === 'outline'
+          ? { outline_id: d.outline_id, title: d.title }
+          : { presentation_id: d.presentation_id, title: d.title },
+        estimated_cost: null,
+        created_at: new Date().toISOString(),
+      })
+      scrollBottom()
       break
     case 'error':
       ElMessage.error(d.message || '执行出错')
@@ -159,6 +161,7 @@ function scrollBottom() {
 }
 
 function renderMsg(msg: MsgItem) {
+  if (msg.role === 'document') return 'document'
   if (msg.content_type === 'file') return 'file'
   if (msg.content_type === 'image') return 'image'
   if (msg.content_type === 'outline') return 'outline'
@@ -192,6 +195,11 @@ function renderMsg(msg: MsgItem) {
           v-else-if="renderMsg(msg) === 'image'"
           :content="msg.content"
           :created-at="msg.created_at"
+        />
+        <DocumentCard
+          v-else-if="renderMsg(msg) === 'document'"
+          :doc-type="msg.content_type || ''"
+          :metadata="msg.metadata_json || {}"
         />
         <OutlineCard
           v-else-if="renderMsg(msg) === 'outline'"

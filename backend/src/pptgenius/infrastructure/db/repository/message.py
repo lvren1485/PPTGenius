@@ -83,6 +83,30 @@ async def count_messages_by_conversation(db: AsyncSession, conversation_id: int)
     return result.scalar_one()
 
 
+async def create_document_message(
+    db: AsyncSession,
+    conversation_id: int,
+    doc_type: str,
+    doc_data: dict,
+    content: str = "",
+) -> Message:
+    """Create a document-type message (outline / ppt).  Not fed into LLM history."""
+    idx = await _get_next_idx(db, conversation_id)
+    msg = Message(
+        conversation_id=conversation_id,
+        idx=idx,
+        role="document",
+        content=content,
+        content_type=doc_type,       # "outline" or "ppt"
+        metadata_json=doc_data,      # {outline_id: N, title: "..."} or {presentation_id: N, title: "..."}
+        estimated_cost=None,
+    )
+    db.add(msg)
+    await db.commit()
+    await db.refresh(msg)
+    return msg
+
+
 async def trim_messages(db: AsyncSession, conversation_id: int, before_idx: int) -> int:
     """删除 conversation 中 idx 小于 before_idx 的所有消息，返回删除条数。"""
     from sqlalchemy import delete

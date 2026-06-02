@@ -37,6 +37,7 @@ class Database:
     # ─── message ───
     async def create_message(self, *a, **kw): return await msg_repo.create_message(self.db, *a, **kw)
     async def create_human_message(self, *a, **kw): return await msg_repo.create_human_message(self.db, *a, **kw)
+    async def create_document_message(self, *a, **kw): return await msg_repo.create_document_message(self.db, *a, **kw)
     async def get_messages_by_conversation(self, *a, **kw): return await msg_repo.get_messages_by_conversation(self.db, *a, **kw)
     async def count_messages_by_conversation(self, *a, **kw): return await msg_repo.count_messages_by_conversation(self.db, *a, **kw)
     async def trim_messages(self, *a, **kw): return await msg_repo.trim_messages(self.db, *a, **kw)

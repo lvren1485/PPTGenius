@@ -53,6 +53,7 @@ class MessageItem(BaseModel):
     role: str
     content: str
     content_type: str | None = None
+    metadata_json: dict | None = None
     estimated_cost: float | None = None
     created_at: datetime
 

@@ -170,7 +170,9 @@ async def run_coordinator(
         lines = []
         for m in recent:
             content = m.content or ""
-            if m.role == "image":
+            if m.role == "document":
+                continue  # outline/ppt docs not for LLM context
+            elif m.role == "image":
                 # Parse image message: extract path
                 for line in content.split("\n"):
                     if line.startswith("Path:"):
@@ -235,9 +237,12 @@ async def run_coordinator(
     snapshot = tc.snapshot()
     yield _sse("tokens", snapshot)
 
-    # --- store assistant message ---
+    # --- store assistant summary message ---
     design_rationales = list(_rationale_store) if _rationale_store else None
-    assistant_content = _build_assistant_content(decision, latest_outline, design_rationales)
+    # Re-fetch latest state (may have been updated by sub-agent)
+    outlines2 = await db.list_outlines_by_conversation(conversation_id)
+    latest_outline2 = outlines2[0] if outlines2 else None
+    assistant_content = _build_assistant_content(decision, latest_outline2, design_rationales)
     await db.create_message(
         conversation_id=conversation_id,
         role="assistant",
@@ -349,6 +354,19 @@ async def _run_outline(
 
                 if final_data:
                     yield _sse("outline", final_data)
+                    outline_id = final_data.get("outline_id")
+                    if outline_id:
+                        await db.create_document_message(
+                            conversation_id=conversation_id,
+                            doc_type="outline",
+                            doc_data={"outline_id": outline_id, "title": final_data.get("title", "")},
+                            content=final_data.get("title", ""),
+                        )
+                        yield _sse("document", {
+                            "doc_type": "outline",
+                            "outline_id": outline_id,
+                            "title": final_data.get("title", ""),
+                        })
                 yield _sse("phase", {
                     "phase": "waiting_user",
                     "message": "大纲已就绪，请确认或提出修改意见",
@@ -489,12 +507,25 @@ async def _run_ppt(
                     "phase": "ppt_done",
                     "message": f"PPT生成完成 (耗时 {t_end - t_start:.1f}s)",
                 })
+                ppt_title = outline.title if outline else "未命名"
                 yield _sse("ppt_done", {
                     "presentation_id": captured_pres_id,
                     "file_path": state["file_path"],
                     "elapsed_seconds": round(t_end - t_start, 1),
                     "mode": mode,
                 })
+                if captured_pres_id:
+                    await db.create_document_message(
+                        conversation_id=conversation_id,
+                        doc_type="ppt",
+                        doc_data={"presentation_id": captured_pres_id, "title": ppt_title},
+                        content=ppt_title,
+                    )
+                    yield _sse("document", {
+                        "doc_type": "ppt",
+                        "presentation_id": captured_pres_id,
+                        "title": ppt_title,
+                    })
 
     except Exception:
         _log.exception("PPT agent error")
