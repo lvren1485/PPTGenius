@@ -107,7 +107,7 @@ def _make_list_files(db: Database, user_id: int):
     return list_knowledge_files
 
 
-def _make_read_file(db: Database):
+def _make_read_file(db: Database, fetch_count: list[int], fetched_ids: set[int]):
     @tool
     async def read_file(file_id: int) -> str:
         """Read the full text of a knowledge file (all chunks). Use this after
@@ -117,6 +117,12 @@ def _make_read_file(db: Database):
         ----------
         file_id : int — The file ID from list_knowledge_files.
         """
+        if fetch_count[0] >= 4:
+            return f"本轮抓取已达上限 (4次)。请基于已有信息生成大纲。"
+        if file_id in fetched_ids:
+            return f"already fetched (file_id={file_id})"
+        fetch_count[0] += 1
+        fetched_ids.add(file_id)
         chunks = await db.list_chunks_by_file(file_id)
         if not chunks:
             return f"文件 {file_id} 没有内容。"
@@ -124,7 +130,7 @@ def _make_read_file(db: Database):
         for c in sorted(chunks, key=lambda x: x.chunk_index):
             parts.append(c.chunk_text)
         full = "\n\n".join(parts)
-        return full[:8000]  # limit to avoid overwhelming context
+        return full[:8000]
 
     return read_file
 
@@ -160,13 +166,16 @@ def _make_list_input_images(conv_id: int):
     return list_input_images
 
 
-def _make_fetch_web(db: Database, user_id: int, conv_id: int):
+def _make_fetch_web(db: Database, user_id: int, conv_id: int, fetch_count: list[int]):
     @tool
     async def fetch_web(url: str) -> str:
         """Fetch and index a web page. The page content will be added to the knowledge base.
 
         Use this after search_web to get the full content of a promising result.
         """
+        if fetch_count[0] >= 4:
+            return f"本轮抓取已达上限 (4次)。请基于已有信息生成大纲。"
+        fetch_count[0] += 1
         result = await _web_search.fetch_and_ingest(db, url, user_id, conv_id)
         if result.get("ingested"):
             return (
@@ -250,14 +259,15 @@ async def generator_node(state: OutlineState, config: RunnableConfig) -> dict:
     except RuntimeError:
         writer = lambda _: None  # no-op when not inside a running graph (e.g. tests)
 
+    # Per-round fetch tracking (fetch_web, max 4 per round)
+    fetch_count = [0]
+
     write_outline_tool, get_result = _make_write_outline(db, user_id, conv_id, outline_id)
     tools = [
-        _make_list_files(db, user_id),
-        _make_read_file(db),
         _make_list_input_images(conv_id),
         _make_search_knowledge(user_id),
         _make_search_web(),
-        _make_fetch_web(db, user_id, conv_id),
+        _make_fetch_web(db, user_id, conv_id, fetch_count),
         write_outline_tool,
     ]
 

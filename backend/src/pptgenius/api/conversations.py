@@ -73,6 +73,18 @@ async def get_conversation(
     ))
 
 
+@router.patch("/{conv_id}/archive")
+async def archive_conversation(
+    conv_id: int,
+    db: Database = Depends(get_db),
+) -> ApiResponse[dict]:
+    conv = await db.get_conversation(conv_id)
+    if conv is None:
+        raise HTTPException(404, {"code": 40001, "message": "conversation not found"})
+    ok = await db.archive_conversation(conv_id)
+    return ApiResponse(data={"archived": ok, "id": conv_id})
+
+
 @router.delete("/{conv_id}")
 async def delete_conversation(
     conv_id: int,
@@ -83,8 +95,6 @@ async def delete_conversation(
     if conv is None:
         raise HTTPException(404, {"code": 40001, "message": "conversation not found"})
     if hard:
-        # Hard delete not exposed on Database — just soft-delete for now
-        # TODO: add hard_delete_conversation in repository if needed
         pass
     ok = await db.soft_delete_conversation(conv_id)
     return ApiResponse(data={"deleted": ok, "id": conv_id, "hard": hard})

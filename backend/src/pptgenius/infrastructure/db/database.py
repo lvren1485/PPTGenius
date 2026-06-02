@@ -32,6 +32,7 @@ class Database:
     async def list_conversations(self, *a, **kw): return await conv_repo.list_conversations(self.db, *a, **kw)
     async def update_conversation_title(self, *a, **kw): return await conv_repo.update_conversation_title(self.db, *a, **kw)
     async def update_conversation_phase(self, *a, **kw): return await conv_repo.update_conversation_phase(self.db, *a, **kw)
+    async def archive_conversation(self, *a, **kw): return await conv_repo.archive_conversation(self.db, *a, **kw)
     async def soft_delete_conversation(self, *a, **kw): return await conv_repo.soft_delete_conversation(self.db, *a, **kw)
 
     # ─── message ───

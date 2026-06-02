@@ -18,9 +18,18 @@ function handleSend() {
   text.value = ''
 }
 
+const fileBatch: File[] = []
+let batchTimer: ReturnType<typeof setTimeout> | null = null
+
 function handleUpload(file: UploadFile) {
   if (file.raw) {
-    emit('upload', [file.raw])
+    fileBatch.push(file.raw)
+    if (batchTimer) clearTimeout(batchTimer)
+    batchTimer = setTimeout(() => {
+      emit('upload', [...fileBatch])
+      fileBatch.length = 0
+      batchTimer = null
+    }, 100)
   }
   return false
 }

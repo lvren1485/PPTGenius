@@ -58,6 +58,15 @@ async def update_conversation_phase(db: AsyncSession, conv_id: int, phase: str) 
     return True
 
 
+async def archive_conversation(db: AsyncSession, conv_id: int) -> bool:
+    conv = await db.get(Conversation, conv_id)
+    if conv is None:
+        return False
+    conv.status = "archived"
+    await db.commit()
+    return True
+
+
 async def soft_delete_conversation(db: AsyncSession, conv_id: int) -> bool:
     conv = await db.get(Conversation, conv_id)
     if conv is None:

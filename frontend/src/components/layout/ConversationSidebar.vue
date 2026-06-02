@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Plus } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { Plus, FolderChecked, Delete } from '@element-plus/icons-vue'
 import api from '../../api/client'
 import { useAuthStore } from '../../stores/auth'
 
@@ -19,7 +20,6 @@ const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 const convs = ref<ConvItem[]>([])
-const loading = ref(false)
 
 const activeId = computed(() => {
   const id = Number(route.params.id)
@@ -28,12 +28,16 @@ const activeId = computed(() => {
 
 onMounted(() => loadConvs())
 
+// Reload when route changes (new conv created, archive/delete, etc.)
+watch(() => route.path, () => loadConvs())
+
 async function loadConvs() {
-  loading.value = true
   try {
-    const { data } = await api.get('/conversations', { params: { user_id: auth.userId } })
+    const { data } = await api.get('/conversations', {
+      params: { user_id: auth.userId, status: 'active' },
+    })
     if (data.code === 0) convs.value = data.data.items || []
-  } finally { loading.value = false }
+  } catch { /* ignore */ }
 }
 
 function createChat() {
@@ -46,10 +50,33 @@ function selectChat(id: number) {
   }
 }
 
+async function archiveConv(id: number, e: Event) {
+  e.stopPropagation()
+  try {
+    await api.patch(`/conversations/${id}/archive`)
+    convs.value = convs.value.filter(c => c.id !== id)
+    ElMessage.success('已归档')
+    if (activeId.value === id) router.push('/')
+  } catch {
+    ElMessage.error('归档失败')
+  }
+}
+
+async function deleteConv(id: number, e: Event) {
+  e.stopPropagation()
+  try {
+    await api.delete(`/conversations/${id}`)
+    convs.value = convs.value.filter(c => c.id !== id)
+    ElMessage.success('已删除')
+    if (activeId.value === id) router.push('/')
+  } catch {
+    ElMessage.error('删除失败')
+  }
+}
+
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
 }
-
 </script>
 
 <template>
@@ -66,7 +93,25 @@ function formatDate(d: string) {
         :class="{ active: c.id === activeId }"
         @click="selectChat(c.id)"
       >
-        <div class="conv-title">{{ c.title || '未命名' }}</div>
+        <div class="conv-row">
+          <div class="conv-title">{{ c.title || '未命名' }}</div>
+          <div class="conv-actions">
+            <el-button
+              :icon="FolderChecked"
+              size="small"
+              text
+              title="归档"
+              @click="archiveConv(c.id, $event)"
+            />
+            <el-button
+              :icon="Delete"
+              size="small"
+              text
+              title="删除"
+              @click="deleteConv(c.id, $event)"
+            />
+          </div>
+        </div>
         <div class="conv-meta">
           <span>{{ c.message_count }} 条</span>
           <span>{{ formatDate(c.updated_at) }}</span>
@@ -107,12 +152,27 @@ function formatDate(d: string) {
 .conv-item.active {
   background: #d9ecff;
 }
+.conv-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
 .conv-title {
   font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+.conv-actions {
+  display: none;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.conv-item:hover .conv-actions {
+  display: flex;
 }
 .conv-meta {
   display: flex;

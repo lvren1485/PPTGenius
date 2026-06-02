@@ -166,14 +166,25 @@ async def run_coordinator(
     image_paths: list[str] = []
     file_contexts: list[str] = []
     if history_messages:
-        recent = history_messages[-10:]  # last 10 messages
+        recent = history_messages[-40:]  # last 40 messages
         lines = []
+        doc_count = 0  # document count since last human message
         for m in recent:
             content = m.content or ""
-            if m.role == "document":
-                continue  # outline/ppt docs not for LLM context
+            if m.role == "user":
+                doc_count = 0  # reset on each human message
+                lines.append(f"[用户]: {content[:200]}")
+            elif m.role == "assistant":
+                lines.append(f"[助手]: {content[:200]}")
+            elif m.role == "document":
+                doc_count += 1
+                if doc_count <= 5:
+                    meta = m.metadata_json or {}
+                    if m.content_type == "outline":
+                        lines.append(f"[产出大纲]: id={meta.get('outline_id')} {content[:100]}")
+                    elif m.content_type == "ppt":
+                        lines.append(f"[产出PPT]: id={meta.get('presentation_id')} {content[:100]}")
             elif m.role == "image":
-                # Parse image message: extract path
                 for line in content.split("\n"):
                     if line.startswith("Path:"):
                         image_paths.append(line.split(":", 1)[1].strip())
@@ -182,10 +193,6 @@ async def run_coordinator(
             elif m.role == "file":
                 file_contexts.append(content)
                 lines.append(f"[用户上传文件]: {content[:150]}")
-            else:
-                role = "用户" if m.role == "user" else "助手"
-                content_preview = content[:200]
-                lines.append(f"[{role}]: {content_preview}")
         history_summary = "\n".join(lines)
 
     # --- classify intent ---

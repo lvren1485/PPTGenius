@@ -34,8 +34,6 @@ interface SseState {
 }
 
 const route = useRoute()
-import type { UploadFile } from 'element-plus'
-
 const router = useRouter()
 const auth = useAuthStore()
 const convId = computed(() => {
@@ -46,7 +44,6 @@ const convId = computed(() => {
 const messages = ref<MsgItem[]>([])
 const sse = ref<SseState>({ phase: '', step: '', detail: '', pct: 0 })
 const convTitle = ref('')
-const startMsg = ref('')
 
 const suggestions = [
   '做一个关于Python数据分析的PPT',
@@ -60,6 +57,7 @@ const suggestions = [
 watch(convId, async (id) => {
   if (id > 0) {
     await loadConversation()
+    scrollBottom()
     const msg = route.query.msg as string
     if (msg) {
       router.replace({ query: {} })
@@ -75,6 +73,7 @@ watch(convId, async (id) => {
 onMounted(async () => {
   if (convId.value > 0) {
     await loadConversation()
+    scrollBottom()
     const msg = route.query.msg as string
     if (msg) {
       router.replace({ query: {} })
@@ -109,7 +108,6 @@ async function ensureConversation(title?: string): Promise<number> {
 
 async function sendMessage(text: string) {
   if (!text.trim()) return
-  startMsg.value = ''
   // Lazy-create conversation if needed, auto-title from first 10 chars
   const cid = await ensureConversation(text.slice(0, 10))
 
@@ -199,17 +197,30 @@ async function handleUpload(files: File[]) {
   }
 }
 
-function onWelcomeUpload(file: UploadFile) {
-  if (file.raw) handleUpload([file.raw])
-  return false
-}
-
 function scrollBottom() {
   nextTick(() => {
     const el = document.getElementById('msg-container')
     if (el) el.scrollTop = el.scrollHeight
   })
 }
+
+const visibleMessages = computed(() => {
+  const docs: MsgItem[] = []
+  const others: MsgItem[] = []
+  for (const m of messages.value) {
+    if (m.role === 'document') {
+      docs.push(m)
+    } else {
+      others.push(m)
+    }
+  }
+  // Keep last 5 documents only
+  const keptDocs = docs.slice(-5)
+  // Interleave by original idx order
+  const all = [...others, ...keptDocs]
+  all.sort((a, b) => a.idx - b.idx)
+  return all
+})
 
 function renderMsg(msg: MsgItem) {
   if (msg.role === 'document') return 'document'
@@ -247,7 +258,7 @@ function renderMsg(msg: MsgItem) {
       </div>
 
       <div class="msg-container" id="msg-container" v-if="convId">
-        <template v-for="msg in messages" :key="msg.id || msg.idx">
+        <template v-for="msg in visibleMessages" :key="msg.id || msg.idx">
           <MessageBubble
             v-if="renderMsg(msg) === 'text'"
             :role="msg.role"
@@ -279,15 +290,14 @@ function renderMsg(msg: MsgItem) {
             :ppt-data="JSON.parse(msg.content)"
           />
         </template>
+        <SseStatus
+          v-if="sse.phase || sse.step"
+          :phase="sse.phase"
+          :step="sse.step"
+          :detail="sse.detail"
+          :pct="sse.pct"
+        />
       </div>
-
-      <SseStatus
-        v-if="convId && (sse.phase || sse.step)"
-        :phase="sse.phase"
-        :step="sse.step"
-        :detail="sse.detail"
-        :pct="sse.pct"
-      />
 
       <ChatInput @send="sendMessage" @upload="handleUpload" />
     </div>
@@ -362,13 +372,6 @@ function renderMsg(msg: MsgItem) {
   padding: 24px;
   display: flex;
   flex-direction: column;
-  margin: 0 auto;
-}
-.msg-container {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
+  width: 100%;
 }
 </style>

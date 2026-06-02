@@ -19,7 +19,7 @@ agent:
   outline:
     mode: "mix"               # max_iteration | pass_score | mix
     max_iterations: 5
-    pass_score: 9.0           # 0-10, used by pass_score / mix modes
+    pass_score: 7.5           # 0-10, used by pass_score / mix modes
     evaluation_threshold: 0.7
   ppt:
     mode: "super_freedom"          # sub_agent | freedom | super_freedom
@@ -52,7 +52,7 @@ web_search:
   enabled: true
   engine: "duckduckgo"
   max_results: 5
-  timeout: 15
+  timeout: 5
   bing_api_key: ""
   google_api_key: ""
   google_cx: ""
