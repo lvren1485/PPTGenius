@@ -129,7 +129,7 @@ slide 级别（非 element）。
 
 1. 分析 outline slide 的 content_json
 2. 如果有图表数据 → read_instruction("chart/column.json") 等
-3. 搜索 SVG 图标 → search_icons
+3. 搜索 SVG 图标 → search_icons（⚠️ SVG 图标尺寸 ≤0.79 inch/2cm，更大用 shape）
 4. 生成所有元素 → submit_slide_elements 提交
 """
 

@@ -1,0 +1,649 @@
+[
+  {
+    "background": {
+      "type": "gradient",
+      "gradient_angle": 135,
+      "gradient_stops": [
+        {
+          "position": 0,
+          "color": "1a237e"
+        },
+        {
+          "position": 0.5,
+          "color": "283593"
+        },
+        {
+          "position": 1.0,
+          "color": "3949ab"
+        }
+      ]
+    },
+    "notes": "封面页——深蓝渐变科技风",
+    "elements": [
+      {
+        "type": "shape",
+        "shape_type": "rectangle",
+        "position": {
+          "left": 0,
+          "top": 0,
+          "width": 13.333,
+          "height": 0.08
+        },
+        "fill": {
+          "type": "solid",
+          "color": "5c6bc0"
+        }
+      },
+      {
+        "type": "shape",
+        "shape_type": "rectangle",
+        "position": {
+          "left": 0,
+          "top": 6.8,
+          "width": 13.333,
+          "height": 0.7
+        },
+        "fill": {
+          "type": "solid",
+          "color": "1a237e"
+        }
+      },
+      {
+        "type": "shape",
+        "shape_type": "rounded_rectangle",
+        "position": {
+          "left": 0.8,
+          "top": 2.0,
+          "width": 0.12,
+          "height": 3.5
+        },
+        "fill": {
+          "type": "solid",
+          "color": "5c6bc0"
+        }
+      },
+      {
+        "type": "textbox",
+        "position": {
+          "left": 1.2,
+          "top": 1.8,
+          "width": 11.0,
+          "height": 1.5
+        },
+        "content": [
+          {
+            "paragraph": {
+              "alignment": "left",
+              "runs": [
+                {
+                  "text": "AI时代的机遇与挑战",
+                  "font": {
+                    "size": 40,
+                    "bold": true,
+                    "color": "ffffff"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "type": "textbox",
+        "position": {
+          "left": 1.2,
+          "top": 3.4,
+          "width": 10.5,
+          "height": 0.8
+        },
+        "content": [
+          {
+            "paragraph": {
+              "alignment": "left",
+              "runs": [
+                {
+                  "text": "从深度学习到大语言模型 · 2025技术前沿",
+                  "font": {
+                    "size": 18,
+                    "color": "b3c6ff"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "type": "textbox",
+        "position": {
+          "left": 1.2,
+          "top": 5.0,
+          "width": 5.0,
+          "height": 0.6
+        },
+        "content": [
+          {
+            "paragraph": {
+              "alignment": "left",
+              "runs": [
+                {
+                  "text": "张三 · 2025年6月",
+                  "font": {
+                    "size": 14,
+                    "color": "7986cb"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "type": "picture",
+        "position": {
+          "left": 0.4,
+          "top": 0.4,
+          "width": 0.6,
+          "height": 0.6
+        },
+        "name": "cpu",
+        "color": "5c6bc0",
+        "fit": "aspect"
+      }
+    ]
+  },
+  {
+    "background": {
+      "type": "solid",
+      "color": "F8FAFC"
+    },
+    "notes": "内容页——浅色背景三栏对比布局",
+    "elements": [
+      {
+        "type": "shape",
+        "shape_type": "rectangle",
+        "position": {
+          "left": 0,
+          "top": 0,
+          "width": 13.333,
+          "height": 0.06
+        },
+        "fill": {
+          "type": "solid",
+          "color": "1a73e8"
+        }
+      },
+      {
+        "type": "textbox",
+        "position": {
+          "left": 0.8,
+          "top": 0.3,
+          "width": 11.7,
+          "height": 0.8
+        },
+        "content": [
+          {
+            "paragraph": {
+              "alignment": "left",
+              "runs": [
+                {
+                  "text": "机器学习的三大范式",
+                  "font": {
+                    "size": 28,
+                    "bold": true,
+                    "color": "1a237e"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "type": "shape",
+        "shape_type": "rounded_rectangle",
+        "position": {
+          "left": 0.5,
+          "top": 1.5,
+          "width": 3.8,
+          "height": 5.2
+        },
+        "fill": {
+          "type": "solid",
+          "color": "e8f0fe"
+        },
+        "line": {
+          "color": "1a73e8",
+          "width_pt": 1.0
+        }
+      },
+      {
+        "type": "textbox",
+        "position": {
+          "left": 0.7,
+          "top": 1.7,
+          "width": 3.4,
+          "height": 0.6
+        },
+        "content": [
+          {
+            "paragraph": {
+              "alignment": "center",
+              "runs": [
+                {
+                  "text": "监督学习",
+                  "font": {
+                    "size": 20,
+                    "bold": true,
+                    "color": "1a73e8"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "type": "textbox",
+        "position": {
+          "left": 0.7,
+          "top": 2.4,
+          "width": 3.4,
+          "height": 4.0
+        },
+        "content": [
+          {
+            "paragraph": {
+              "alignment": "left",
+              "space_after_pt": 6,
+              "runs": [
+                {
+                  "text": "从标注数据中学习",
+                  "font": {
+                    "size": 16,
+                    "color": "333333"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "paragraph": {
+              "alignment": "left",
+              "space_after_pt": 6,
+              "runs": [
+                {
+                  "text": "应用: 图像分类、房价预测",
+                  "font": {
+                    "size": 14,
+                    "color": "5f6368"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "paragraph": {
+              "alignment": "left",
+              "runs": [
+                {
+                  "text": "算法: 线性回归、决策树、NN",
+                  "font": {
+                    "size": 14,
+                    "color": "5f6368"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "type": "shape",
+        "shape_type": "rounded_rectangle",
+        "position": {
+          "left": 4.7,
+          "top": 1.5,
+          "width": 3.8,
+          "height": 5.2
+        },
+        "fill": {
+          "type": "solid",
+          "color": "fef7e0"
+        },
+        "line": {
+          "color": "f9a825",
+          "width_pt": 1.0
+        }
+      },
+      {
+        "type": "textbox",
+        "position": {
+          "left": 4.9,
+          "top": 1.7,
+          "width": 3.4,
+          "height": 0.6
+        },
+        "content": [
+          {
+            "paragraph": {
+              "alignment": "center",
+              "runs": [
+                {
+                  "text": "无监督学习",
+                  "font": {
+                    "size": 20,
+                    "bold": true,
+                    "color": "f9a825"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "type": "textbox",
+        "position": {
+          "left": 4.9,
+          "top": 2.4,
+          "width": 3.4,
+          "height": 4.0
+        },
+        "content": [
+          {
+            "paragraph": {
+              "alignment": "left",
+              "space_after_pt": 6,
+              "runs": [
+                {
+                  "text": "从无标签数据发现模式",
+                  "font": {
+                    "size": 16,
+                    "color": "333333"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "paragraph": {
+              "alignment": "left",
+              "space_after_pt": 6,
+              "runs": [
+                {
+                  "text": "应用: 客户分群、异常检测",
+                  "font": {
+                    "size": 14,
+                    "color": "5f6368"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "paragraph": {
+              "alignment": "left",
+              "runs": [
+                {
+                  "text": "算法: K-Means、PCA、DBSCAN",
+                  "font": {
+                    "size": 14,
+                    "color": "5f6368"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "type": "shape",
+        "shape_type": "rounded_rectangle",
+        "position": {
+          "left": 8.9,
+          "top": 1.5,
+          "width": 3.8,
+          "height": 5.2
+        },
+        "fill": {
+          "type": "solid",
+          "color": "e8f5e9"
+        },
+        "line": {
+          "color": "43a047",
+          "width_pt": 1.0
+        }
+      },
+      {
+        "type": "textbox",
+        "position": {
+          "left": 9.1,
+          "top": 1.7,
+          "width": 3.4,
+          "height": 0.6
+        },
+        "content": [
+          {
+            "paragraph": {
+              "alignment": "center",
+              "runs": [
+                {
+                  "text": "强化学习",
+                  "font": {
+                    "size": 20,
+                    "bold": true,
+                    "color": "43a047"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "type": "textbox",
+        "position": {
+          "left": 9.1,
+          "top": 2.4,
+          "width": 3.4,
+          "height": 4.0
+        },
+        "content": [
+          {
+            "paragraph": {
+              "alignment": "left",
+              "space_after_pt": 6,
+              "runs": [
+                {
+                  "text": "试错与环境交互学习",
+                  "font": {
+                    "size": 16,
+                    "color": "333333"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "paragraph": {
+              "alignment": "left",
+              "space_after_pt": 6,
+              "runs": [
+                {
+                  "text": "应用: AlphaGo、机器人控制",
+                  "font": {
+                    "size": 14,
+                    "color": "5f6368"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "paragraph": {
+              "alignment": "left",
+              "runs": [
+                {
+                  "text": "算法: Q-Learning、DQN、PPO",
+                  "font": {
+                    "size": 14,
+                    "color": "5f6368"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "type": "picture",
+        "position": {
+          "left": 0.6,
+          "top": 1.65,
+          "width": 0.5,
+          "height": 0.5
+        },
+        "name": "brain",
+        "color": "1a73e8",
+        "fit": "aspect"
+      },
+      {
+        "type": "picture",
+        "position": {
+          "left": 4.8,
+          "top": 1.65,
+          "width": 0.5,
+          "height": 0.5
+        },
+        "name": "chart-dots",
+        "color": "f9a825",
+        "fit": "aspect"
+      },
+      {
+        "type": "picture",
+        "position": {
+          "left": 9.0,
+          "top": 1.65,
+          "width": 0.5,
+          "height": 0.5
+        },
+        "name": "robot",
+        "color": "43a047",
+        "fit": "aspect"
+      }
+    ]
+  },
+  {
+    "background": {
+      "type": "gradient",
+      "gradient_angle": 180,
+      "gradient_stops": [
+        {
+          "position": 0,
+          "color": "263238"
+        },
+        {
+          "position": 1.0,
+          "color": "37474f"
+        }
+      ]
+    },
+    "notes": "结尾致谢页",
+    "elements": [
+      {
+        "type": "shape",
+        "shape_type": "rounded_rectangle",
+        "position": {
+          "left": 3.5,
+          "top": 2.0,
+          "width": 6.333,
+          "height": 3.5
+        },
+        "fill": {
+          "type": "no_fill"
+        },
+        "line": {
+          "color": "5c6bc0",
+          "width_pt": 2.0
+        }
+      },
+      {
+        "type": "textbox",
+        "position": {
+          "left": 3.7,
+          "top": 2.5,
+          "width": 5.9,
+          "height": 1.0
+        },
+        "content": [
+          {
+            "paragraph": {
+              "alignment": "center",
+              "runs": [
+                {
+                  "text": "感谢聆听",
+                  "font": {
+                    "size": 40,
+                    "bold": true,
+                    "color": "ffffff"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "type": "textbox",
+        "position": {
+          "left": 3.7,
+          "top": 3.7,
+          "width": 5.9,
+          "height": 0.6
+        },
+        "content": [
+          {
+            "paragraph": {
+              "alignment": "center",
+              "runs": [
+                {
+                  "text": "Questions? Let us discuss.",
+                  "font": {
+                    "size": 16,
+                    "color": "90a4ae"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "type": "textbox",
+        "position": {
+          "left": 3.7,
+          "top": 4.5,
+          "width": 5.9,
+          "height": 0.5
+        },
+        "content": [
+          {
+            "paragraph": {
+              "alignment": "center",
+              "runs": [
+                {
+                  "text": "contact@example.com",
+                  "font": {
+                    "size": 14,
+                    "color": "607d8b"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+]

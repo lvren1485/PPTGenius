@@ -74,7 +74,12 @@ async def dispatcher_node(state: PPTState, config) -> dict:
             t0 = time.monotonic()
             try:
                 result: dict[str, Any]
-                if mode == "freedom":
+                if mode == "super_freedom":
+                    result = await _process_super_freedom_slide(
+                        db=slide_db, slide=slide, all_slides=slides,
+                        state=state, config=config,
+                    )
+                elif mode == "freedom":
                     result = await _process_freedom_slide(
                         db=slide_db, sm=sm, slide=slide, all_slides=slides,
                         state=state, config=config,
@@ -198,6 +203,48 @@ async def _process_freedom_slide(
                 "agent_times": {"freedom": time.monotonic() - t0}, "has_error": False}
     except Exception as exc:
         _log.error("Freedom slide %d failed: %s", slide_index, exc)
+        try:
+            await db.update_slide_status(
+                state["presentation_id"], slide_index, "error",
+                error_message=str(exc)[:500],
+            )
+        except Exception:
+            pass
+        return {"slide_index": slide_index, "elapsed": time.monotonic() - t0,
+                "agent_times": {}, "has_error": True}
+
+
+async def _process_super_freedom_slide(
+    *,
+    db: Database,
+    slide: dict,
+    all_slides: list[dict],
+    state: PPTState,
+    config,
+) -> dict:
+    """Process one slide in Super-Freedom mode — full creative control."""
+    from ..phase2_super_freedom.agent import run_super_freedom_agent
+
+    slide_index = slide["slide_index"]
+    neighbor_ctx = _build_neighbor_context(all_slides, slide_index)
+    enriched_slide = {**slide, "_neighbor_context": neighbor_ctx}
+
+    t0 = time.monotonic()
+    try:
+        await run_super_freedom_agent(
+            db=db, slide=enriched_slide,
+            selected_layouts=state.get("selected_layouts", {}),
+            presentation_id=state["presentation_id"],
+            slide_index=slide_index,
+            color_scheme_id=state.get("color_scheme_id"),
+            conv_id=state["conversation_id"],
+            config=config,
+        )
+        await db.update_slide_status(state["presentation_id"], slide_index, "completed")
+        return {"slide_index": slide_index, "elapsed": time.monotonic() - t0,
+                "agent_times": {"super_freedom": time.monotonic() - t0}, "has_error": False}
+    except Exception as exc:
+        _log.error("SuperFreedom slide %d failed: %s", slide_index, exc)
         try:
             await db.update_slide_status(
                 state["presentation_id"], slide_index, "error",

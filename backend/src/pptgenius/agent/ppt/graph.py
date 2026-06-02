@@ -113,10 +113,26 @@ async def _assembly_node(state: PPTState, config) -> dict:
     cs_data = {"colors": color_scheme.colors_json} if color_scheme else {}
 
     selected_layouts = state.get("selected_layouts", {})
+    ppt_mode = state.get("ppt_mode", "sub_agent")
 
     # ── build instruction JSON for PPT generator ──
     ppt_slides: list[dict] = []
     for s in sorted(slides, key=lambda x: x.slide_index):
+        outputs = s.agent_outputs or {}
+
+        # Super-freedom: agent already generated complete slide (background + elements + notes)
+        if ppt_mode == "super_freedom" and "super_freedom" in outputs:
+            sf = outputs["super_freedom"]
+            ppt_slides.append({
+                "layout": "blank",
+                "background": sf.get("background"),
+                "notes": sf.get("notes", ""),
+                "elements": sf.get("elements", []),
+            })
+            print(f'  Slide {s.slide_index}: super_freedom — {len(sf.get("elements", []))} elements')
+            continue
+
+        # Sub-agent / freedom: merge layout + agent outputs
         layout_def = selected_layouts.get(s.layout_name, {})
         if not layout_def:
             layout_def = _load_layout_file(s.layout_name)
@@ -136,7 +152,6 @@ async def _assembly_node(state: PPTState, config) -> dict:
                 elements.append({**dec, "type": "shape"})
 
         # Agent outputs: text + chart + shape (or freedom)
-        outputs = s.agent_outputs or {}
         for agent_type, output in outputs.items():
             if agent_type == "_notes":
                 continue
