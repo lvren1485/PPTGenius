@@ -56,7 +56,7 @@ function handleUpload(file: UploadFile) {
 .chat-input {
   border-top: 1px solid #e4e7ed;
   padding: 16px 24px;
-  background: #fff;
+  background: #fafbfc;
 }
 .input-row {
   display: flex;

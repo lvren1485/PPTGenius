@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { streamChat } from '../api/sse'
+import ConversationSidebar from '../components/layout/ConversationSidebar.vue'
 import MessageBubble from '../components/chat/MessageBubble.vue'
 import FileCard from '../components/chat/FileCard.vue'
 import ImageCard from '../components/chat/ImageCard.vue'
@@ -33,39 +34,84 @@ interface SseState {
 }
 
 const route = useRoute()
+import type { UploadFile } from 'element-plus'
+
 const router = useRouter()
 const auth = useAuthStore()
-const convId = Number(route.params.id)
+const convId = computed(() => {
+  const id = Number(route.params.id)
+  return isNaN(id) ? 0 : id
+})
 
 const messages = ref<MsgItem[]>([])
 const sse = ref<SseState>({ phase: '', step: '', detail: '', pct: 0 })
-const loading = ref(false)
-
 const convTitle = ref('')
+const startMsg = ref('')
+
+const suggestions = [
+  '做一个关于Python数据分析的PPT',
+  '介绍人工智能的发展历程',
+  '制作一份产品发布会的演示文稿',
+  '整理一份毕业论文答辩PPT',
+  '制作公司年度总结报告',
+]
+
+// Reload when switching conversations
+watch(convId, async (id) => {
+  if (id > 0) {
+    await loadConversation()
+    const msg = route.query.msg as string
+    if (msg) {
+      router.replace({ query: {} })
+      await sendMessage(msg)
+      await loadConversation()
+    }
+  } else {
+    messages.value = []
+    convTitle.value = ''
+  }
+})
 
 onMounted(async () => {
-  await loadConversation()
-  const msg = route.query.msg as string
-  if (msg) {
-    router.replace({ query: {} })
-    await sendMessage(msg)
+  if (convId.value > 0) {
     await loadConversation()
+    const msg = route.query.msg as string
+    if (msg) {
+      router.replace({ query: {} })
+      await sendMessage(msg)
+      await loadConversation()
+    }
   }
 })
 
 async function loadConversation() {
   try {
-    const { data } = await api.get(`/conversations/${convId}`)
+    const { data } = await api.get(`/conversations/${convId.value}`)
     if (data.code === 0) {
       messages.value = data.data.messages || []
       convTitle.value = data.data.title || ''
     }
   } catch {
-    ElMessage.error('加载会话失败')
+    // ignore
   }
 }
 
+async function ensureConversation(title?: string): Promise<number> {
+  if (convId.value > 0) return convId.value
+  const { data } = await api.post('/conversations', {
+    user_id: auth.userId,
+    title: title || '新对话',
+  })
+  const id = data.data.id
+  router.replace(`/chat/${id}`)
+  return id
+}
+
 async function sendMessage(text: string) {
+  if (!text.trim()) return
+  startMsg.value = ''
+  // Lazy-create conversation if needed, auto-title from first 10 chars
+  const cid = await ensureConversation(text.slice(0, 10))
 
   messages.value.push({
     id: 0, idx: messages.value.length + 1,
@@ -76,16 +122,14 @@ async function sendMessage(text: string) {
   scrollBottom()
 
   sse.value = { phase: '', step: '', detail: '', pct: 0 }
-  loading.value = true
 
   try {
-    for await (const evt of streamChat(convId, text)) {
+    for await (const evt of streamChat(cid, text)) {
       handleSseEvent(evt)
     }
   } catch (e: any) {
     ElMessage.error(e.message || '请求失败')
   } finally {
-    loading.value = false
     sse.value = { phase: '', step: '', detail: '', pct: 0 }
   }
 
@@ -137,9 +181,11 @@ function handleSseEvent(evt: { event: string; data: Record<string, any> }) {
 }
 
 async function handleUpload(files: File[]) {
+  const title = files.length > 0 ? files[0].name.slice(0, 20) : undefined
+  const cid = await ensureConversation(title)
   const form = new FormData()
   form.append('user_id', String(auth.userId))
-  form.append('conversation_id', String(convId))
+  form.append('conversation_id', String(cid))
   files.forEach((f) => form.append('files', f))
 
   try {
@@ -151,6 +197,11 @@ async function handleUpload(files: File[]) {
   } catch {
     ElMessage.error('上传失败')
   }
+}
+
+function onWelcomeUpload(file: UploadFile) {
+  if (file.raw) handleUpload([file.raw])
+  return false
 }
 
 function scrollBottom() {
@@ -171,77 +222,147 @@ function renderMsg(msg: MsgItem) {
 </script>
 
 <template>
-  <div class="chat-page">
-    <div class="chat-header">
-      <el-button text @click="router.push('/')">← 返回</el-button>
-      <span class="chat-title">{{ convTitle || '新会话' }}</span>
+  <div class="chat-layout">
+    <ConversationSidebar />
+
+    <div class="chat-main">
+      <div class="chat-header" v-if="convId">
+        <span class="chat-title">{{ convTitle || '新会话' }}</span>
+      </div>
+      <div class="chat-empty" v-if="!convId">
+        <div class="welcome">
+          <h2>PPTGenius</h2>
+          <p class="welcome-sub">AI 驱动的 PPT 生成助手，输入主题即可开始</p>
+          <div class="suggestions">
+            <div
+              v-for="s in suggestions"
+              :key="s"
+              class="suggest-item"
+              @click="sendMessage(s)"
+            >
+              {{ s }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="msg-container" id="msg-container" v-if="convId">
+        <template v-for="msg in messages" :key="msg.id || msg.idx">
+          <MessageBubble
+            v-if="renderMsg(msg) === 'text'"
+            :role="msg.role"
+            :content="msg.content"
+            :content_type="msg.content_type"
+            :created-at="msg.created_at"
+          />
+          <FileCard
+            v-else-if="renderMsg(msg) === 'file'"
+            :content="msg.content"
+            :created-at="msg.created_at"
+          />
+          <ImageCard
+            v-else-if="renderMsg(msg) === 'image'"
+            :content="msg.content"
+            :created-at="msg.created_at"
+          />
+          <DocumentCard
+            v-else-if="renderMsg(msg) === 'document'"
+            :doc-type="msg.content_type || ''"
+            :metadata="msg.metadata_json || {}"
+          />
+          <OutlineCard
+            v-else-if="renderMsg(msg) === 'outline'"
+            :outline-data="JSON.parse(msg.content)"
+          />
+          <PptCard
+            v-else-if="renderMsg(msg) === 'ppt'"
+            :ppt-data="JSON.parse(msg.content)"
+          />
+        </template>
+      </div>
+
+      <SseStatus
+        v-if="convId && (sse.phase || sse.step)"
+        :phase="sse.phase"
+        :step="sse.step"
+        :detail="sse.detail"
+        :pct="sse.pct"
+      />
+
+      <ChatInput @send="sendMessage" @upload="handleUpload" />
     </div>
-
-    <div class="msg-container" id="msg-container">
-      <template v-for="msg in messages" :key="msg.id || msg.idx">
-        <MessageBubble
-          v-if="renderMsg(msg) === 'text'"
-          :role="msg.role"
-          :content="msg.content"
-          :content_type="msg.content_type"
-          :created-at="msg.created_at"
-        />
-        <FileCard
-          v-else-if="renderMsg(msg) === 'file'"
-          :content="msg.content"
-          :created-at="msg.created_at"
-        />
-        <ImageCard
-          v-else-if="renderMsg(msg) === 'image'"
-          :content="msg.content"
-          :created-at="msg.created_at"
-        />
-        <DocumentCard
-          v-else-if="renderMsg(msg) === 'document'"
-          :doc-type="msg.content_type || ''"
-          :metadata="msg.metadata_json || {}"
-        />
-        <OutlineCard
-          v-else-if="renderMsg(msg) === 'outline'"
-          :outline-data="JSON.parse(msg.content)"
-        />
-        <PptCard
-          v-else-if="renderMsg(msg) === 'ppt'"
-          :ppt-data="JSON.parse(msg.content)"
-        />
-      </template>
-    </div>
-
-    <SseStatus
-      v-if="sse.phase || sse.step"
-      :phase="sse.phase"
-      :step="sse.step"
-      :detail="sse.detail"
-      :pct="sse.pct"
-    />
-
-    <ChatInput @send="sendMessage" @upload="handleUpload" />
   </div>
 </template>
 
 <style scoped>
-.chat-page {
+.chat-layout {
+  display: flex;
+  height: calc(100vh - 56px);
+}
+.chat-main {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 56px);
-  max-width: 900px;
-  margin: 0 auto;
+  min-width: 0;
 }
 .chat-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
   padding: 12px 24px;
-  background: #fff;
-  border-bottom: 1px solid #e4e7ed;
+  border-bottom: 1px solid #e8eaed;
+  background: #fafbfc;
 }
 .chat-title {
   font-weight: 600;
+  font-size: 15px;
+}
+.chat-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+.welcome {
+  text-align: center;
+  max-width: 560px;
+}
+.welcome h2 {
+  font-size: 32px;
+  color: #409eff;
+  margin-bottom: 8px;
+}
+.welcome-sub {
+  color: #909399;
+  margin-bottom: 32px;
+  font-size: 15px;
+}
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 28px;
+}
+.suggest-item {
+  padding: 10px 18px;
+  background: #fff;
+  border: 1px solid #dcdfe6;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #606266;
+  transition: border-color .2s, color .2s;
+}
+.suggest-item:hover {
+  border-color: #409eff;
+  color: #409eff;
+}
+.msg-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  margin: 0 auto;
 }
 .msg-container {
   flex: 1;

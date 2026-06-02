@@ -14,7 +14,7 @@ const router = createRouter({
   routes: [
     { path: '/login', name: 'Login', component: () => import('./views/LoginView.vue'), meta: { showHeader: false } },
     { path: '/register', name: 'Register', component: () => import('./views/RegisterView.vue'), meta: { showHeader: false } },
-    { path: '/', name: 'Home', component: () => import('./views/HomeView.vue') },
+    { path: '/', name: 'Home', component: () => import('./views/ChatView.vue') },
     { path: '/chat/:id', name: 'Chat', component: () => import('./views/ChatView.vue') },
     { path: '/outlines', name: 'OutlineList', component: () => import('./views/OutlineListView.vue') },
     { path: '/outline/:id', name: 'OutlineDetail', component: () => import('./views/OutlineDetail.vue') },

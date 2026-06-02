@@ -17,7 +17,6 @@ const navItems = [
   { path: '/presentations', label: 'PPT' },
   { path: '/cost', label: '费用' },
   { path: '/knowledge', label: '知识库' },
-  { path: '/test-page', label: 'TEST' },
 ]
 </script>
 
@@ -48,7 +47,7 @@ const navItems = [
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #fff;
+  background: #fafbfc;
   border-bottom: 1px solid #e4e7ed;
   padding: 0 24px;
   height: 56px;

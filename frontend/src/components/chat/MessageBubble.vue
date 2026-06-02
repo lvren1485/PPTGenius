@@ -62,8 +62,8 @@ function formatTime(d: string) {
   padding: 12px 20px;
 }
 .is-assistant .msg-body {
-  background: #fff;
-  border: 1px solid #e4e7ed;
+  background: #fafbfc;
+  border: 1px solid #e8eaed;
 }
 .msg-content {
   word-break: break-word;

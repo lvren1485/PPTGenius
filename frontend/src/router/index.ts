@@ -1,8 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { h } from 'vue'
 import { useAuthStore } from '../stores/auth'
-
-const TestPage = { template: '<div style="padding:40px"><h2>Test Page Works</h2></div>' }
 
 const router = createRouter({
   history: createWebHistory('/'),
@@ -22,7 +19,7 @@ const router = createRouter({
     {
       path: '/',
       name: 'Home',
-      component: () => import('../views/HomeView.vue'),
+      component: () => import('../views/ChatView.vue'),
     },
     {
       path: '/chat/:id',
@@ -63,11 +60,6 @@ const router = createRouter({
       path: '/knowledge',
       name: 'Knowledge',
       component: () => import('../views/KnowledgeView.vue'),
-    },
-    {
-      path: '/test-page',
-      name: 'TestPage',
-      component: TestPage,
     },
   ],
 })

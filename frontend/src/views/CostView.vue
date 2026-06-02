@@ -67,18 +67,18 @@ function goChat(cid: number) {
 
       <!-- By Date -->
       <h3 class="section-title">按日期</h3>
-      <el-table v-if="byDate.length" :data="byDate" stripe size="small">
-        <el-table-column prop="date" label="日期" width="120" />
-        <el-table-column prop="cost" label="费用" width="120">
+      <el-table v-if="byDate.length" :data="byDate" stripe size="small" style="width:fit-content">
+        <el-table-column prop="date" label="日期" width="200" />
+        <el-table-column prop="cost" label="费用" width="200">
           <template #default="{ row }">¥{{ Number(row.cost).toFixed(4) }}</template>
         </el-table-column>
-        <el-table-column prop="conversations" label="会话数" width="100" />
-        <el-table-column prop="messages" label="消息数" width="100" />
+        <el-table-column prop="conversations" label="会话数" width="200" />
+        <el-table-column prop="messages" label="消息数" width="200" />
       </el-table>
 
       <!-- By Conversation -->
       <h3 class="section-title">按会话</h3>
-      <el-table v-if="byConv.length" :data="byConv" stripe size="small">
+      <el-table v-if="byConv.length" :data="byConv" stripe size="small" style="width:100%">
         <el-table-column prop="title" label="标题" min-width="200">
           <template #default="{ row }">
             <el-button link type="primary" @click="goChat(row.conversation_id)">
@@ -104,7 +104,7 @@ function goChat(cid: number) {
 
 <style scoped>
 .cost-page {
-  max-width: 900px;
+  max-width: 1000px;
   margin: 0 auto;
   padding: 24px;
 }
