@@ -153,7 +153,7 @@ def test_load_evaluator_system():
 def test_load_rubric():
     rubric = load_rubric()
     assert rubric["name"]
-    assert len(rubric["dimensions"]) == 4
+    assert len(rubric["dimensions"]) == 5
     for dim in rubric["dimensions"]:
         assert "key" in dim
         assert "label" in dim
@@ -279,6 +279,7 @@ def test_submit_evaluation_tool_signature():
     assert "logic_coherence" in props
     assert "comprehensiveness" in props
     assert "visual_diversity" in props
+    assert "content_richness" in props
     assert "suggestions" in props
 
 

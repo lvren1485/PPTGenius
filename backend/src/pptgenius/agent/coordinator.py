@@ -439,7 +439,7 @@ async def _run_ppt(
         "ppt_mode": mode,
         "outline_slides": [],
         "design_rationales": [],
-        "file_path": f"output/{outline.title}.pptx",
+        "file_path": "",  # set by assembly node with {pres_id}.pptx
         "messages": [],
     }
 

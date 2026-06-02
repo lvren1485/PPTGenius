@@ -1,6 +1,6 @@
 {
   "name": "PPT大纲评分表",
-  "version": "2.0",
+  "version": "3.0",
   "total_max": 10.0,
   "dimensions": [
     {
@@ -58,23 +58,22 @@
         "4": "编排单一：大量页面全用 content+bullet_list，缺少 title/section/thanks 页类型，整体视觉无节奏变化",
         "2": "无编排意识：所有页面千篇一律，未区分页面类型，未考虑任何可视化呈现方式"
       }
-    }
-  ],
+    },
     {
-      "key": "content_depth",
-      "label": "内容充实度",
+      "key": "content_richness",
+      "label": "内容丰富度",
       "weight": 1.0,
       "max_score": 10,
-      "description": "每页 content_json 的文本量是否充足。detailed_content 字数、main_points 数量、key_data 是否有具体数值",
+      "description": "大纲的内容页描述长度和总页数是否充分。每个 content 页 detailed_content 应在 400 字左右。如果用户指定了页数要求，仅看文本长度（忽略页数指标）；如果用户未指定页数，则总页数 12-24 为佳，低于此指标扣分",
       "criteria": {
-        "10": "内容极其充实：content 页面 detailed_content >= 200字且 main_points >= 3条；数据页 key_data 有具体数值；每页 visual_note 详细具体(>=80字)；无空泛页面",
-        "8": "内容充实：大部分 content 页面 detailed_content 150-200字，main_points 2-3条，少量页面内容可更详实",
-        "6": "内容一般：部分 content 页面 detailed_content 100-150字或 main_points 仅1-2条，存在 key_data 为空的图表页",
-        "4": "内容薄弱：多数页面 detailed_content < 100字，大量使用模板式空泛文字，key_data 普遍为空",
-        "2": "内容空洞：页面仅有标题和1-2句简单描述，无法支撑完整 PPT 生成"
+        "10": "内容极其丰富：总页数 16-24 页，content 页面平均 detailed_content >= 400 字且 main_points >= 3 条；数据页 key_data 有具体数值；每页 visual_note 详实(>=80字)",
+        "8": "内容丰富：总页数 12-15 页或 25-28 页，content 页面平均 detailed_content 300-399 字，main_points 2-3 条",
+        "6": "内容一般：总页数 8-11 页，content 页面平均 detailed_content 200-299 字，main_points 1-2 条，存在 key_data 为空的图表页",
+        "4": "内容薄弱：总页数 5-7 页，多数 content 页面 detailed_content < 200 字，大量使用模板式空泛文字",
+        "2": "内容空洞：总页数 < 5 页或每页仅有标题和1-2句简单描述，无法支撑完整 PPT 生成"
       }
     }
   ],
-  "total_formula": "(structure_clarity + logic_coherence + comprehensiveness + visual_diversity + content_depth) / 5",
+  "total_formula": "(structure_clarity + logic_coherence + comprehensiveness + visual_diversity + content_richness) / 5",
   "pass_threshold_note": "总分 >= pass_score 即为合格（默认 8.0/10）"
 }

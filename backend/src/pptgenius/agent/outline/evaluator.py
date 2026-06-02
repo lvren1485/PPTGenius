@@ -80,6 +80,7 @@ def _make_submit_evaluation(db: Database, outline_id: int):
         logic_coherence: float,
         comprehensiveness: float,
         visual_diversity: float,
+        content_richness: float,
         suggestions: str,
     ) -> str:
         """Submit evaluation scores for the current outline. MUST be called last.
@@ -90,9 +91,10 @@ def _make_submit_evaluation(db: Database, outline_id: int):
         logic_coherence : float — Score for logic coherence (0-10).
         comprehensiveness : float — Score for comprehensiveness (0-10).
         visual_diversity : float — Score for visual element diversity (0-10).
+        content_richness : float — Score for content richness — slide count (12-24 ideal) and content page text length (400+ chars ideal); deduct if below thresholds (0-10).
         suggestions : str — Specific, actionable improvement suggestions.
         """
-        total = round((structure_clarity + logic_coherence + comprehensiveness + visual_diversity) / 4, 2)
+        total = round((structure_clarity + logic_coherence + comprehensiveness + visual_diversity + content_richness) / 5, 2)
         await db.update_outline_eval(outline_id, total)
         _log.info("evaluation submitted for outline %d: %.2f", outline_id, total)
         return json.dumps({
@@ -100,6 +102,7 @@ def _make_submit_evaluation(db: Database, outline_id: int):
             "logic_coherence": logic_coherence,
             "comprehensiveness": comprehensiveness,
             "visual_diversity": visual_diversity,
+            "content_richness": content_richness,
             "total": total,
             "suggestions": suggestions,
         })
@@ -138,6 +141,7 @@ async def evaluator_node(state: OutlineState, config: RunnableConfig) -> dict:
         slides_text=slides_text,
         design_rationale="\n---\n".join(design_rationales) if design_rationales else "",
         metrics=metrics,
+        user_query=state.get("query", ""),
     )
 
     agent = create_agent(

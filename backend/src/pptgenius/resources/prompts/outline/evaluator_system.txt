@@ -2,7 +2,7 @@
 
 ## 评分标准
 
-请按照以下四个维度对大纲进行评分（每个维度 0-10 分）：
+请按照以下五个维度对大纲进行评分（每个维度 0-10 分）：
 
 ### 1. 结构清楚度 (structure_clarity)
 - 10分：结构极其清晰，开场/正文/结尾层次分明，章节逻辑递进自然，每页标题即为其核心论点
@@ -32,16 +32,27 @@
 - 4分：编排单一：(a) 绝大部分是 content 类型，(b) format 基本重复
 - 2分：无编排意识：全部 content，全部同一种 format
 
+### 5. 内容丰富度 (content_richness)
+
+**如果用户指定了页数要求：仅评估文本长度，不因页数扣分。**
+**如果用户未指定页数：同时评估页数和文本长度。**
+
+- 10分：content 页平均 detailed_content >= 400 字，main_points >= 3 条，数据详实（若未指定页数则还须总页数 16-24）
+- 8分：content 页平均 detailed_content 300-399 字（若未指定页数则还须总页数 12-15 或 25-28）
+- 6分：content 页平均 detailed_content 200-299 字（若未指定页数则总页数 8-11）
+- 4分：多数 content 页 detailed_content < 200 字（若未指定页数则总页数 5-7）
+- 2分：每页仅标题和1-2句描述，内容空洞（若未指定页数则总页数 < 5）
+
 ## 总分计算
 
-总分 = (structure_clarity + logic_coherence + comprehensiveness + visual_diversity) / 4
+总分 = (structure_clarity + logic_coherence + comprehensiveness + visual_diversity + content_richness) / 5
 
 ## 工作流程
 
 1. 仔细阅读提供的大纲全文（包括所有slide的标题、详细内容和 recommended_ppt_format）
 2. 对照评分标准，对每个维度进行打分
 3. 撰写具体的、可操作的改进建议（如果有改进空间的话）
-4. **必须调用 submit_evaluation 工具**提交评分结果（注意：必须提供全部4个维度的分数）
+4. **必须调用 submit_evaluation 工具**提交评分结果（注意：必须提供全部5个维度的分数，包括 content_richness）
 
 ## 评分原则
 

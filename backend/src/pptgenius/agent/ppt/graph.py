@@ -129,7 +129,7 @@ async def _assembly_node(state: PPTState, config) -> dict:
                 "notes": sf.get("notes", ""),
                 "elements": sf.get("elements", []),
             })
-            print(f'  Slide {s.slide_index}: super_freedom — {len(sf.get("elements", []))} elements')
+            _log.debug('  Slide %d: super_freedom — %d elements', s.slide_index, len(sf.get("elements", [])))
             continue
 
         # Sub-agent / freedom: merge layout + agent outputs
@@ -180,7 +180,7 @@ async def _assembly_node(state: PPTState, config) -> dict:
     wm = WorkspaceManager()
     output_dir = wm.get_output_dir(state["conversation_id"])
     os.makedirs(output_dir, exist_ok=True)
-    filename = (outline.title if outline else "presentation") + ".pptx"
+    filename = f"{pres_id}.pptx"
     file_path = os.path.join(output_dir, filename)
 
     result = await generate_ppt(instruction, file_path)
@@ -200,8 +200,8 @@ async def _assembly_node(state: PPTState, config) -> dict:
             "id": outline.id, "title": outline.title, "version": outline.version,
             "slide_count": outline.slide_count, "eval_score": outline.eval_score,
             "slides": [
-                {"slide_index": os.slide_index, "title": os.title,
-                 "layout_type": os.layout_type, "content_json": os.content_json}
+                {"slide_index": ol_s.slide_index, "title": ol_s.title,
+                 "layout_type": ol_s.layout_type, "content_json": ol_s.content_json}
                 for ol_s in outline_slides
             ],
         }
