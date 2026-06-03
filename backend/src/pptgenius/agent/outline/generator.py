@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 
 from langchain.agents import create_agent
-from langchain_core.messages import HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
@@ -183,7 +183,7 @@ def _make_fetch_web(db: Database, user_id: int, conv_id: int, fetch_count: list[
                 f"标题: {result['title']}\n"
                 f"域名: {result['domain']}\n"
                 f"内容长度: {result['char_count']} 字符\n"
-                f"内容预览:\n{result['text'][:2000]}"
+                f"内容预览:\n{result['text'][:1000]}"
             )
         return f"抓取失败或内容过短。标题: {result.get('title', 'N/A')}"
 
@@ -297,12 +297,15 @@ async def generator_node(state: OutlineState, config: RunnableConfig) -> dict:
     final_outline_id, rationale, was_called = get_result()
     new_iteration = state.get("iteration", 0) + 1
 
-    # If write_outline wasn't called, retry once with an explicit instruction
+    # If write_outline wasn't called, retry once with an explicit instruction.
+    # Strip dangling tool_calls (AIMessage with tool_calls but no matching
+    # ToolMessage) — DeepSeek rejects these with 400.
     if not was_called:
         _log.warning("write_outline not called — retrying with explicit instruction")
         retry_msg = HumanMessage(content="请立即调用 write_outline 工具保存大纲。不要再搜索或分析，直接保存。")
+        clean_msgs = _strip_dangling_tool_calls(result["messages"])
         result2 = await agent.ainvoke(
-            {"messages": list(result["messages"]) + [retry_msg]},
+            {"messages": clean_msgs + [retry_msg]},
             config=config,
         )
         final_outline_id, rationale, was_called = get_result()
@@ -316,3 +319,15 @@ async def generator_node(state: OutlineState, config: RunnableConfig) -> dict:
         "design_rationales": [rationale] if rationale else [],
         "messages": result["messages"],
     }
+
+
+def _strip_dangling_tool_calls(messages: list) -> list:
+    """Remove trailing AIMessages with tool_calls that lack matching ToolMessages.
+
+    DeepSeek rejects message histories where an assistant message has tool_calls
+    but no subsequent ToolMessage responses (400 insufficient tool messages).
+    """
+    cleaned = list(messages)
+    while cleaned and isinstance(cleaned[-1], AIMessage) and cleaned[-1].tool_calls:
+        cleaned.pop()
+    return cleaned

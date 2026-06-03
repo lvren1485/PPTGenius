@@ -65,7 +65,7 @@ def _extract_domain(url: str) -> str:
     return m.group(1) if m else ""
 
 
-async def fetch_page(url: str, timeout: int = 15) -> dict:
+async def fetch_page(url: str, timeout: int = 5) -> dict:
     """Fetch *url* and return ``{url, title, domain, text, char_count}``."""
     try:
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
