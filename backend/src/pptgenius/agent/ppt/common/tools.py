@@ -241,36 +241,3 @@ def _make_submit_shape_elements(db: Database, presentation_id: int, slide_index:
         return f"✅ 已保存 {len(elements)} 个形状元素。"
 
     return submit_shape_elements
-
-
-def _make_submit_slide_elements(db: Database, presentation_id: int, slide_index: int):
-    """Freedom mode: submit all elements for a slide at once."""
-    @tool
-    async def submit_slide_elements(elements: list[dict]) -> str:
-        """Submit ALL elements for this slide (textbox, chart, table, picture, shape).
-        Freedom mode — one agent generates everything.  Validates all elements.
-
-        Parameters
-        ----------
-        elements : list[dict] — Array of element objects.  Each element's type
-            determines which schema it's validated against.
-        """
-        result = validate_elements(elements)
-        if not result.is_valid:
-            error_details = "\n".join(
-                f"  - [{e['path']}] {e['error']}" for e in result.errors[:15]
-            )
-            return (
-                f"❌ 校验失败 ({len(result.errors)} 个错误):\n{error_details}\n"
-                f"请根据错误修正后重新提交。"
-            )
-
-        await db.set_slide_agent_output(
-            presentation_id=presentation_id,
-            slide_index=slide_index,
-            agent_type="freedom",
-            output={"elements": elements},
-        )
-        return f"✅ 已保存整页 {len(elements)} 个元素。"
-
-    return submit_slide_elements

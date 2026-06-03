@@ -1,7 +1,7 @@
 """Phase 2 Dispatcher — parallel slide processing with concurrency limit.
 
-Fans out process_single_slide() calls across all slides. Each slide
-processes its sub-agents (text/chart/shape) in parallel internally.
+Fans out per-slide super_freedom agent calls across all slides. Each slide
+gets its own DB session. Concurrency bounded by asyncio.Semaphore.
 
 The dispatcher is pure code (no LLM) — single node, no loopback.
 """
@@ -15,9 +15,8 @@ from typing import Any
 from pptgenius.infrastructure.db import Database, get_session_manager
 from pptgenius.infrastructure.utils import get_logger
 
-from ..common.layout_resolver import select_layout
 from ..state import PPTState
-from .supervisor import Phase2Timing, process_single_slide
+from .supervisor import Phase2Timing
 
 _log = get_logger("pptgenius.agent.ppt.dispatcher")
 
@@ -29,8 +28,7 @@ async def dispatcher_node(state: PPTState, config) -> dict:
     """Process all slides in parallel (bounded by semaphore).
 
     Each slide gets its own DB session via SessionManager for the
-    slide-level DB operations (notes, status update). Sub-agents within
-    a slide further get their own isolated sessions.
+    slide-level DB operations (notes, status update).
     """
     db: Database = config["configurable"]["db"]
     sm = get_session_manager()
@@ -38,7 +36,6 @@ async def dispatcher_node(state: PPTState, config) -> dict:
 
     slides: list[dict] = state["outline_slides"]
     total = state["total_slides"]
-    mode: str = state.get("ppt_mode", "sub_agent")
 
     if total == 0:
         _log.warning("No slides to process")
@@ -56,8 +53,7 @@ async def dispatcher_node(state: PPTState, config) -> dict:
         except Exception as exc:
             _log.warning("Failed to sync slides style: %s", exc)
 
-    _log.info("Dispatcher: %d slides, mode=%s, concurrency=%d",
-              total, mode, _MAX_CONCURRENT_SLIDES)
+    _log.info("Dispatcher: %d slides, concurrency=%d", total, _MAX_CONCURRENT_SLIDES)
 
     # Event queue for real-time SSE streaming from parallel tasks
     event_queue: asyncio.Queue = asyncio.Queue()
@@ -79,75 +75,52 @@ async def dispatcher_node(state: PPTState, config) -> dict:
     sem = asyncio.Semaphore(_MAX_CONCURRENT_SLIDES)
 
     async def _process_one(slide: dict) -> dict | None:
-        """Process one slide through the appropriate mode pipeline.
+        """Process one slide through super_freedom pipeline.
         Each slide gets its OWN DB session to avoid concurrent-access corruption."""
         async with sem:
             slide_index = slide["slide_index"]
             _log.info("Dispatching slide %d/%d: %s", slide_index + 1, total,
                       slide.get("title", "?")[:40])
 
-            # Emit slide_start for super_freedom
-            if mode == "super_freedom":
-                await event_queue.put({
-                    "type": "slide_start",
-                    "slide_index": slide_index,
-                    "total": total,
-                    "title": slide.get("title", ""),
-                })
+            await event_queue.put({
+                "type": "slide_start",
+                "slide_index": slide_index,
+                "total": total,
+                "title": slide.get("title", ""),
+            })
 
-            # Each slide gets its own isolated DB session
             slide_db = sm.new_session()
             t0 = time.monotonic()
             try:
-                result: dict[str, Any]
-                if mode == "super_freedom":
-                    result = await _process_super_freedom_slide(
-                        db=slide_db, slide=slide, all_slides=slides,
-                        state=state, config=config,
-                    )
-                elif mode == "freedom":
-                    result = await _process_freedom_slide(
-                        db=slide_db, sm=sm, slide=slide, all_slides=slides,
-                        state=state, config=config,
-                    )
-                else:
-                    result = await process_single_slide(
-                        db=slide_db, sm=sm, slide=slide, all_slides=slides,
-                        selected_layouts=state.get("selected_layouts", {}),
-                        presentation_id=state["presentation_id"],
-                        color_scheme_id=state.get("color_scheme_id"),
-                        template_id=state.get("template_id"),
-                        conv_id=state["conversation_id"],
-                        config=config,
-                    )
+                result = await _process_super_freedom_slide(
+                    db=slide_db, slide=slide, all_slides=slides,
+                    state=state, config=config,
+                )
                 elapsed = time.monotonic() - t0
                 _log.info("Slide %d/%d done in %.1fs %s",
                           slide_index + 1, total, elapsed,
                           "ERROR" if result.get("has_error") else "OK")
 
-                # Emit slide_end for super_freedom
-                if mode == "super_freedom":
-                    await event_queue.put({
-                        "type": "slide_end",
-                        "slide_index": slide_index,
-                        "total": total,
-                        "elapsed": round(elapsed, 2),
-                        "ok": not result.get("has_error"),
-                    })
+                await event_queue.put({
+                    "type": "slide_end",
+                    "slide_index": slide_index,
+                    "total": total,
+                    "elapsed": round(elapsed, 2),
+                    "ok": not result.get("has_error"),
+                })
 
                 return result
             except Exception as exc:
                 elapsed = time.monotonic() - t0
                 _log.error("Slide %d/%d crashed in %.1fs: %s",
                            slide_index + 1, total, elapsed, exc)
-                if mode == "super_freedom":
-                    await event_queue.put({
-                        "type": "slide_end",
-                        "slide_index": slide_index,
-                        "total": total,
-                        "elapsed": round(elapsed, 2),
-                        "ok": False,
-                    })
+                await event_queue.put({
+                    "type": "slide_end",
+                    "slide_index": slide_index,
+                    "total": total,
+                    "elapsed": round(elapsed, 2),
+                    "ok": False,
+                })
                 return {"slide_index": slide_index, "elapsed": elapsed,
                         "has_error": True, "error": str(exc)}
             finally:
@@ -200,67 +173,6 @@ def _build_neighbor_context(all_slides: list[dict], slide_index: int, window: in
         parts.append(f"后{i - slide_index}页: \"{s.get('title', '')}\" "
                      f"(layout={s.get('layout_type', 'content')})")
     return "\n".join(parts) if parts else "（独立页面，无相邻页）"
-
-
-async def _process_freedom_slide(
-    *,
-    db: Database,
-    sm,
-    slide: dict,
-    all_slides: list[dict],
-    state: PPTState,
-    config,
-) -> dict:
-    """Process one slide in Freedom mode (single agent generates everything)."""
-    from ..phase2_freedom.freedom_agent import run_freedom_agent
-
-    slide_index = slide["slide_index"]
-    layout_name = select_layout(slide)
-
-    selected_layouts = state.get("selected_layouts", {})
-    layout_def = selected_layouts.get(layout_name, {})
-    from ..common.layout_resolver import get_container_bounds
-    container_bounds = get_container_bounds(layout_def)
-
-    neighbor_ctx = _build_neighbor_context(all_slides, slide_index)
-    enriched_slide = {**slide, "_neighbor_context": neighbor_ctx}
-
-    # Create presentation_slide if needed (freedom mode may not pre-create)
-    existing = await db.get_slides_by_presentation_id(state["presentation_id"])
-    if not any(s.slide_index == slide_index for s in existing):
-        await db.create_presentation_slide(
-            presentation_id=state["presentation_id"],
-            slide_index=slide_index,
-            layout_name=layout_name,
-            color_scheme_id=state.get("color_scheme_id"),
-            template_id=state.get("template_id"),
-        )
-
-    t0 = time.monotonic()
-    try:
-        await run_freedom_agent(
-            db=db, slide=enriched_slide, layout_name=layout_name,
-            container_bounds=container_bounds,
-            presentation_id=state["presentation_id"],
-            slide_index=slide_index,
-            color_scheme_id=state.get("color_scheme_id"),
-            conv_id=state["conversation_id"],
-            config=config,
-        )
-        await db.update_slide_status(state["presentation_id"], slide_index, "completed")
-        return {"slide_index": slide_index, "elapsed": time.monotonic() - t0,
-                "agent_times": {"freedom": time.monotonic() - t0}, "has_error": False}
-    except Exception as exc:
-        _log.error("Freedom slide %d failed: %s", slide_index, exc)
-        try:
-            await db.update_slide_status(
-                state["presentation_id"], slide_index, "error",
-                error_message=str(exc)[:500],
-            )
-        except Exception:
-            pass
-        return {"slide_index": slide_index, "elapsed": time.monotonic() - t0,
-                "agent_times": {}, "has_error": True}
 
 
 async def _process_super_freedom_slide(

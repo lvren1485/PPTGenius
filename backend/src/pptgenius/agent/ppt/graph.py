@@ -1,8 +1,8 @@
 """PPT agent graph — two-phase pipeline with parallel slide dispatch.
 
 Phase 1: StyleAgent selects color_scheme + layout
-Phase 2: Dispatcher fans out per-slide processing (parallel, semaphore-bounded)
-Assembly: merge all agent outputs → validate → render .pptx → snapshot
+Phase 2: Dispatcher fans out per-slide super_freedom agents (parallel, semaphore-bounded)
+Assembly: collect agent outputs → render .pptx → snapshot
 """
 
 from __future__ import annotations
@@ -96,8 +96,6 @@ async def _create_presentation_node(state: PPTState, config) -> dict:
 async def _assembly_node(state: PPTState, config) -> dict:
     """Assembly: merge layout + agent outputs → validate → render .pptx → snapshot."""
     from pptgenius.infrastructure.db import Database
-    from pptgenius.agent.ppt.common.layout_resolver import interpolate_layout
-    from pptgenius.infrastructure.config import RESOURCES_DIR
 
     db: Database = config["configurable"]["db"]
     pres_id = state["presentation_id"]
@@ -107,66 +105,18 @@ async def _assembly_node(state: PPTState, config) -> dict:
     outline = await db.get_outline(state["outline_id"])
     slides = await db.get_slides_by_presentation_id(pres_id)
 
-    # ── load color scheme & layouts ──
-    cs_id = state.get("color_scheme_id") or (pres.color_scheme_id if pres else None)
-    color_scheme = await db.get_color_scheme(cs_id) if cs_id else None
-    cs_data = {"colors": color_scheme.colors_json} if color_scheme else {}
-
-    selected_layouts = state.get("selected_layouts", {})
-    ppt_mode = state.get("ppt_mode", "sub_agent")
-
     # ── build instruction JSON for PPT generator ──
     ppt_slides: list[dict] = []
     for s in sorted(slides, key=lambda x: x.slide_index):
         outputs = s.agent_outputs or {}
-
-        # Super-freedom: agent already generated complete slide (background + elements + notes)
-        if ppt_mode == "super_freedom" and "super_freedom" in outputs:
-            sf = outputs["super_freedom"]
-            ppt_slides.append({
-                "layout": "blank",
-                "background": sf.get("background"),
-                "notes": sf.get("notes", ""),
-                "elements": sf.get("elements", []),
-            })
-            _log.debug('  Slide %d: super_freedom — %d elements', s.slide_index, len(sf.get("elements", [])))
-            continue
-
-        # Sub-agent / freedom: merge layout + agent outputs
-        layout_def = selected_layouts.get(s.layout_name, {})
-        if not layout_def:
-            layout_def = _load_layout_file(s.layout_name)
-        layout = interpolate_layout(layout_def, cs_data)
-
-        # Collect elements: layout decorations + agent outputs
-        # (fixed_elements are templates; agents generate actual content)
-        elements: list[dict] = []
-
-        # Layout-level decorations (background shapes)
-        for dec in layout.get("decorations", []):
-            elements.append({**dec, "type": dec.get("type", "shape")})
-
-        # Container decorations
-        for container in layout.get("containers", []):
-            for dec in container.get("decorations", []):
-                elements.append({**dec, "type": "shape"})
-
-        # Agent outputs: text + chart + shape (or freedom)
-        for agent_type, output in outputs.items():
-            if agent_type == "_notes":
-                continue
-            agent_elements = output.get("elements") or output.get("element")
-            if agent_elements:
-                if isinstance(agent_elements, dict):
-                    agent_elements = [agent_elements]
-                elements.extend(agent_elements)
-
+        sf = outputs.get("super_freedom", {})
         ppt_slides.append({
-            "layout": layout.get("ppt_layout", "blank"),
-            "background": layout.get("background"),
-            "notes": outputs.get("_notes", {}).get("notes") if "_notes" in outputs else "",
-            "elements": elements,
+            "layout": "blank",
+            "background": sf.get("background"),
+            "notes": sf.get("notes", ""),
+            "elements": sf.get("elements", []),
         })
+        _log.debug('  Slide %d: super_freedom — %d elements', s.slide_index, len(sf.get("elements", [])))
 
     instruction = {
         "meta": {"slide_width": 13.333, "slide_height": 7.5, "language": "zh"},
@@ -233,16 +183,6 @@ async def _assembly_node(state: PPTState, config) -> dict:
         slide_count=len(slides),
     )
     await db.update_presentation_status(pres_id, "completed")
-    return {}
-
-
-def _load_layout_file(layout_name: str) -> dict:
-    """Load a layout JSON file from the resources directory."""
-    import json
-    from pptgenius.infrastructure.config import RESOURCES_DIR
-    path = RESOURCES_DIR / "layouts" / f"{layout_name}.json"
-    if path.exists():
-        return json.loads(path.read_text(encoding="utf-8"))
     return {}
 
 

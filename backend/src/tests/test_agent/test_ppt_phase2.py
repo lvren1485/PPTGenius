@@ -1,4 +1,7 @@
-"""Tests for Phase 2 — supervisor logic, sub-agent dispatch, freedom agent logic.
+"""Tests for Phase 2 — deprecated sub-agent / freedom pipelines + super_freedom.
+
+sub_agent and freedom pipelines are DEPRECATED. These tests remain for
+regression coverage of code that is kept for reference.
 
 All tests are API-call-free (no LLM required).
 """
@@ -430,23 +433,3 @@ class TestSubmitTools:
         })
         assert "✅" in result or "校验失败" in result
 
-    @pytest.mark.asyncio
-    async def test_submit_slide_elements_freedom(self):
-        from pptgenius.agent.ppt.common.tools import _make_submit_slide_elements
-
-        db = MagicMock()
-        db.set_slide_agent_output = AsyncMock()
-
-        tool = _make_submit_slide_elements(db, presentation_id=1, slide_index=0)
-
-        result = await tool.ainvoke({
-            "elements": [
-                {
-                    "type": "textbox",
-                    "position": {"left": 1.0, "top": 1.0, "width": 11.0, "height": 1.0},
-                    "content": [{"paragraph": {"alignment": "left", "runs": [{"text": "Title"}]}}],
-                },
-            ]
-        })
-        # Check result is meaningful
-        assert len(result) > 10

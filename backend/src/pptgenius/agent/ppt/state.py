@@ -29,7 +29,7 @@ class PPTState(TypedDict):
     # ── Phase 2 progress ──
     current_slide_index: int
     total_slides: int
-    ppt_mode: str                             # "sub_agent" | "freedom"
+    ppt_mode: str                             # "super_freedom"
 
     # ── context ──
     outline_slides: list[dict]

@@ -428,7 +428,7 @@ async def _run_ppt(
 
     cfg = get_settings().agent
     ppt_mode = getattr(cfg, "ppt", None)
-    mode = getattr(ppt_mode, "mode", "sub_agent") if ppt_mode else "sub_agent"
+    mode = getattr(ppt_mode, "mode", "super_freedom") if ppt_mode else "super_freedom"
 
     state: PPTState = {
         "user_id": user_id,

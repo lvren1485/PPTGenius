@@ -31,7 +31,7 @@ def _base_state(**overrides) -> PPTState:
         "style_rationale": "",
         "current_slide_index": 0,
         "total_slides": 5,
-        "ppt_mode": "sub_agent",
+        "ppt_mode": "super_freedom",
         "outline_slides": [],
         "design_rationales": [],
         "file_path": "output/test.pptx",
@@ -106,18 +106,14 @@ class TestPPTState:
             "style_rationale": "",
             "current_slide_index": 0,
             "total_slides": 0,
-            "ppt_mode": "sub_agent",
+            "ppt_mode": "super_freedom",
             "outline_slides": [],
             "design_rationales": [],
             "file_path": "",
             "messages": [],
         }
-        assert state["ppt_mode"] == "sub_agent"
+        assert state["ppt_mode"] == "super_freedom"
         assert state["is_modify"] is False
-
-    def test_freedom_mode_state(self):
-        state = _base_state(ppt_mode="freedom")
-        assert state["ppt_mode"] == "freedom"
 
     def test_design_rationales_accumulate(self):
         """operator.add should concatenate lists."""

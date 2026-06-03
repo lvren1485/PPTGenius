@@ -28,7 +28,7 @@ class OutlineAgentConfig(BaseModel):
 
 
 class PPTAgentConfig(BaseModel):
-    mode: str = "sub_agent"  # sub_agent | freedom | super_freedom
+    mode: str = "super_freedom"  # super_freedom
     max_retries_per_slide: int = 3
     slide_timeout_seconds: int = 120
 
