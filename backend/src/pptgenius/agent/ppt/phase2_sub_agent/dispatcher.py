@@ -59,6 +59,23 @@ async def dispatcher_node(state: PPTState, config) -> dict:
     _log.info("Dispatcher: %d slides, mode=%s, concurrency=%d",
               total, mode, _MAX_CONCURRENT_SLIDES)
 
+    # Event queue for real-time SSE streaming from parallel tasks
+    event_queue: asyncio.Queue = asyncio.Queue()
+
+    async def _emit_events():
+        """Forward queued events to LangGraph stream writer (runs in graph context)."""
+        try:
+            writer = get_stream_writer()
+        except RuntimeError:
+            return
+        while True:
+            event = await event_queue.get()
+            if event is None:  # sentinel
+                break
+            writer(event)
+
+    emitter_task = asyncio.create_task(_emit_events())
+
     sem = asyncio.Semaphore(_MAX_CONCURRENT_SLIDES)
 
     async def _process_one(slide: dict) -> dict | None:
@@ -68,6 +85,15 @@ async def dispatcher_node(state: PPTState, config) -> dict:
             slide_index = slide["slide_index"]
             _log.info("Dispatching slide %d/%d: %s", slide_index + 1, total,
                       slide.get("title", "?")[:40])
+
+            # Emit slide_start for super_freedom
+            if mode == "super_freedom":
+                await event_queue.put({
+                    "type": "slide_start",
+                    "slide_index": slide_index,
+                    "total": total,
+                    "title": slide.get("title", ""),
+                })
 
             # Each slide gets its own isolated DB session
             slide_db = sm.new_session()
@@ -98,11 +124,30 @@ async def dispatcher_node(state: PPTState, config) -> dict:
                 _log.info("Slide %d/%d done in %.1fs %s",
                           slide_index + 1, total, elapsed,
                           "ERROR" if result.get("has_error") else "OK")
+
+                # Emit slide_end for super_freedom
+                if mode == "super_freedom":
+                    await event_queue.put({
+                        "type": "slide_end",
+                        "slide_index": slide_index,
+                        "total": total,
+                        "elapsed": round(elapsed, 2),
+                        "ok": not result.get("has_error"),
+                    })
+
                 return result
             except Exception as exc:
                 elapsed = time.monotonic() - t0
                 _log.error("Slide %d/%d crashed in %.1fs: %s",
                            slide_index + 1, total, elapsed, exc)
+                if mode == "super_freedom":
+                    await event_queue.put({
+                        "type": "slide_end",
+                        "slide_index": slide_index,
+                        "total": total,
+                        "elapsed": round(elapsed, 2),
+                        "ok": False,
+                    })
                 return {"slide_index": slide_index, "elapsed": elapsed,
                         "has_error": True, "error": str(exc)}
             finally:
@@ -111,6 +156,10 @@ async def dispatcher_node(state: PPTState, config) -> dict:
     # Fan out all slides (semaphore limits actual concurrency)
     tasks = [_process_one(s) for s in slides]
     results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    # Stop the event emitter
+    await event_queue.put(None)
+    await emitter_task
 
     # Collect timing
     ok = 0
@@ -231,7 +280,7 @@ async def _process_super_freedom_slide(
 
     t0 = time.monotonic()
     try:
-        await run_super_freedom_agent(
+        submitted = await run_super_freedom_agent(
             db=db, slide=enriched_slide,
             selected_layouts=state.get("selected_layouts", {}),
             presentation_id=state["presentation_id"],
@@ -240,9 +289,16 @@ async def _process_super_freedom_slide(
             conv_id=state["conversation_id"],
             config=config,
         )
-        await db.update_slide_status(state["presentation_id"], slide_index, "completed")
+        status = "completed" if submitted else "error"
+        if not submitted:
+            _log.error("SuperFreedom slide %d: submit_slide_instruction was never called", slide_index)
+        await db.update_slide_status(
+            state["presentation_id"], slide_index, status,
+            error_message="" if submitted else "submit_slide_instruction was never called",
+        )
         return {"slide_index": slide_index, "elapsed": time.monotonic() - t0,
-                "agent_times": {"super_freedom": time.monotonic() - t0}, "has_error": False}
+                "agent_times": {"super_freedom": time.monotonic() - t0},
+                "has_error": not submitted}
     except Exception as exc:
         _log.error("SuperFreedom slide %d failed: %s", slide_index, exc)
         try:
