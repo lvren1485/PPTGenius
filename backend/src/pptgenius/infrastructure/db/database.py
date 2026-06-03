@@ -78,6 +78,7 @@ class Database:
     async def update_slide_status(self, *a, **kw): return await ppt_repo.update_slide_status(self.db, *a, **kw)
     async def update_slides_style(self, *a, **kw): return await ppt_repo.update_slides_style(self.db, *a, **kw)
     async def increment_slide_retry(self, *a, **kw): return await ppt_repo.increment_slide_retry(self.db, *a, **kw)
+    async def increment_slide_retry_by_index(self, *a, **kw): return await ppt_repo.increment_slide_retry_by_index(self.db, *a, **kw)
     async def set_slide_chart_data(self, *a, **kw): return await ppt_repo.set_slide_chart_data(self.db, *a, **kw)
     async def set_slide_table_data(self, *a, **kw): return await ppt_repo.set_slide_table_data(self.db, *a, **kw)
     async def set_slide_image_paths(self, *a, **kw): return await ppt_repo.set_slide_image_paths(self.db, *a, **kw)

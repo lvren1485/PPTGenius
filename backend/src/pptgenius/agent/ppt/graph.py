@@ -14,7 +14,7 @@ from langgraph.graph import END, START, StateGraph
 from pptgenius.infrastructure.utils import get_logger
 
 from .phase1_style import style_agent_node
-from .phase2_sub_agent.dispatcher import dispatcher_node
+from .dispatcher import dispatcher_node
 from .state import PPTState
 
 _log = get_logger("pptgenius.agent.ppt")

@@ -152,4 +152,4 @@
 1. 分析 slide 的 content_json，确定页面类型和内容重点
 2. 如需图表数据 → read_instruction("chart/...") 查看图表类型
 3. 如需装饰图标 → search_icons("keyword") 搜索
-4. 设计完整 slide → **必须调用 submit_slide_instruction 提交**
+4. 设计完整 slide → **必须调用 submit_slide_instruction 提交**(**不提交则设计无效，并会要求重试**)

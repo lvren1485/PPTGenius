@@ -15,6 +15,15 @@ async def create_knowledge_file(
     file_size: int | None = None,
     source_type: str = "upload",
 ) -> KnowledgeFile:
+    # Check if already exists (common: web fetch duplicate, or concurrent ingest)
+    from sqlalchemy import select as _sel
+    result = await db.execute(
+        _sel(KnowledgeFile).where(KnowledgeFile.file_path == file_path)
+    )
+    existing = result.scalar_one_or_none()
+    if existing is not None:
+        return existing
+
     kf = KnowledgeFile(
         user_id=user_id,
         filename=filename,
@@ -25,19 +34,23 @@ async def create_knowledge_file(
     )
     db.add(kf)
     try:
-        await db.commit()
+        await db.flush()
         await db.refresh(kf)
+        await db.commit()
     except Exception:
-        await db.rollback()
-        # Re-query by file_path (commit failed, likely duplicate)
-        from sqlalchemy import select as _sel
+        # flush/commit failed (dup key or session conflict) — rollback
+        # is unsafe when another flush is in progress, so just query again
+        try:
+            await db.rollback()
+        except Exception:
+            pass
         result = await db.execute(
             _sel(KnowledgeFile).where(KnowledgeFile.file_path == file_path)
         )
         existing = result.scalar_one_or_none()
         if existing is not None:
             return existing
-        # Retry once with flush-only
+        # Last attempt: just add + flush
         kf2 = KnowledgeFile(
             user_id=user_id, filename=filename, file_path=file_path,
             file_type=file_type, file_size=file_size, source_type=source_type,

@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 
 from langchain.agents import create_agent
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
@@ -67,6 +67,7 @@ def _make_submit_slide_instruction(db: Database, presentation_id: int, slide_ind
         # Validate all elements
         result = validate_elements(elements)
         if not result.is_valid:
+            await db.increment_slide_retry_by_index(presentation_id, slide_index)
             error_details = "\n".join(
                 f"  - [{e['path']}] {e['error']}" for e in result.errors[:15]
             )
@@ -79,8 +80,10 @@ def _make_submit_slide_instruction(db: Database, presentation_id: int, slide_ind
         if background:
             bg_type = background.get("type", "")
             if bg_type not in ("solid", "gradient", "image", "no_fill"):
+                await db.increment_slide_retry_by_index(presentation_id, slide_index)
                 return f"❌ background.type 无效: '{bg_type}'。有效值: solid, gradient, image, no_fill"
             if bg_type == "gradient" and not background.get("gradient_stops"):
+                await db.increment_slide_retry_by_index(presentation_id, slide_index)
                 return "❌ gradient 背景必须包含 gradient_stops。"
 
         # Store as complete slide instruction
@@ -152,32 +155,33 @@ async def run_super_freedom_agent(
         middleware=[TokenCountingMiddleware(conv_id)],
     )
 
+    # Increase recursion_limit — 25 is too low for multi-tool slide design loops
+    agent_config = {**config, "recursion_limit": 50}
     result = await agent.ainvoke(
         {"messages": [HumanMessage(content=user_prompt)]},
-        config=config,
+        config=agent_config,
     )
 
-    # Force submit_slide_instruction via bind_tools if not called voluntarily
+    # Retry if submit_slide_instruction wasn't called.
+    # DeepSeek thinking mode doesn't support tool_choice, so we use a clean
+    # text retry with a fresh agent that only has the submit tool — no
+    # search_icons / read_instruction to distract it.
     if not was_called[0]:
-        _log.warning("submit_slide_instruction not called for slide %d — forcing via tool_choice", slide_index)
-        cfg = get_settings().llm
-        force_model = ChatOpenAI(
-            model=cfg.model, base_url=cfg.base_url, api_key=cfg.api_key,
-            temperature=0.3, max_tokens=8000,
-        ).bind_tools([submit_tool], tool_choice="submit_slide_instruction")
-
-        retry_msg = HumanMessage(
-            content="请立即提交当前 slide 的完整设计。调用 submit_slide_instruction。"
+        _log.warning("submit_slide_instruction not called for slide %d — retrying", slide_index)
+        retry_agent = create_agent(
+            model=_get_model(),
+            tools=[submit_tool],
+            system_prompt="你必须立即调用 submit_slide_instruction 提交当前 slide 的完整设计。直接提交，不要搜索或查阅任何资料。",
+            middleware=[TokenCountingMiddleware(conv_id)],
         )
-        response = await force_model.ainvoke(
-            list(result["messages"]) + [retry_msg],
+        await retry_agent.ainvoke(
+            {"messages": [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=user_prompt),
+                HumanMessage(content="请立即调用 submit_slide_instruction 提交当前 slide 的完整设计。不要再做任何搜索或浏览，直接提交。"),
+            ]},
             config=config,
         )
-        if response.tool_calls:
-            for tc in response.tool_calls:
-                if tc["name"] == "submit_slide_instruction":
-                    await submit_tool.ainvoke(tc["args"], config=config)
-                    break
 
     _log.info("SuperFreedomAgent done for slide %d (submitted=%s)", slide_index, was_called[0])
     return was_called[0]

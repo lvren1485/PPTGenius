@@ -64,6 +64,7 @@ LABEL_POSITION_MAP = {
     "inside_end": XL_LABEL_POSITION.INSIDE_END,
     "center": XL_LABEL_POSITION.CENTER,
     "inside_base": XL_LABEL_POSITION.INSIDE_BASE,
+    "above": XL_LABEL_POSITION.ABOVE,
     "best_fit": XL_LABEL_POSITION.BEST_FIT,
 }
 

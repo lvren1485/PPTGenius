@@ -49,6 +49,16 @@ async def generate_ppt(
     prs = Presentation()
     prs.slide_width = Inches(meta.slide_width)
     prs.slide_height = Inches(meta.slide_height)
+
+    # Fix sldSz type attribute — python-pptx default template is 4:3,
+    # leaving type="screen4x3" even when dimensions are 16:9.  PowerPoint
+    # shows a repair prompt when type and actual size disagree.
+    _sldSz = prs.element.find(
+        '{http://schemas.openxmlformats.org/presentationml/2006/main}sldSz'
+    )
+    if _sldSz is not None and _sldSz.get('type') != 'screen16x9':
+        _sldSz.set('type', 'screen16x9')
+
     ws = workspace_path or "."
 
     for si, slide_spec in enumerate(instruction.slides):

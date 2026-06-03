@@ -269,6 +269,18 @@ async def increment_slide_retry(db: AsyncSession, slide_id: int) -> int | None:
     return s.retry_count
 
 
+async def increment_slide_retry_by_index(
+    db: AsyncSession, presentation_id: int, slide_index: int,
+) -> int | None:
+    """Increment retry_count on a slide looked up by (presentation_id, slide_index)."""
+    s = await _get_slide(db, presentation_id, slide_index)
+    if s is None:
+        return None
+    s.retry_count = (s.retry_count or 0) + 1
+    await db.commit()
+    return s.retry_count
+
+
 async def set_slide_chart_data(
     db: AsyncSession, presentation_id: int, slide_index: int, chart_data: dict,
 ) -> bool:
