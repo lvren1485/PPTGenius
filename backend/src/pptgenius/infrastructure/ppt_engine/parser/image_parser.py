@@ -53,20 +53,28 @@ def render_picture(slide, el: ImageElement, workspace_path: str = ".") -> None:
 
 
 def _svg_to_png(svg_path: str) -> str:
-    """Convert SVG to PNG at 300 DPI. Resvg primary, cairosvg fallback."""
+    """Convert SVG to PNG at high resolution (min 500px per dimension).
+
+    Renders at a target width derived from the SVG viewBox so the output
+    is always >= 500px on the shorter side.  Resvg primary, cairosvg fallback.
+    """
     png_path = svg_path.rsplit(".", 1)[0] + ".png"
 
     # Cache: skip re-conversion if PNG is newer than SVG source
     if os.path.exists(png_path) and os.path.getmtime(png_path) >= os.path.getmtime(svg_path):
         return png_path
 
+    target_w, target_h = _calc_render_size(svg_path)
+
     # Primary: resvg-py (pre-built wheels, zero system deps)
     try:
         import resvg_py
-        png_bytes = resvg_py.svg_to_bytes(svg_path=svg_path, dpi=300)
+        png_bytes = resvg_py.svg_to_bytes(
+            svg_path=svg_path, width=target_w, height=target_h,
+        )
         with open(png_path, "wb") as f:
             f.write(png_bytes)
-        logger.info("SVG → PNG (resvg, 300 DPI): %s", os.path.basename(svg_path))
+        logger.info("SVG → PNG (resvg, %dx%d): %s", target_w, target_h, os.path.basename(svg_path))
         return png_path
     except ImportError:
         pass
@@ -76,8 +84,11 @@ def _svg_to_png(svg_path: str) -> str:
     # Fallback: cairosvg (needs libcairo2 on Linux, GTK runtime on Windows)
     try:
         import cairosvg
-        cairosvg.svg2png(url=svg_path, write_to=png_path, dpi=300)
-        logger.info("SVG → PNG (cairosvg, 300 DPI): %s", os.path.basename(svg_path))
+        cairosvg.svg2png(
+            url=svg_path, write_to=png_path,
+            output_width=target_w, output_height=target_h,
+        )
+        logger.info("SVG → PNG (cairosvg, %dx%d): %s", target_w, target_h, os.path.basename(svg_path))
         return png_path
     except ImportError:
         logger.warning("No SVG converter available. Install resvg-py or cairosvg.")
@@ -85,3 +96,41 @@ def _svg_to_png(svg_path: str) -> str:
     except OSError as exc:
         logger.warning("Cairo library not found (%s). Install libcairo2 or use resvg-py.", exc)
         return svg_path
+
+
+def _calc_render_size(svg_path: str) -> tuple[int, int]:
+    """Calculate render size from SVG viewBox so the shorter side >= 500px."""
+    import re
+
+    target_min = 1024
+    try:
+        with open(svg_path, "r", encoding="utf-8") as f:
+            head = f.read(4096)
+    except Exception:
+        return target_min, target_min
+
+    m = re.search(r'viewBox\s*=\s*["\']([^"\']+)["\']', head)
+    if not m:
+        return target_min, target_min
+
+    parts = m.group(1).split()
+    if len(parts) < 4:
+        return target_min, target_min
+
+    try:
+        vb_w, vb_h = float(parts[2]), float(parts[3])
+    except ValueError:
+        return target_min, target_min
+
+    if vb_w <= 0 or vb_h <= 0:
+        return target_min, target_min
+
+    # Scale so the shorter side reaches target_min
+    if vb_w >= vb_h:
+        target_w = target_min
+        target_h = max(1, round(target_min * vb_h / vb_w))
+    else:
+        target_h = target_min
+        target_w = max(1, round(target_min * vb_w / vb_h))
+
+    return target_w, target_h

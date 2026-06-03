@@ -57,7 +57,7 @@ instructions/
 |---------|------|------|
 | [textbox.json](textbox.json) | `textbox` | 文本框（段落+多run文本+字体效果） |
 | [table.json](table.json) | `table` | 表格（表头/斑马条纹/合并单元格） |
-| [picture.json](picture.json) | `picture` | 图片嵌入（SVG自动转PNG 300DPI） |
+| [picture.json](picture.json) | `picture` | 图片嵌入（SVG自动转PNG，高分辨率） |
 | [shape.json](shape.json) | `shape` | 自选图形（182种, 见 shape_catalog.json） |
 | [background.json](background.json) | (slide级) | 幻灯片背景（纯色/渐变/图片） |
 
