@@ -55,6 +55,7 @@ const suggestions = [
 
 // Reload when switching conversations
 watch(convId, async (id) => {
+  if (sending.value) return  // don't interfere with active sendMessage flow
   if (id > 0) {
     await loadConversation()
     scrollBottom()
@@ -62,7 +63,6 @@ watch(convId, async (id) => {
     if (msg) {
       router.replace({ query: {} })
       await sendMessage(msg)
-      await loadConversation()
     }
   } else {
     messages.value = []
@@ -95,6 +95,8 @@ async function loadConversation() {
   }
 }
 
+const sending = ref(false)  // true while SSE stream is active
+
 async function ensureConversation(title?: string): Promise<number> {
   if (convId.value > 0) return convId.value
   const { data } = await api.post('/conversations', {
@@ -102,37 +104,60 @@ async function ensureConversation(title?: string): Promise<number> {
     title: title || '新对话',
   })
   const id = data.data.id
-  router.replace(`/chat/${id}`)
+  // Navigate to the new conversation
+  await router.replace(`/chat/${id}`)
+  // Small delay to let the watch(convId) handler clear old state
+  await nextTick()
   return id
 }
 
 async function sendMessage(text: string) {
-  if (!text.trim()) return
-  // Lazy-create conversation if needed, auto-title from first 10 chars
-  const cid = await ensureConversation(text.slice(0, 10))
-
-  messages.value.push({
-    id: 0, idx: messages.value.length + 1,
-    role: 'user', content: text, content_type: 'text',
-    metadata_json: null, estimated_cost: null, created_at: new Date().toISOString(),
-  })
-  await nextTick()
-  scrollBottom()
-
-  sse.value = { phase: '', step: '', detail: '', pct: 0 }
-
+  if (!text.trim() || sending.value) return
+  sending.value = true
   try {
-    for await (const evt of streamChat(cid, text)) {
-      handleSseEvent(evt)
-    }
-  } catch (e: any) {
-    ElMessage.error(e.message || '请求失败')
-  } finally {
-    sse.value = { phase: '', step: '', detail: '', pct: 0 }
-  }
+    // Lazy-create conversation if needed, auto-title from first 10 chars
+    const cid = await ensureConversation(text.slice(0, 10))
 
-  await loadConversation()
-  scrollBottom()
+    // Push user message
+    messages.value.push({
+      id: 0, idx: messages.value.length + 1,
+      role: 'user', content: text, content_type: 'text',
+      metadata_json: null, estimated_cost: null, created_at: new Date().toISOString(),
+    })
+    await nextTick()
+    scrollBottom()
+
+    // Reset SSE state for the new stream
+    sse.value = { phase: '', step: '', detail: '', pct: 0 }
+    // Push a loading placeholder
+    const loadingIdx = messages.value.length + 1
+    messages.value.push({
+      id: -1, idx: loadingIdx,
+      role: 'assistant', content: '...', content_type: 'text',
+      metadata_json: null, estimated_cost: null, created_at: new Date().toISOString(),
+    })
+    scrollBottom()
+
+    try {
+      for await (const evt of streamChat(cid, text)) {
+        // Remove loading placeholder on first real event
+        if (messages.value.some(m => m.id === -1)) {
+          messages.value = messages.value.filter(m => m.id !== -1)
+        }
+        handleSseEvent(evt)
+      }
+    } catch (e: any) {
+      ElMessage.error(e.message || '请求失败')
+      messages.value = messages.value.filter(m => m.id !== -1)
+    } finally {
+      sse.value = { phase: '', step: '', detail: '', pct: 0 }
+    }
+
+    await loadConversation()
+    scrollBottom()
+  } finally {
+    sending.value = false
+  }
 }
 
 function handleSseEvent(evt: { event: string; data: Record<string, any> }) {
@@ -155,10 +180,8 @@ function handleSseEvent(evt: { event: string; data: Record<string, any> }) {
       // Handled via 'document' event; ignore old-format inline data
       break
     case 'knowledge':
-      // Knowledge sources — log only
       break
     case 'document':
-      // Document message (outline/ppt) — same rendering path as history
       messages.value.push({
         id: 0, idx: messages.value.length + 1,
         role: 'document',
@@ -290,14 +313,15 @@ function renderMsg(msg: MsgItem) {
             :ppt-data="JSON.parse(msg.content)"
           />
         </template>
-        <SseStatus
-          v-if="sse.phase || sse.step"
-          :phase="sse.phase"
-          :step="sse.step"
-          :detail="sse.detail"
-          :pct="sse.pct"
-        />
       </div>
+
+      <SseStatus
+        v-if="sse.phase || sse.step"
+        :phase="sse.phase"
+        :step="sse.step"
+        :detail="sse.detail"
+        :pct="sse.pct"
+      />
 
       <ChatInput @send="sendMessage" @upload="handleUpload" />
     </div>
@@ -372,6 +396,9 @@ function renderMsg(msg: MsgItem) {
   padding: 24px;
   display: flex;
   flex-direction: column;
-  width: 100%;
+}
+/* Make SseStatus and loading visible inside the flow */
+.msg-container :deep(.sse-status) {
+  margin: 0 0 16px;
 }
 </style>

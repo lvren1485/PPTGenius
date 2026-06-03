@@ -109,21 +109,27 @@ backend/
     │   │
     │   ├── ppt/                     # PPT 生成（两阶段流水线）
     │   │   ├── __init__.py
-    │   │   ├── graph.py             # StateGraph: create_presentation → style_agent → supervisor* → assembly
+    │   │   ├── graph.py             # StateGraph: create_presentation → style_agent → dispatcher → assembly
     │   │   ├── state.py             # PPTState TypedDict
+    │   │   ├── dispatcher.py        # Phase 2 Dispatcher: 多轮重试 + 并发调度 + SSE 事件推送
     │   │   ├── phase1_style.py      # Phase 1: StyleAgent（选配色+布局）
     │   │   │
-    │   │   ├── phase2_sub_agent/    # Phase 2 模式 A — sub_agent
+    │   │   ├── phase2_sub_agent/    # Phase 2 模式 A — sub_agent [已废弃]
     │   │   │   ├── __init__.py
     │   │   │   ├── supervisor.py    # 逐页调度 TextAgent + ChartAgent + ShapeAgent（每页并发）
     │   │   │   ├── text_agent.py    # 文本框 + 表格 + SVG 图标
     │   │   │   ├── chart_agent.py   # 图表生成（读取 chart instruction + 提交 chart 元素）
     │   │   │   └── shape_agent.py   # 装饰形状（封面/章节/结尾页）
     │   │   │
-    │   │   ├── phase2_freedom/      # Phase 2 模式 B — freedom
+    │   │   ├── phase2_freedom/      # Phase 2 模式 B — freedom [已废弃]
     │   │   │   ├── __init__.py
     │   │   │   ├── supervisor.py    # 逐页调度 FreedomAgent
     │   │   │   └── freedom_agent.py # 单 Agent 生成整页所有元素
+    │   │   │
+    │   │   ├── phase2_super_freedom/ # Phase 2 模式 C — super_freedom [当前使用]
+    │   │   │   ├── __init__.py
+    │   │   │   ├── agent.py         # SuperFreedomAgent: 完全创作自由
+    │   │   │   └── prompts.py       # system/user prompt 构建（注入配色/模板/邻居上下文）
     │   │   │
     │   │   ├── common/              # PPT Agent 共享模块
     │   │   │   ├── __init__.py
@@ -203,7 +209,9 @@ backend/
         │   │   ├── evaluator_system.txt
         │   │   └── rubric.json
         │   └── ppt/
-        │       └── style_agent_system.txt
+        │       ├── style_agent_system.txt
+        │       ├── super_freedom_system.txt
+        │       └── super_freedom_user.txt
         ├── instructions/            # PPT 元素 JSON Schema
         │   ├── HOW_TO_READ.md       # 指令文件阅读约定
         │   ├── textbox.json
@@ -296,7 +304,7 @@ START → generator → evaluator → { continue? → generator, stop? → final
 ```
 START → create_presentation → { style_agent? }
                                   ↓
-                              supervisor* → assembly → END
+                              dispatcher → assembly → END
 ```
 
 **Phase 1: StyleAgent**（`create_agent`，6 个工具）
@@ -310,24 +318,75 @@ START → create_presentation → { style_agent? }
 | `get_layout` | 查看布局 JSON 定义 |
 | `set_presentation_style` | **终止工具**，持久化选择到 presentation 表 |
 
-**Phase 2: Supervisor（两种模式）**
+`style_agent_node` 有重试机制：若 `set_presentation_style` 未被调用，以 stripped-down agent 重试（仅有 `set_presentation_style` 一个工具）。若已有 color_scheme_id + template_id（如 modify 模式），`_route_style` 直接跳过 Phase 1。
 
-| 模式 | 配置 key | 说明 |
-|------|---------|------|
-| sub_agent | `agent.ppt.mode = "sub_agent"` | 每页并发调度 TextAgent + ChartAgent + ShapeAgent |
-| freedom | `agent.ppt.mode = "freedom"` | 单 FreedomAgent 生成整页所有元素 |
+**Phase 2: Dispatcher（多轮重试并发调度）**
 
-**Sub-agent 分发逻辑**（每页，agents 并发执行）：
+Dispatcher 为纯代码节点（无 LLM），负责：
+1. `_create_presentation_node` 预先创建所有 presentation_slides（batch insert），解决 "先有鸡还是先有蛋" 问题
+2. 以 `asyncio.gather` 并发处理所有 slides（通过 semaphore 控制并发数 `_MAX_CONCURRENT_SLIDES`）
+3. 每轮结束后收集失败 slides，进入下一轮重试（最多 `_MAX_RETRY_ROUNDS=3` 轮）
+4. 每 slide 获取独立 DB session（通过 `SessionManager.new_session()`），避免并发写入冲突
+5. 通过 `asyncio.Queue` + `get_stream_writer()` 实时 SSE 推送进度事件（`slide_start` / `slide_end`）
+6. 每 slide 构建相邻页上下文 `_build_neighbor_context()`（前后各 2 页的标题 + layout_type）
 
-| Agent | 触发条件 | 产出 |
-|-------|---------|------|
-| TextAgent | 总是 | textbox / table / picture (SVG icon) 元素 |
-| ChartAgent | `has_chart == true` | chart 元素（18 种图表类型） |
-| ShapeAgent | `layout_type` 为 title/section/ending | 装饰 shape 元素 |
+**Phase 2 三条管线对比：**
 
-**共同的工具模式：** 每个 agent 通过 `read_instruction()` 读取对应的 JSON Schema，生成元素后通过 `submit_*_elements()` 提交（经 Pydantic validator 校验）。
+| 管线 | 配置 key | 状态 | 核心思路 |
+|------|---------|------|---------|
+| sub_agent | `agent.ppt.mode = "sub_agent"` | **已废弃** | 每页 3 Agent 并发（Text+Chart+Shape），各负责一类元素 |
+| freedom | `agent.ppt.mode = "freedom"` | **已废弃** | 每页 1 Agent 生成全部元素 |
+| super_freedom | `agent.ppt.mode = "super_freedom"` | **当前使用** | 每页 1 Agent，完全创作自由，模板仅供参考 |
 
-**Assembly node**：标记 presentation 状态为 completed。
+**管线 A — sub_agent**（`phase2_sub_agent/`）
+
+每页并发运行 3 个独立 Agent：
+
+| Agent | 触发条件 | 工具 | 产出 |
+|-------|---------|------|------|
+| TextAgent | 总是 | `search_icons`, `read_instruction`, `submit_text_elements` | textbox / table / picture (SVG icon) 元素 |
+| ChartAgent | `has_chart == true` | `read_chart_instruction`, `submit_chart_element` | chart 元素（8 种图表类型：column_clustered, line, pie, doughnut, bar_clustered, area, radar, scatter） |
+| ShapeAgent | `layout_type` 为 title/section/ending | `submit_shape_elements` | 装饰 shape 元素（几何图形、圆形、六边形等） |
+
+每个 Agent 通过 `read_instruction()` 读取 JSON Schema，通过 `submit_*_elements()` 提交经 Pydantic validator 校验的元素。三个 Agent 的结果存入 `agent_outputs["text"]`、`agent_outputs["chart"]`、`agent_outputs["shape"]`。
+
+**管线 B — freedom**（`phase2_freedom/`）
+
+每页单个 FreedomAgent，一次调用生成整页所有元素（textbox/table/chart/shape/picture）。工具：`search_icons`, `read_instruction`, `submit_slide_elements`（终止工具）。temperature=0.3, max_tokens=16000。Supervisor 逐页串行处理（非并发）。
+
+**管线 C — super_freedom**（`phase2_super_freedom/`，当前激活）
+
+每页单个 SuperFreedomAgent，完全创作自由——模板和布局仅供参考，Agent 自行决定所有元素的位置、大小、样式。工具链：
+- `search_icons`：搜索 Tabler 5,800+ SVG 图标库
+- `read_instruction`：读取 JSON Schema 定义
+- `submit_slide_instruction`：**终止工具**，一次性提交 background + elements + notes
+
+关键设计：
+- `recursion_limit=50`（高于默认 25，适应多工具调用的 slide 设计循环）
+- **重试机制**：若 `submit_slide_instruction` 未被调用，启动 stripped-down retry agent（仅含 submit 工具，System Prompt 强制直接提交），解决 DeepSeek thinking mode 不支持 `tool_choice` 的问题
+- **Prompt 注入**：系统提示注入全部 6 种元素的 JSON Schema（textbox/table/picture/shape/background/chart）+ 设计规范（字体≥14pt、4 色调色板、6-15 元素/slide）+ 完整 title_slide 示例
+- **User Prompt**：注入 slide 内容（title/layout_type/main_points/detailed_content/key_data）、配色方案（primary/accent/text/bg/chart_colors/fonts）、模板参考（layout 定义）、相邻页上下文（前后各 2 页）
+
+**Assembly node**（`_assembly_node`）：
+1. 从 DB 读取所有 presentation_slides，提取 `agent_outputs["super_freedom"]`
+2. 构建 instruction JSON（meta + slides 数组，每 slide 含 layout/background/notes/elements）
+3. 调用 `generate_ppt()` → python-pptx 渲染 → 输出 `{pres_id}.pptx`
+4. 创建 snapshot（outline_json + presentation_json）写入 DB
+5. 更新 presentation 状态为 completed
+
+### 4.3.1 三条管线方案评价
+
+**sub_agent 方案的问题：**
+
+三个 Agent（TextAgent / ChartAgent / ShapeAgent）独立并发执行，各自只能看到自己的 instruction，**无法感知其他 Agent 生成的元素位置**。例如 ShapeAgent 在左上角放了一个装饰圆，TextAgent 同时在左上角放了标题文本框——两者重叠，最终渲染时元素堆叠混乱。此外，三个 Agent 各自拿到了整个 slide 的可用空间，没有 "已占用区域" 的概念，导致元素密度不可控。
+
+**freedom 方案的问题：**
+
+单 Agent 生成整页避免了元素重叠，但 Agent 被限制在 layout 定义的固定容器内放置元素。**Agent 无法修改或扩展 layout 本身**——如果 layout 只定义了标题区和正文区，整页就只有这两个区域有内容，背景大面积留白。封面和章节页尤其明显：layout 定义的装饰元素是固定的占位符，Agent 无法根据实际内容调整。
+
+**super_freedom 方案（当前）：**
+
+完全释放创作自由度，模板和布局仅为参考信息注入 Prompt。Agent 自行决定所有元素的 position/size/style，可以自由添加背景（solid/gradient/image）、装饰形状、SVG 图标。解决了 freedom 的 "背景太空" 问题。但代价是**跨页一致性下降**——没有模板强制约束，不同 slide 的设计风格可能差异较大，依赖 Prompt 中的设计规范约束。
 
 ### 4.4 Token 计数
 
@@ -356,18 +415,31 @@ START → create_presentation → { style_agent? }
 Outline slide (content_json)
     │
     ├── Phase 1: StyleAgent
-    │       选择 color_scheme + layout → presentation 表
+    │       选择 color_scheme + layout → 写入 presentation 表
+    │       同步 style 到所有 presentation_slides（color_scheme_id + template_id）
     │
-    ├── Phase 2: Per-Slide
-    │   ├── TextAgent → textbox/table/picture elements → agent_outputs["text"]
-    │   ├── ChartAgent → chart element → agent_outputs["chart"]
-    │   └── ShapeAgent → shape elements → agent_outputs["shape"]
+    ├── Phase 2: Dispatcher (纯代码，无 LLM)
+    │   ┌─ 预先创建所有 presentation_slides（batch insert）
+    │   ├─ asyncio.gather 并发调度所有 slides
+    │   ├─ 每 slide 独立 DB session
+    │   ├─ asyncio.Queue → SSE 实时推送 (slide_start / slide_end / retry_round)
+    │   └─ 每 slide 调用 SuperFreedomAgent:
+    │       ├─ read_instruction() 读取 JSON Schema
+    │       ├─ search_icons() 搜索 SVG 图标
+    │       └─ submit_slide_instruction(background, elements, notes)
+    │              ↓
+    │          agent_outputs["super_freedom"] → presentation_slides 表
     │
     └── Assembly
-         validator 校验 → python-pptx 渲染 → output.pptx
+         读取所有 slides 的 agent_outputs → 构建 instruction JSON
+         → generate_ppt() → python-pptx 渲染 → {pres_id}.pptx
+         → create_snapshot() → 写入 DB
+         → update_presentation_status("completed")
 ```
 
 **指令系统**：`resources/instructions/*.json` 定义每种元素的 JSON Schema。Agent 通过 `read_instruction("textbox.json")` 等工具读取。`HOW_TO_READ.md` 说明类型约定（`string|null`、`hex[]` 等）。
+
+**元素数据类型**：TextboxElement（文本框）、TableElement（表格）、PictureElement（SVG 图标经 cairosvg→PNG 嵌入）、ChartElement（python-pptx 原生图表）、ShapeElement（装饰形状，182 种）。所有元素经 `validator.py` 校验后才写入 DB。
 
 ---
 
@@ -430,7 +502,7 @@ agent:
     pass_score: 7.0
     mode: "mix"              # max_iteration | pass_score | mix
   ppt:
-    mode: "sub_agent"        # sub_agent | freedom
+    mode: "super_freedom"    # sub_agent (deprecated) | freedom (deprecated) | super_freedom
   cache:
     trim_max_tokens: 20000
     enable_node_cache: true

@@ -22,13 +22,16 @@ function formatTime(d: string) {
 </script>
 
 <template>
-  <div class="msg-bubble" :class="{ 'is-user': isUser, 'is-assistant': isAssistant }">
+  <div class="msg-bubble" :class="{ 'is-user': isUser, 'is-assistant': isAssistant, 'is-loading': isAssistant && content === '...' }">
     <div class="msg-role">{{ isUser ? '我' : 'AI' }}</div>
     <div class="msg-body">
-      <div v-if="isAssistant" class="msg-content" v-html="renderMarkdown(content)" />
+      <div v-if="isAssistant && content === '...'" class="msg-content loading-dots">
+        <span></span><span></span><span></span>
+      </div>
+      <div v-else-if="isAssistant" class="msg-content" v-html="renderMarkdown(content)" />
       <div v-else class="msg-content">{{ content }}</div>
     </div>
-    <div class="msg-time">{{ formatTime(createdAt) }}</div>
+    <div class="msg-time" v-if="content !== '...'">{{ formatTime(createdAt) }}</div>
   </div>
 </template>
 
@@ -95,5 +98,31 @@ function formatTime(d: string) {
   font-size: 12px;
   color: #c0c4cc;
   margin-top: 4px;
+}
+.is-loading .msg-body {
+  background: #fafbfc;
+  border-color: #e4e7ed;
+  min-width: 80px;
+}
+.loading-dots {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 0;
+}
+.loading-dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #c0c4cc;
+  animation: bounce 1.4s ease-in-out infinite both;
+}
+.loading-dots span:nth-child(1) { animation-delay: 0s; }
+.loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+.loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
 }
 </style>

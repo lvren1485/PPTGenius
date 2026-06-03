@@ -48,10 +48,10 @@ const pctSafe = computed(() => Math.min(100, Math.max(0, props.pct || 0)))
 
 <style scoped>
 .sse-status {
-  background: #f5f7fa;
-  border-radius: 8px;
-  padding: 10px 16px;
-  margin-bottom: 12px;
+  background: #ecf5ff;
+  border-top: 1px solid #d9ecff;
+  padding: 10px 24px;
+  flex-shrink: 0;
 }
 .sse-row {
   display: flex;

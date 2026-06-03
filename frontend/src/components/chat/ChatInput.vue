@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { UploadFilled } from '@element-plus/icons-vue'
+import { UploadFilled, Promotion } from '@element-plus/icons-vue'
 import type { UploadFile } from 'element-plus'
 
 const emit = defineEmits<{
@@ -9,7 +9,6 @@ const emit = defineEmits<{
 }>()
 
 const text = ref('')
-const uploading = ref(false)
 
 function handleSend() {
   const msg = text.value.trim()
@@ -38,23 +37,32 @@ function handleUpload(file: UploadFile) {
 <template>
   <div class="chat-input">
     <div class="input-row">
-      <el-upload
-        :show-file-list="false"
-        :auto-upload="false"
-        :on-change="handleUpload as any"
-        accept="*"
-        multiple
-      >
-        <el-button :icon="UploadFilled" circle />
-      </el-upload>
+      <div class="input-left">
+        <el-upload
+          :show-file-list="false"
+          :auto-upload="false"
+          :on-change="handleUpload as any"
+          accept="*"
+          multiple
+        >
+          <el-button :icon="UploadFilled" size="large" circle class="upload-btn" />
+        </el-upload>
+      </div>
       <el-input
         v-model="text"
-        placeholder="输入消息..."
+        placeholder="输入消息，Enter 发送..."
         :rows="2"
         type="textarea"
+        resize="none"
         @keydown.enter.exact.prevent="handleSend"
       />
-      <el-button type="primary" :disabled="!text.trim()" @click="handleSend">
+      <el-button
+        type="primary"
+        size="large"
+        :icon="Promotion"
+        :disabled="!text.trim()"
+        @click="handleSend"
+      >
         发送
       </el-button>
     </div>
@@ -63,14 +71,29 @@ function handleUpload(file: UploadFile) {
 
 <style scoped>
 .chat-input {
-  border-top: 1px solid #e4e7ed;
+  border-top: 1px solid #e8eaed;
   padding: 16px 24px;
   background: #fafbfc;
 }
 .input-row {
   display: flex;
   align-items: flex-end;
-  gap: 10px;
+  gap: 12px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+.input-left {
+  display: flex;
+  align-items: center;
+}
+.upload-btn {
+  color: #606266;
+}
+.input-row :deep(.el-textarea__inner) {
+  font-size: 15px;
+  border-radius: 12px;
+  padding: 10px 16px;
+  background: #fff;
 }
 .input-row :deep(.el-textarea) {
   flex: 1;
