@@ -7,6 +7,7 @@ stores assistant messages, and emits full token + outline summaries.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import AsyncGenerator, Literal
 
@@ -61,6 +62,52 @@ def _load_coordinator_prompt() -> str:
 
 def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+def _sse_comment() -> str:
+    """SSE comment — keeps connection alive, ignored by clients."""
+    return ": heartbeat\n\n"
+
+
+async def _heartbeat_sender(queue: asyncio.Queue, interval: int = 30):
+    """Send SSE heartbeats on ``queue`` every *interval* seconds."""
+    while True:
+        await asyncio.sleep(interval)
+        await queue.put(_sse_comment())
+
+
+async def _astream_with_heartbeat(graph, state, config, heartbeat_interval: int = 30):
+    """Wrap astream_events with a heartbeat to keep SSE alive during silence.
+
+    Yields ``(is_event, value)`` where is_event=False means *value* is an
+    SSE comment string to send directly.
+    """
+    queue: asyncio.Queue = asyncio.Queue()
+    done = asyncio.Event()
+
+    async def _consume():
+        async for event in graph.astream_events(state, config=config, version="v2"):
+            await queue.put((True, event))
+        done.set()
+
+    async def _beat():
+        while not done.is_set():
+            await asyncio.sleep(heartbeat_interval)
+            if not done.is_set():
+                await queue.put((False, _sse_comment()))
+
+    consumer = asyncio.create_task(_consume())
+    beater = asyncio.create_task(_beat())
+
+    while not done.is_set() or not queue.empty():
+        try:
+            item = await asyncio.wait_for(queue.get(), timeout=1)
+            yield item
+        except asyncio.TimeoutError:
+            continue
+
+    await consumer
+    await beater
 
 
 # ── conversation state tool ──────────────────────────────────────────────────
@@ -459,9 +506,13 @@ async def _run_ppt(
 
     try:
         captured_pres_id = state["presentation_id"]
-        async for event in graph.astream_events(
-            state, config={"configurable": {"db": db}}, version="v2",
+        async for is_event, item in _astream_with_heartbeat(
+            graph, state, {"configurable": {"db": db}},
         ):
+            if not is_event:
+                yield item  # heartbeat comment
+                continue
+            event = item
             kind = event["event"]
 
             # capture presentation_id from create_presentation node output
