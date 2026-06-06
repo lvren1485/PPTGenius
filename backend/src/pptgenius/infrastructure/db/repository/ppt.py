@@ -11,15 +11,13 @@ async def create_presentation(
     user_id: int,
     conversation_id: int,
     outline_id: int | None = None,
-    template_id: int | None = None,
-    color_scheme_id: int | None = None,
+    style_id: int | None = None,
 ) -> Presentation:
     pres = Presentation(
         user_id=user_id,
         conversation_id=conversation_id,
         outline_id=outline_id,
-        template_id=template_id,
-        color_scheme_id=color_scheme_id,
+        style_id=style_id,
     )
     db.add(pres)
     await db.commit()
@@ -75,17 +73,13 @@ async def update_presentation_status(
     return True
 
 
-async def update_presentation_style(
-    db: AsyncSession,
-    pres_id: int,
-    color_scheme_id: int,
-    template_id: int = 1,
+async def set_presentation_style(
+    db: AsyncSession, pres_id: int, style_id: int
 ) -> bool:
     pres = await db.get(Presentation, pres_id)
     if pres is None or pres.status == "deleted":
         return False
-    pres.color_scheme_id = color_scheme_id
-    pres.template_id = template_id
+    pres.style_id = style_id
     await db.commit()
     return True
 
@@ -125,16 +119,14 @@ async def create_presentation_slide(
     slide_index: int,
     layout_name: str,
     outline_slide_id: int | None = None,
-    template_id: int | None = None,
-    color_scheme_id: int | None = None,
+    style_id: int | None = None,
 ) -> PresentationSlide:
     s = PresentationSlide(
         presentation_id=presentation_id,
         slide_index=slide_index,
         layout_name=layout_name,
         outline_slide_id=outline_slide_id,
-        template_id=template_id,
-        color_scheme_id=color_scheme_id,
+        style_id=style_id,
     )
     db.add(s)
     await db.commit()
@@ -146,7 +138,6 @@ async def create_presentation_slides_batch(
     db: AsyncSession,
     slides: list[dict],
 ) -> list[PresentationSlide]:
-    """Create multiple presentation slides in a single commit."""
     objs = []
     for s in slides:
         obj = PresentationSlide(
@@ -154,8 +145,7 @@ async def create_presentation_slides_batch(
             slide_index=s["slide_index"],
             layout_name=s["layout_name"],
             outline_slide_id=s.get("outline_slide_id"),
-            template_id=s.get("template_id"),
-            color_scheme_id=s.get("color_scheme_id"),
+            style_id=s.get("style_id"),
         )
         db.add(obj)
         objs.append(obj)
@@ -182,7 +172,6 @@ async def get_slides_by_presentation_id(
 
 
 async def _get_slide(db: AsyncSession, presentation_id: int, slide_index: int):
-    """Look up a presentation_slide by (presentation_id, slide_index)."""
     stmt_result = await db.execute(
         select(PresentationSlide)
         .where(PresentationSlide.presentation_id == presentation_id)
@@ -192,45 +181,27 @@ async def _get_slide(db: AsyncSession, presentation_id: int, slide_index: int):
 
 
 async def set_slide_agent_output(
-        db: AsyncSession,
-        presentation_id: int,
-        slide_index: int,
-        agent_type: str,
-        output: dict,
+    db: AsyncSession,
+    presentation_id: int,
+    slide_index: int,
+    agent_outputs: dict,
 ) -> bool:
-    """Accumulative: merges output into agent_outputs[agent_type] without
-    overwriting other agent_types.  Safe for concurrent calls from different
-    sessions (last-write-wins per key, never deletes other keys)."""
-    stmt = (
-        select(PresentationSlide)
-        .where(PresentationSlide.presentation_id == presentation_id)
-        .where(PresentationSlide.slide_index == slide_index)
-    )
-    result = await db.execute(stmt)
-    s = result.scalar_one_or_none()
+    s = await _get_slide(db, presentation_id, slide_index)
     if s is None:
         return False
-    # Merge into existing: read current + add new key
-    current = dict(s.agent_outputs or {})
-    current[agent_type] = output
-    s.agent_outputs = current
+    s.agent_outputs = agent_outputs
     await db.commit()
     return True
 
 
 async def update_slides_style(
-    db: AsyncSession,
-    presentation_id: int,
-    color_scheme_id: int,
-    template_id: int = 1,
+    db: AsyncSession, presentation_id: int, style_id: int
 ) -> int:
-    """Update color_scheme_id and template_id on all slides of a presentation.
-    Returns the number of slides updated."""
     from sqlalchemy import update
     stmt = (
         update(PresentationSlide)
         .where(PresentationSlide.presentation_id == presentation_id)
-        .values(color_scheme_id=color_scheme_id, template_id=template_id)
+        .values(style_id=style_id)
     )
     result = await db.execute(stmt)
     await db.commit()
@@ -244,13 +215,7 @@ async def update_slide_status(
     status: str,
     error_message: str | None = None,
 ) -> bool:
-    stmt = (
-        select(PresentationSlide)
-        .where(PresentationSlide.presentation_id == presentation_id)
-        .where(PresentationSlide.slide_index == slide_index)
-    )
-    result = await db.execute(stmt)
-    s = result.scalar_one_or_none()
+    s = await _get_slide(db, presentation_id, slide_index)
     if s is None:
         return False
     s.status = status
@@ -258,27 +223,6 @@ async def update_slide_status(
         s.error_message = error_message
     await db.commit()
     return True
-
-
-async def increment_slide_retry(db: AsyncSession, slide_id: int) -> int | None:
-    s = await db.get(PresentationSlide, slide_id)
-    if s is None:
-        return None
-    s.retry_count = (s.retry_count or 0) + 1
-    await db.commit()
-    return s.retry_count
-
-
-async def increment_slide_retry_by_index(
-    db: AsyncSession, presentation_id: int, slide_index: int,
-) -> int | None:
-    """Increment retry_count on a slide looked up by (presentation_id, slide_index)."""
-    s = await _get_slide(db, presentation_id, slide_index)
-    if s is None:
-        return None
-    s.retry_count = (s.retry_count or 0) + 1
-    await db.commit()
-    return s.retry_count
 
 
 async def set_slide_chart_data(
@@ -340,8 +284,7 @@ async def replace_presentation_slides(
             slide_index=s["slide_index"],
             layout_name=s["layout_name"],
             outline_slide_id=s.get("outline_slide_id"),
-            template_id=s.get("template_id"),
-            color_scheme_id=s.get("color_scheme_id"),
+            style_id=s.get("style_id"),
         )
         new.append(slide)
     return new

@@ -12,7 +12,7 @@ from . import (
     outline,
     ppt,
     snapshot,
-    template,
+    style,
     user,
 )
 
@@ -24,6 +24,6 @@ __all__ = [
     "outline",
     "ppt",
     "snapshot",
-    "template",
+    "style",
     "user",
 ]

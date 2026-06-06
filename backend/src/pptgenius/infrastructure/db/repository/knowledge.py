@@ -14,6 +14,8 @@ async def create_knowledge_file(
     file_type: str,
     file_size: int | None = None,
     source_type: str = "upload",
+    conversation_id: int | None = None,
+    web_url: str | None = None,
 ) -> KnowledgeFile:
     # Check if already exists (common: web fetch duplicate, or concurrent ingest)
     from sqlalchemy import select as _sel
@@ -31,6 +33,8 @@ async def create_knowledge_file(
         file_type=file_type,
         file_size=file_size,
         source_type=source_type,
+        conversation_id=conversation_id,
+        web_url=web_url,
     )
     db.add(kf)
     try:
@@ -54,6 +58,7 @@ async def create_knowledge_file(
         kf2 = KnowledgeFile(
             user_id=user_id, filename=filename, file_path=file_path,
             file_type=file_type, file_size=file_size, source_type=source_type,
+            conversation_id=conversation_id, web_url=web_url,
         )
         db.add(kf2)
         await db.flush()
@@ -82,8 +87,7 @@ async def list_knowledge_files(
     if status:
         stmt = stmt.where(KnowledgeFile.status == status)
     if conversation_id is not None:
-        # file_path contains workspace/{conv_id}/ (normalize backslash for Windows)
-        stmt = stmt.where(KnowledgeFile.file_path.like(f"%workspace%{conversation_id}%"))
+        stmt = stmt.where(KnowledgeFile.conversation_id == conversation_id)
     stmt = stmt.order_by(KnowledgeFile.created_at.desc())
     result = await db.execute(stmt)
     return list(result.scalars().all())
@@ -98,6 +102,17 @@ async def update_knowledge_file_status(
     kf.status = status
     if chunk_count is not None:
         kf.chunk_count = chunk_count
+    await db.commit()
+    return True
+
+
+async def update_knowledge_file_summary(
+    db: AsyncSession, file_id: int, summary_json: dict
+) -> bool:
+    kf = await db.get(KnowledgeFile, file_id)
+    if kf is None:
+        return False
+    kf.summary_json = summary_json
     await db.commit()
     return True
 

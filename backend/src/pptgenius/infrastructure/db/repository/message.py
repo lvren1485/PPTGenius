@@ -29,8 +29,8 @@ async def create_message(
     content_type: str = "text",
     estimated_cost: float | None = None,
     metadata_json: dict | None = None,
+    token_cost_json: dict | None = None,
 ) -> Message:
-    """创建消息并自动累加 conversation.estimated_cost。"""
     idx = await _get_next_idx(db, conversation_id)
     msg = Message(
         conversation_id=conversation_id,
@@ -40,6 +40,7 @@ async def create_message(
         content_type=content_type,
         estimated_cost=estimated_cost,
         metadata_json=metadata_json,
+        token_cost_json=token_cost_json,
     )
     db.add(msg)
     if estimated_cost:
@@ -107,8 +108,21 @@ async def create_document_message(
     return msg
 
 
+async def update_message_token_cost(
+    db: AsyncSession, message_id: int, cost: dict
+) -> bool:
+    msg = await db.get(Message, message_id)
+    if msg is None:
+        return False
+    current = dict(msg.token_cost_json or {})
+    for k, v in cost.items():
+        current[k] = current.get(k, 0) + v
+    msg.token_cost_json = current
+    await db.commit()
+    return True
+
+
 async def trim_messages(db: AsyncSession, conversation_id: int, before_idx: int) -> int:
-    """删除 conversation 中 idx 小于 before_idx 的所有消息，返回删除条数。"""
     from sqlalchemy import delete
 
     stmt = (

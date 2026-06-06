@@ -470,7 +470,7 @@ Round 8:  assembly → 50t                                     = 11.0k
 | ppt_style 需要上下文 | 自动注入 outline 摘要（主题、领域、章节列表） |
 | slides_content 需要 style | 自动注入 style 完整值 + template 预设 |
 | 修改前 | `get_outline_slide` 读单页完整 content_json |
-| 所有 agent 调用 | `agent_id` 追踪，`token_cost_json` 记录 |
+| 所有 agent 调用 | `agent_id`（内存）追踪，token cost 写入 `messages.token_cost_json` |
 
 ### Snapshot 记录时机
 
@@ -800,35 +800,44 @@ assemble_pptx(db, presentation_id, conversation_id, user_id) → file_path
 
 ### 双层计数器
 
-```python
-TokenCounter._conv_counters: dict[int, TokenCounter]   # conversation_id
-TokenCounter._agent_counters: dict[str, TokenCounter]  # agent_id (新增)
-```
+Token 统计在内存中维护两层：
+- `TokenCounter._conv_counters: dict[int, TokenCounter]` — 按 conversation_id
+- `TokenCounter._agent_counters: dict[str, TokenCounter]` — 按 agent_id（内存 key，不持久化）
 
-`get_cost(key)` 支持 `int`（conv）和 `str`（agent）。
-
-### Middleware 双层写
-
-```python
-class TokenCountingMiddleware(AgentMiddleware):
-    def after_model(self, state, runtime):
-        tc_conv = TokenCounter.for_conversation(conv_id)
-        tc_agent = TokenCounter.for_agent(agent_id)
-        tc_conv.add(usage); tc_agent.add(usage)
-```
+`agent_id` 由 `model_builder` 随机生成（`secrets.token_hex(4)`），仅作为内存中 TokenCounter 的 key，不存入数据库。
 
 ### Cost 归属
 
-| Agent | 写入表 | 时机 |
-|-------|--------|------|
-| Unified Master | `outlines` + `presentations` | return 前 |
-| outline_section | `outline_section` | return 前 |
-| slides_content (Slide Agent) | `presentation_slides` | return 前 |
-| Coordinator | `messages`（自动） | 不改动现有逻辑 |
+Token cost 统一记录在 `messages` 表：
 
-四张表统一加 `agent_id VARCHAR(16)` + `token_cost_json JSON`。
+| 消息类型 | content_type | token_cost_json 写入时机 |
+|---------|-------------|------------------------|
+| Master 普通回复 | `text` | Middleware `after_model` |
+| Tool 调用结果 | `toolresult_slide` / `toolresult_outline_section` 等 | Tool 返回时写入对应消息行 |
+| 用户消息 | `text` | 无（不计费） |
 
-因为存在修改，所以token成本为累加而非覆盖。只有当全部replace时才覆盖。所以只需要提供累加接口
+`messages` 表保留原有 `estimated_cost DOUBLE`（美元计费），新增 `token_cost_json JSON`（token 数量明细 `{input, output, total}`）。
+
+### Middleware 写入
+
+```python
+class TokenCountingMiddleware(AgentMiddleware):
+    def __init__(self, message_id: int, agent_id: str):
+        self.message_id = message_id
+        self.agent_id = agent_id
+
+    def after_model(self, state, runtime):
+        usage = state.get("usage", {})
+        tc_conv = TokenCounter.for_conversation(conv_id)
+        tc_agent = TokenCounter.for_agent(self.agent_id)
+        tc_conv.add(usage); tc_agent.add(usage)
+        # 异步写入 messages.token_cost_json
+        db.update_message_token_cost(self.message_id, usage)
+```
+
+Middleware 需要拿到 `message_id`（create_message 返回的 ID），在 `after_model` 中累加写入。
+
+如果 middleware 中拿不到 message_id，则在 tool 调用结束时直接调用 `update_message_token_cost` 修改 DB。因为 token cost 只需累加，只需提供累加接口。
 
 ---
 
@@ -959,20 +968,16 @@ python-pptx 越晚添加越靠上。Assembly 中 `sorted(elements, key=z_order)`
 
 | 表 | 列 | 类型 |
 |-----|-----|------|
+| `conversations` | `current_outline_id` | INT FK → outlines |
+| `messages` | `token_cost_json` | JSON（token 明细） |
 | `styles` | `background_json` | JSON |
-| `outlines` | `version_major/minor/patch` | INT |
-| `outlines` | `exported_at` | DATETIME |
-| `outlines` | `export_format` | VARCHAR(16) |
-| `outlines` | `agent_id` | VARCHAR(16) |
-| `outlines` | `token_cost_json` | JSON |
-| `outline_slides` | `section_id` | INT FK |
+| `outlines` | `version_major/minor/patch` | INT（替代旧 version INT） |
+| `outlines` | `eval_detail` | JSON |
+| `outline_sections` | （整表新增） | |
+| `outline_slides` | `section_id` | INT FK → outline_sections |
 | `outline_slides` | `citations` | JSON |
-| `outline_slides` | `agent_id` | VARCHAR(16) |
-| `outline_slides` | `token_cost_json` | JSON |
-| `presentations` | `agent_id` | VARCHAR(16) |
-| `presentations` | `token_cost_json` | JSON |
-| `presentation_slides` | `agent_id` | VARCHAR(16) |
-| `presentation_slides` | `token_cost_json` | JSON |
+| `outline_slides` | `status` | VARCHAR(32) DEFAULT 'pending' |
+| `outline_snapshots` | （整表新增） | |
 | `knowledge_files` | `web_url` | VARCHAR(2048) |
 | `knowledge_files` | `conversation_id` | INT + INDEX |
 | `knowledge_files` | `summary_json` | JSON |
@@ -981,9 +986,15 @@ python-pptx 越晚添加越靠上。Assembly 中 `sorted(elements, key=z_order)`
 
 | 表 | 列 |
 |-----|-----|
+| `outlines` | `version` INT（→ version_major/minor/patch） |
+| `outline_slides` | `agent_id` |
 | `presentations` | `template_id` |
+| `presentations` | `agent_id` |
 | `presentation_slides` | `template_id` |
+| `presentation_slides` | `agent_id` |
 | `presentation_slides` | `color_scheme_id` → `style_id` |
+
+> **注意：** `agent_id` 不存入任何表，仅作为内存中 TokenCounter 的 key。`token_cost_json` 仅存在于 `messages` 表，大纲/PPT 各表不存。
 
 ---
 

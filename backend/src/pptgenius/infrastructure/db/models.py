@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UnicodeText, func
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -26,6 +26,9 @@ class Conversation(Base):
     title: Mapped[str] = mapped_column(String(256), nullable=False, default="")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
     current_phase: Mapped[str | None] = mapped_column(String(32), default="chat")
+    current_outline_id: Mapped[int | None] = mapped_column(
+        ForeignKey("outlines.id", ondelete="SET NULL")
+    )
     workspace_path: Mapped[str] = mapped_column(String(512), nullable=False, default="")
     estimated_cost: Mapped[float | None] = mapped_column(Float, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -34,8 +37,12 @@ class Conversation(Base):
     )
 
     messages: Mapped[list["Message"]] = relationship(back_populates="conversation")
-    outlines: Mapped[list["Outline"]] = relationship(back_populates="conversation")
+    outlines: Mapped[list["Outline"]] = relationship(
+        back_populates="conversation",
+        foreign_keys="[Outline.conversation_id]",
+    )
     presentations: Mapped[list["Presentation"]] = relationship(back_populates="conversation")
+    knowledge_files: Mapped[list["KnowledgeFile"]] = relationship(back_populates="conversation")
 
 
 class Message(Base):
@@ -48,6 +55,7 @@ class Message(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     content_type: Mapped[str | None] = mapped_column(String(32), default="text")
     estimated_cost: Mapped[float | None] = mapped_column(Float)
+    token_cost_json: Mapped[dict | None] = mapped_column(JSON)
     metadata_json: Mapped[dict | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
@@ -63,15 +71,39 @@ class Outline(Base):
     title: Mapped[str] = mapped_column(String(256), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="draft")
     eval_score: Mapped[float | None] = mapped_column(Float)
-    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    eval_detail: Mapped[dict | None] = mapped_column(JSON)
+    version_major: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    version_minor: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    version_patch: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     slide_count: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
     )
 
-    conversation: Mapped["Conversation"] = relationship(back_populates="outlines")
+    conversation: Mapped["Conversation"] = relationship(
+        back_populates="outlines",
+        foreign_keys="[Outline.conversation_id]",
+    )
+    sections: Mapped[list["OutlineSection"]] = relationship(back_populates="outline")
     slides: Mapped[list["OutlineSlide"]] = relationship(back_populates="outline")
+
+
+class OutlineSection(Base):
+    __tablename__ = "outline_sections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    outline_id: Mapped[int] = mapped_column(
+        ForeignKey("outlines.id", ondelete="CASCADE"), nullable=False
+    )
+    section_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    title: Mapped[str] = mapped_column(String(256), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    slide_count: Mapped[int | None] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    outline: Mapped["Outline"] = relationship(back_populates="sections")
+    slides: Mapped[list["OutlineSlide"]] = relationship(back_populates="section")
 
 
 class OutlineSlide(Base):
@@ -79,6 +111,9 @@ class OutlineSlide(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     outline_id: Mapped[int] = mapped_column(ForeignKey("outlines.id"), nullable=False)
+    section_id: Mapped[int | None] = mapped_column(
+        ForeignKey("outline_sections.id", ondelete="SET NULL")
+    )
     slide_index: Mapped[int] = mapped_column(Integer, nullable=False)
     title: Mapped[str] = mapped_column(String(256), nullable=False)
     content_json: Mapped[dict | None] = mapped_column(JSON)
@@ -86,31 +121,30 @@ class OutlineSlide(Base):
     has_image: Mapped[bool | None] = mapped_column(Boolean, default=False)
     has_chart: Mapped[bool | None] = mapped_column(Boolean, default=False)
     notes: Mapped[str | None] = mapped_column(Text)
+    citations: Mapped[list | None] = mapped_column(JSON)
+    status: Mapped[str | None] = mapped_column(String(32), default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     outline: Mapped["Outline"] = relationship(back_populates="slides")
+    section: Mapped["OutlineSection"] = relationship(back_populates="slides")
 
 
-class Template(Base):
-    __tablename__ = "templates"
+class OutlineSnapshot(Base):
+    __tablename__ = "outline_snapshots"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
-    label: Mapped[str] = mapped_column(String(100), nullable=False)
-    category: Mapped[str | None] = mapped_column(String(50))
-    description: Mapped[str | None] = mapped_column(String(500))
-    slide_width: Mapped[float] = mapped_column(Float, default=13.333)
-    slide_height: Mapped[float] = mapped_column(Float, default=7.5)
-    layouts_json: Mapped[dict] = mapped_column(JSON, nullable=False)
-    is_active: Mapped[bool | None] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), onupdate=func.now()
+    outline_id: Mapped[int] = mapped_column(
+        ForeignKey("outlines.id", ondelete="CASCADE"), nullable=False
     )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    conversation_id: Mapped[int] = mapped_column(ForeignKey("conversations.id"), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    outline_json: Mapped[dict] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
-class ColorScheme(Base):
-    __tablename__ = "color_schemes"
+class Style(Base):
+    __tablename__ = "styles"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
@@ -118,10 +152,9 @@ class ColorScheme(Base):
     colors_json: Mapped[dict] = mapped_column(JSON, nullable=False)
     chart_colors_json: Mapped[dict] = mapped_column(JSON, nullable=False)
     fonts_json: Mapped[dict] = mapped_column(JSON, nullable=False)
-    style_density: Mapped[str | None] = mapped_column(
-        String(16), default="moderate", nullable=True
-    )
-    decoration_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    style_density: Mapped[str | None] = mapped_column(String(16), default="moderate")
+    decoration_json: Mapped[dict | None] = mapped_column(JSON)
+    background_json: Mapped[dict | None] = mapped_column(JSON)
     is_active: Mapped[bool | None] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -136,8 +169,7 @@ class Presentation(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     conversation_id: Mapped[int] = mapped_column(ForeignKey("conversations.id"), nullable=False)
     outline_id: Mapped[int | None] = mapped_column(ForeignKey("outlines.id"))
-    template_id: Mapped[int | None] = mapped_column(ForeignKey("templates.id"))
-    color_scheme_id: Mapped[int | None] = mapped_column(ForeignKey("color_schemes.id"))
+    style_id: Mapped[int | None] = mapped_column(ForeignKey("styles.id", ondelete="SET NULL"))
     file_path: Mapped[str] = mapped_column(String(512), nullable=False, default="")
     file_size: Mapped[int | None] = mapped_column(Integer)
     slide_count: Mapped[int | None] = mapped_column(Integer, default=0)
@@ -160,11 +192,12 @@ class PresentationSlide(Base):
         ForeignKey("presentations.id", ondelete="CASCADE"), nullable=False
     )
     outline_slide_id: Mapped[int | None] = mapped_column(
-        ForeignKey("outline_slides.id")
+        ForeignKey("outline_slides.id", ondelete="SET NULL")
     )
     slide_index: Mapped[int] = mapped_column(Integer, nullable=False)
-    template_id: Mapped[int | None] = mapped_column(ForeignKey("templates.id"))
-    color_scheme_id: Mapped[int | None] = mapped_column(ForeignKey("color_schemes.id"))
+    style_id: Mapped[int | None] = mapped_column(
+        ForeignKey("styles.id", ondelete="SET NULL")
+    )
     layout_name: Mapped[str] = mapped_column(String(50), nullable=False)
     agent_outputs: Mapped[dict | None] = mapped_column(JSON)
     chart_data: Mapped[dict | None] = mapped_column(JSON)
@@ -201,15 +234,21 @@ class KnowledgeFile(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    conversation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("conversations.id", ondelete="SET NULL")
+    )
     filename: Mapped[str] = mapped_column(String(256), nullable=False)
     file_path: Mapped[str] = mapped_column(String(512), nullable=False)
     file_type: Mapped[str] = mapped_column(String(16), nullable=False)
     file_size: Mapped[int | None] = mapped_column(Integer)
     chunk_count: Mapped[int | None] = mapped_column(Integer, default=0)
     source_type: Mapped[str | None] = mapped_column(String(16), default="upload")
+    web_url: Mapped[str | None] = mapped_column(String(2048))
+    summary_json: Mapped[dict | None] = mapped_column(JSON)
     status: Mapped[str | None] = mapped_column(String(32), default="indexed")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
+    conversation: Mapped["Conversation"] = relationship(back_populates="knowledge_files")
     chunks: Mapped[list["KnowledgeChunk"]] = relationship(
         back_populates="file", cascade="all, delete-orphan"
     )

@@ -58,6 +58,17 @@ async def update_conversation_phase(db: AsyncSession, conv_id: int, phase: str) 
     return True
 
 
+async def set_conversation_outline(
+    db: AsyncSession, conv_id: int, outline_id: int | None
+) -> bool:
+    conv = await db.get(Conversation, conv_id)
+    if conv is None or conv.status == "deleted":
+        return False
+    conv.current_outline_id = outline_id
+    await db.commit()
+    return True
+
+
 async def archive_conversation(db: AsyncSession, conv_id: int) -> bool:
     conv = await db.get(Conversation, conv_id)
     if conv is None:

@@ -2,6 +2,7 @@ import os
 import sys
 
 import pytest_asyncio
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
@@ -24,7 +25,10 @@ async def engine():
     yield test_engine
 
     async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        await conn.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
+        for table in reversed(list(Base.metadata.tables.values())):
+            await conn.execute(text(f"DROP TABLE IF EXISTS `{table.name}`"))
+        await conn.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
     await test_engine.dispose()
 
 
