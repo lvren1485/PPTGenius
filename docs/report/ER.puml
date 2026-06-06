@@ -1,0 +1,190 @@
+@startuml
+!define Table(name,desc) class name as "desc" << (T,#FFAAAA) >>
+!define primary_key(x) <b><u>x</u></b>
+!define foreign_key(x) <i>x</i>
+
+' 用户与对话
+Table(users, "users") {
+  + primary_key(id) INT
+  name VARCHAR(64)
+  password VARCHAR(256)
+  other JSON
+  created_at DATETIME
+}
+
+Table(conversations, "conversations") {
+  + primary_key(id) INT
+  foreign_key(user_id) INT
+  title VARCHAR(256)
+  status VARCHAR(32)
+  current_phase VARCHAR(32)
+  workspace_path VARCHAR(512)
+  estimated_cost DOUBLE
+  created_at DATETIME
+  updated_at DATETIME
+}
+
+Table(messages, "messages") {
+  + primary_key(id) INT
+  foreign_key(conversation_id) INT
+  idx INT
+  role VARCHAR(16)
+  content TEXT
+  content_type VARCHAR(32)
+  estimated_cost DOUBLE
+  metadata_json JSON
+  created_at DATETIME
+}
+
+' 大纲
+Table(outlines, "outlines") {
+  + primary_key(id) INT
+  foreign_key(user_id) INT
+  foreign_key(conversation_id) INT
+  title VARCHAR(256)
+  status VARCHAR(32)
+  eval_score DOUBLE
+  version INT
+  slide_count INT
+  created_at DATETIME
+  updated_at DATETIME
+}
+
+Table(outline_slides, "outline_slides") {
+  + primary_key(id) INT
+  foreign_key(outline_id) INT
+  slide_index INT
+  title VARCHAR(256)
+  content_json JSON
+  layout_type VARCHAR(32)
+  has_image TINYINT
+  has_chart TINYINT
+  notes TEXT
+  created_at DATETIME
+}
+
+' 模板与配色
+Table(templates, "templates") {
+  + primary_key(id) INT
+  name VARCHAR(50) UNIQUE
+  label VARCHAR(100)
+  category VARCHAR(50)
+  description VARCHAR(500)
+  slide_width FLOAT
+  slide_height FLOAT
+  layouts_json JSON
+  is_active BOOLEAN
+  created_at DATETIME
+  updated_at DATETIME
+}
+
+Table(color_schemes, "color_schemes") {
+  + primary_key(id) INT
+  name VARCHAR(50) UNIQUE
+  label VARCHAR(100)
+  colors_json JSON
+  chart_colors_json JSON
+  fonts_json JSON
+  style_density VARCHAR(16)
+  decoration_json JSON
+  is_active BOOLEAN
+  created_at DATETIME
+  updated_at DATETIME
+}
+
+' PPT
+Table(presentations, "presentations") {
+  + primary_key(id) INT
+  foreign_key(user_id) INT
+  foreign_key(conversation_id) INT
+  foreign_key(outline_id) INT
+  foreign_key(template_id) INT
+  foreign_key(color_scheme_id) INT
+  file_path VARCHAR(512)
+  file_size INT
+  slide_count INT
+  status VARCHAR(32)
+  error_msg TEXT
+  created_at DATETIME
+  updated_at DATETIME
+}
+
+Table(presentation_slides, "presentation_slides") {
+  + primary_key(id) INT
+  foreign_key(presentation_id) INT
+  foreign_key(outline_slide_id) INT
+  foreign_key(template_id) INT
+  foreign_key(color_scheme_id) INT
+  slide_index INT
+  layout_name VARCHAR(50)
+  agent_outputs JSON
+  chart_data JSON
+  table_data JSON
+  image_paths JSON
+  status VARCHAR(20)
+  error_message TEXT
+  retry_count INT
+  created_at DATETIME
+  updated_at DATETIME
+}
+
+Table(presentation_snapshots, "presentation_snapshots") {
+  + primary_key(id) INT
+  foreign_key(presentation_id) INT
+  foreign_key(user_id) INT
+  foreign_key(conversation_id) INT
+  outline_json JSON
+  presentation_json JSON
+  version INT
+  created_at DATETIME
+}
+
+' 知识库
+Table(knowledge_files, "knowledge_files") {
+  + primary_key(id) INT
+  foreign_key(user_id) INT
+  filename VARCHAR(256)
+  file_path VARCHAR(512)
+  file_type VARCHAR(16)
+  file_size INT
+  chunk_count INT
+  source_type VARCHAR(16)
+  status VARCHAR(32)
+  created_at DATETIME
+}
+
+Table(knowledge_chunks, "knowledge_chunks") {
+  + primary_key(id) INT
+  foreign_key(file_id) INT
+  chunk_index INT
+  chunk_text TEXT
+  token_count INT
+  created_at DATETIME
+}
+
+' 关系定义
+users ||--o{ conversations : "user_id"
+conversations ||--o{ messages : "conversation_id"
+users ||--o{ outlines : "user_id"
+conversations ||--o{ outlines : "conversation_id"
+outlines ||--o{ outline_slides : "outline_id"
+
+users ||--o{ presentations : "user_id"
+conversations ||--o{ presentations : "conversation_id"
+outlines ||--o{ presentations : "outline_id"
+templates ||--o{ presentations : "template_id"
+color_schemes ||--o{ presentations : "color_scheme_id"
+
+presentations ||--o{ presentation_slides : "presentation_id"
+outline_slides ||--o{ presentation_slides : "outline_slide_id"
+templates ||--o{ presentation_slides : "template_id"
+color_schemes ||--o{ presentation_slides : "color_scheme_id"
+
+presentations ||--o{ presentation_snapshots : "presentation_id"
+users ||--o{ presentation_snapshots : "user_id"
+conversations ||--o{ presentation_snapshots : "conversation_id"
+
+users ||--o{ knowledge_files : "user_id"
+knowledge_files ||--o{ knowledge_chunks : "file_id"
+
+@enduml
