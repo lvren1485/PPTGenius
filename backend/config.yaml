@@ -1,7 +1,7 @@
 # PPTGenius 业务配置
 app:
   name: "PPTGenius"
-  version: "0.1.0"
+  version: "0.2.0"
 
 workspace:
   root: "./data/workspace"
