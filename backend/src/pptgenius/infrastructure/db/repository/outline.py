@@ -355,6 +355,37 @@ async def insert_outline_slide_after(
     return slide
 
 
+async def replace_section_slides(
+    db: AsyncSession,
+    outline_id: int,
+    section_id: int,
+    slides: list[dict],
+) -> list[OutlineSlide]:
+    """Replace all slides within *section_id*, preserving slides in other sections."""
+    old = await get_slides_by_outline_id(db, outline_id)
+    for s in old:
+        if s.section_id == section_id:
+            await db.delete(s)
+    await db.flush()
+
+    new = []
+    for s in slides:
+        slide = await create_outline_slide(
+            db,
+            outline_id=outline_id,
+            section_id=section_id,
+            slide_index=s["slide_index"],
+            title=s["title"],
+            content_json=s.get("content_json"),
+            layout_type=s.get("layout_type", "content"),
+            has_image=s.get("has_image", False),
+            has_chart=s.get("has_chart", False),
+            notes=s.get("notes"),
+        )
+        new.append(slide)
+    return new
+
+
 async def replace_outline_slides(
     db: AsyncSession,
     outline_id: int,
