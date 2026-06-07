@@ -19,7 +19,15 @@ def make_write_outline_structure(db: Database, conversation_id: int) -> Callable
         title: str,
         sections: list[dict],
     ) -> str:
-        """Create a new outline with sections. title_slide and ending_slide are added automatically."""
+        """Create a new outline skeleton with sections, auto-adding title and ending slides.
+
+        The title_slide (index 1) and ending_slide (last index) are created automatically.
+        Do NOT include them in the sections list.
+
+        Args:
+            title: The presentation title.
+            sections: List of {section_index, title, description}. section_index starts at 1.
+        """
         conv = await db.get_conversation(conversation_id)
         if conv is None:
             return f"错误: 对话 {conversation_id} 不存在"
@@ -65,7 +73,23 @@ def make_modify_outline_structure(db: Database, conversation_id: int) -> Callabl
     """Modify outline: pure DB ops execute directly; content ops create placeholders."""
 
     async def _modify_outline_structure(operations: list[dict]) -> str:
-        """Modify outline structure: rename/delete/reorder are immediate; merge/split/insert create placeholders."""
+        """Modify the outline structure with one or more operations.
+
+        Pure DB ops execute immediately:
+        - rename_slide: {op, slide_index, new_title}
+        - delete_slide: {op, slide_index}
+        - reorder_slides: {op, section_index, slide_order: [old_index, ...]}
+
+        Content ops create placeholder slides (content_json=null, status=pending),
+        requiring a subsequent modify_outline_section call:
+        - merge_slides: {op, slide_indices: [idx, ...], new_title}
+        - split_slide: {op, slide_index}
+        - insert_slide: {op, after_slide_index, title, section_index}
+
+        Args:
+            operations: List of operation dicts. Order matters — deletions before
+                insertions to avoid index conflicts.
+        """
         conv = await db.get_conversation(conversation_id)
         if conv is None or conv.current_outline_id is None:
             return "错误: 没有选中大纲，请先切换或创建大纲"

@@ -1,6 +1,8 @@
 """Perception tools — 7 read-only DB tools for the Master Agent.
 
 All take ``db: Database`` and auto-inject conversation_id / outline_id via closure.
+Each tool uses Google-style docstrings so the @tool decorator extracts per-argument
+descriptions for the LLM.
 """
 
 from __future__ import annotations
@@ -18,7 +20,11 @@ def make_get_conversation_status(
     """Return a tool that reads the full conversation + outlines + presentation state."""
 
     async def _get_conversation_status() -> dict:
-        """List all outlines and knowledge files for the current conversation."""
+        """List all outlines, presentations, and knowledge files for the current conversation.
+
+        Call this first in every turn to orient yourself. Returns the active outline,
+        all available outlines with their presentation status, and knowledge files.
+        """
         conv = await db.get_conversation(conversation_id)
         if conv is None:
             return {"error": f"Conversation {conversation_id} not found"}
@@ -50,7 +56,9 @@ def make_get_conversation_status(
                 "presentation": pres_info,
             })
 
-        kf_list = await db.list_knowledge_files(user_id=conv.user_id, conversation_id=conversation_id)
+        kf_list = await db.list_knowledge_files(
+            user_id=conv.user_id, conversation_id=conversation_id,
+        )
         knowledge_files = [
             {
                 "id": kf.id, "filename": kf.filename, "type": kf.file_type,
@@ -74,7 +82,11 @@ def make_switch_outline(db: Database, conversation_id: int) -> Callable:
     """Return a tool to switch the active outline for this conversation."""
 
     async def _switch_outline(outline_id: int | None = None) -> str:
-        """Switch the active outline for this conversation."""
+        """Switch the active outline for this conversation.
+
+        Args:
+            outline_id: The outline to switch to. Pass null to deselect the current outline.
+        """
         await db.set_conversation_outline(conversation_id, outline_id)
         if outline_id is None:
             return "已取消选中大纲"
@@ -91,7 +103,15 @@ def make_get_outline(db: Database, conversation_id: int) -> Callable:
     """Return a tool to read the current outline structure."""
 
     async def _get_outline(outline_id: int | None = None) -> dict:
-        """Get the full outline structure with section and slide summaries."""
+        """Get the full outline structure with section and slide summaries.
+
+        If outline_id is not provided, uses the current outline from the conversation.
+        Returns sections with their slides, each slide showing title, layout_type, status,
+        and a content summary.
+
+        Args:
+            outline_id: Optional explicit outline id. Omit to use current_outline_id.
+        """
         oid = outline_id
         if oid is None:
             conv = await db.get_conversation(conversation_id)
@@ -137,7 +157,13 @@ def make_get_outline_slide(db: Database, conversation_id: int) -> Callable:
     """Return a tool to read a single slide's full content."""
 
     async def _get_outline_slide(slide_id: int) -> dict:
-        """Read a single slide's full content_json, citations and notes."""
+        """Read a single slide's complete content, citations, and notes.
+
+        Use this before modifying a slide to see its full content_json.
+
+        Args:
+            slide_id: The id of the outline_slide to inspect.
+        """
         slide = await db.get_outline_slide(slide_id)
         if slide is None:
             return {"error": f"Slide {slide_id} not found"}
@@ -158,7 +184,14 @@ def make_get_presentation(db: Database, conversation_id: int) -> Callable:
     """Return a tool to read the presentation state for the current outline."""
 
     async def _get_presentation(presentation_id: int | None = None) -> dict:
-        """Read the presentation state for the current outline (element count per slide)."""
+        """Read the presentation state for the current outline.
+
+        Shows element count and types per slide. Defaults to the presentation
+        associated with the current outline.
+
+        Args:
+            presentation_id: Optional explicit presentation id. Omit for current.
+        """
         pid = presentation_id
         if pid is None:
             conv = await db.get_conversation(conversation_id)
@@ -201,7 +234,11 @@ def make_get_knowledge_files(db: Database, conversation_id: int) -> Callable:
     """Return a tool to list knowledge files for this conversation."""
 
     async def _get_knowledge_files() -> list[dict]:
-        """List knowledge files with summaries for this conversation."""
+        """List all knowledge files for the current conversation with their LLM summaries.
+
+        Files with has_full_summary=true have already been summarized and do not
+        need summarize_file called again.
+        """
         conv = await db.get_conversation(conversation_id)
         if conv is None:
             return []
@@ -223,10 +260,14 @@ def make_get_knowledge_files(db: Database, conversation_id: int) -> Callable:
 
 
 def make_list_styles(db: Database, conversation_id: int) -> Callable:
-    """Return a tool to search available styles by keyword."""
+    """Return a tool to search available visual styles by keyword."""
 
     async def _list_styles(query: str = "") -> list[dict]:
-        """Search available visual styles by keyword (name or label)."""
+        """Search available visual styles by keyword matching name or label.
+
+        Args:
+            query: Search keyword. Pass empty string to list all active styles.
+        """
         styles = await db.search_styles(query)
         return [
             {
