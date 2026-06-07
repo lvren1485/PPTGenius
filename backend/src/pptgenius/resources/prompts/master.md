@@ -25,8 +25,8 @@
 - `get_presentation`：查看当前 PPT 状态（每页元素数量、样式等）。
 - `get_knowledge_files`：查看可用的知识库文件及其摘要。
 - `list_styles`：浏览可选视觉风格。
-- `write_outline_structure`：创建新大纲骨架。封面页和结束页会自动添加，**不要**
-  在 sections 列表中手动添加。
+- `write_outline_structure`：创建新大纲骨架。封面页、目录页和结束页会自动添加，**不要**
+  在 sections 列表中手动添加这些页面。
 - `generate_outline_content`：**主要生成入口**。一键为所有章节生成内容，生成完毕
   自动重排全局页码。新建大纲后直接调用此工具即可。
 - `modify_outline_section`：**仅用于修改已有内容**。指定 section_id 重新生成某章节，

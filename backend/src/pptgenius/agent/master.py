@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage
 from langgraph.config import get_stream_writer
 
+from pptgenius.infrastructure.config.settings import RESOURCES_DIR
 from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import TokenCounter
 
@@ -62,7 +61,7 @@ async def run_master_agent(
     conversation_id: int,
     user_message: str,
     *,
-    recursion_limit: int = 25,
+    recursion_limit: int = 50,
 ) -> dict:
     """Run the Unified Master Agent for one user turn.
 
@@ -78,7 +77,7 @@ async def run_master_agent(
     tools = _assemble_tools(db, conversation_id)
 
     # --- 3. Build agent ---
-    prompt_path = Path(__file__).parent.parent / "resources" / "prompts" / "master.md"
+    prompt_path = RESOURCES_DIR / "prompts" / "master.md"
     system_prompt = prompt_path.read_text(encoding="utf-8")
     agent = create_agent(
         model=llm,
@@ -116,12 +115,16 @@ async def run_master_agent(
                 "input_tokens": snap["prompt_tokens"],
                 "output_tokens": snap["completion_tokens"],
                 "total_tokens": snap["total_tokens"],
+                "cache_tokens": snap["cache_tokens"],
             },
         )
 
     # --- 7. Snapshot on exit ---
     outline_changed = _has_outline_changed(result)
     presentation_changed = _has_presentation_changed(result)
+
+    if outline_changed:
+        await db.increase_outline_version(conv.current_outline_id, "patch")
 
     if outline_changed:
         conv = await db.get_conversation(conversation_id)
@@ -153,7 +156,8 @@ def _has_outline_changed(state: dict) -> bool:
     # modify_outline_structure, assume outline changed.
     for m in msgs:
         name = getattr(m, "name", "")
-        if name in ("write_outline_structure", "modify_outline_structure"):
+        if name in ("write_outline_structure", "modify_outline_structure",
+                     "generate_outline_content", "modify_outline_section"):
             return True
     return False
 
