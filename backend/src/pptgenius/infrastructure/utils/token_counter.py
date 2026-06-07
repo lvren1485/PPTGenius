@@ -43,6 +43,10 @@ def _first_of(d: dict, *keys: str, default: int = 0) -> int:
 
 _counters: dict[int, "TokenCounter"] = {}
 
+# -- per-agent registry (memory-only, agent_id not persisted) -----------------
+
+_agent_counters: dict[str, "TokenCounter"] = {}
+
 
 class TokenCounter:
     """Accumulate token usage for one conversation.
@@ -88,6 +92,33 @@ class TokenCounter:
     def remove(cls, conversation_id: int) -> None:
         """Discard the counter for *conversation_id*."""
         _counters.pop(conversation_id, None)
+
+    # -- per-agent registry ---------------------------------------------------
+
+    @classmethod
+    def for_agent(cls, agent_id: str, model_name: str = "deepseek-v4-flash") -> "TokenCounter":
+        """Get or create the TokenCounter for *agent_id* (memory-only)."""
+        tc = _agent_counters.get(agent_id)
+        if tc is None:
+            tc = _agent_counters[agent_id] = cls(model_name)
+        return tc
+
+    @classmethod
+    def get_agent(cls, agent_id: str) -> "TokenCounter | None":
+        """Return the TokenCounter for *agent_id* or None."""
+        return _agent_counters.get(agent_id)
+
+    @classmethod
+    def remove_agent(cls, agent_id: str) -> None:
+        """Discard the counter for *agent_id*."""
+        _agent_counters.pop(agent_id, None)
+
+    @classmethod
+    def get_cost(cls, key: int | str) -> "TokenCounter | None":
+        """Dual interface: ``int`` → conversation_id, ``str`` → agent_id."""
+        if isinstance(key, int):
+            return _counters.get(key)
+        return _agent_counters.get(key)
 
     # -- public API ----------------------------------------------------------
 

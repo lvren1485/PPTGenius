@@ -122,6 +122,24 @@ async def update_message_token_cost(
     return True
 
 
+async def set_message_cost(
+    db: AsyncSession,
+    message_id: int,
+    token_cost_json: dict,
+    estimated_cost: float,
+) -> bool:
+    """Set both token_cost_json and estimated_cost on a message, and accumulate
+    estimated_cost to the conversation."""
+    msg = await db.get(Message, message_id)
+    if msg is None:
+        return False
+    msg.token_cost_json = token_cost_json
+    msg.estimated_cost = estimated_cost
+    await db.commit()
+    await _add_conversation_cost(db, msg.conversation_id, estimated_cost)
+    return True
+
+
 async def trim_messages(db: AsyncSession, conversation_id: int, before_idx: int) -> int:
     from sqlalchemy import delete
 

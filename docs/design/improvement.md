@@ -4,6 +4,9 @@
 
 ---
 
+> 禁止在src、pptgenius目录及其上级目录新建任何文件夹或文件，除非在下表中明确列出。
+> 所有文件必须经过静态测试，静态测试文件放在backen/src/tests目录下。
+
 ## 目录
 
 - [PPTGenius 改进方案](#pptgenius-改进方案)
@@ -72,6 +75,8 @@
 | **Assembly** | infra 函数 | z_order 排序 → 渲染 .pptx → snapshot，不经 LLM |
 
 ### 目标目录结构
+
+> 原先的agent文件在agent_old中，写对应的文件**必须**查看对应的agent_old文件做参考
 
 ```
 agent/

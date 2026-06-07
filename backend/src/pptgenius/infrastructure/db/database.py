@@ -44,6 +44,7 @@ class Database:
     async def count_messages_by_conversation(self, *a, **kw): return await msg_repo.count_messages_by_conversation(self.db, *a, **kw)
     async def trim_messages(self, *a, **kw): return await msg_repo.trim_messages(self.db, *a, **kw)
     async def update_message_token_cost(self, *a, **kw): return await msg_repo.update_message_token_cost(self.db, *a, **kw)
+    async def set_message_cost(self, *a, **kw): return await msg_repo.set_message_cost(self.db, *a, **kw)
 
     # ─── outline ───
     async def create_outline(self, *a, **kw): return await out_repo.create_outline(self.db, *a, **kw)
