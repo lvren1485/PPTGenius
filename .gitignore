@@ -1,14 +1,37 @@
+# python
 __pycache__/
 *.py[cod]
 .venv/
 venv/
-.env
+
+# distribution files
 output_demo.pptx
 dist/
 build/
 *.egg-info/
+
+# frontend
 frontend/node_modules/
 frontend/dist/
-*.log
+
+# IDEs
+.idea/
 .vscode
 .trae
+
+# assets
+backend/.temp_icons/
+*.svg
+*.png
+icons_meta.json
+
+# running data
+backend/data/
+
+# logs
+*/logs/
+*.log
+
+# secret 
+.env
+config.local.yaml
