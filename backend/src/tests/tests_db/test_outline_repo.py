@@ -227,8 +227,10 @@ class TestOutlineSlideIndex:
 
     async def test_insert_after_shifts_subsequent(self, d):
         db_obj, outline = d
+        slides = await db_obj.get_slides_by_outline_id(outline.id)
+        s2 = [s for s in slides if s.slide_index == 2][0]
         new_slide = await db_obj.insert_outline_slide_after(
-            outline.id, after_index=2, title="Inserted",
+            outline.id, after_slide_id=s2.id, title="Inserted",
         )
         assert new_slide.slide_index == 3
         all_slides = await db_obj.get_slides_by_outline_id(outline.id)
@@ -239,12 +241,14 @@ class TestOutlineSlideIndex:
         assert titles[4] == "Slide 3"  # was index 3, now 4
         assert titles[5] == "Slide 4"  # was index 4, now 5
 
-    async def test_insert_after_zero_puts_first(self, d):
+    async def test_insert_after_first_puts_second(self, d):
         db_obj, outline = d
+        slides = await db_obj.get_slides_by_outline_id(outline.id)
+        s1 = [s for s in slides if s.slide_index == 1][0]
         new_slide = await db_obj.insert_outline_slide_after(
-            outline.id, after_index=0, title="New First",
+            outline.id, after_slide_id=s1.id, title="New Second",
         )
-        assert new_slide.slide_index == 1
+        assert new_slide.slide_index == 2
         all_slides = await db_obj.get_slides_by_outline_id(outline.id)
         assert [s.slide_index for s in all_slides] == [1, 2, 3, 4, 5]
-        assert all_slides[0].title == "New First"
+        assert all_slides[1].title == "New Second"

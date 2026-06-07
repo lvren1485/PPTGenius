@@ -1,6 +1,6 @@
 """Structure tools — write_outline_structure, modify_outline_structure.
 
-Auto-inject conversation_id via closure.  All index values are 1-based.
+Auto-inject conversation_id via closure.  All operations use slide IDs (not indices).
 """
 
 from __future__ import annotations
@@ -13,9 +13,41 @@ from pptgenius.infrastructure.db.database import Database
 
 from ..common.tool_sse_wrapper import wrap_tool_with_sse
 
+_TAG_MERGE = "（待合并）"
+_TAG_SPLIT = "（待分割）"
+
+# keys that reference slide IDs in each operation type
+_ID_KEYS = {
+    "rename": ["slide_id"],
+    "delete": ["target_id", "merge_id"],
+    "insert": ["after_id"],
+    "move":   ["target_id", "after_id"],
+}
+
+
+def _extract_slide_ids(operations: list[dict]) -> list[int]:
+    ids: list[int] = []
+    for op in operations:
+        for key in _ID_KEYS.get(op.get("op", ""), []):
+            v = op.get(key)
+            if v is not None:
+                ids.append(v)
+    return ids
+
+
+def _check_duplicates(ids: list[int]) -> str | None:
+    seen = set()
+    dup = set()
+    for i in ids:
+        if i in seen:
+            dup.add(i)
+        seen.add(i)
+    if dup:
+        return f"错误: 以下 slide ID 重复出现: {sorted(dup)}"
+    return None
+
 
 def make_write_outline_structure(db: Database, conversation_id: int) -> Callable:
-    """Create outline + sections + auto title_slide, TOC, ending_slide + set current_outline_id."""
 
     async def _write_outline_structure(
         title: str,
@@ -48,24 +80,11 @@ def make_write_outline_structure(db: Database, conversation_id: int) -> Callable
                 description=s.get("description", ""),
             )
 
-        # Auto-insert title_slide at index 1
-        await db.create_outline_slide(
-            outline_id=outline.id, slide_index=1,
-            title=title, layout_type="title",
-        )
-        # Auto-insert TOC slide at index 2
-        await db.create_outline_slide(
-            outline_id=outline.id, slide_index=2,
-            title="目录", layout_type="content",
-        )
-        # Ending slide at last index
-        await db.create_outline_slide(
-            outline_id=outline.id, slide_index=3,
-            title="谢谢", layout_type="thanks",
-        )
+        await db.create_outline_slide(outline.id, 1, title, layout_type="title")
+        await db.create_outline_slide(outline.id, 2, "目录", layout_type="content")
+        await db.create_outline_slide(outline.id, 3, "谢谢", layout_type="thanks")
 
         await db.set_conversation_outline(conversation_id, outline.id)
-
         return (
             f"已创建大纲:'{title}'(id={outline.id}), "
             f"{len(sections)} sections, title+TOC+ending 已自动添加"
@@ -75,182 +94,165 @@ def make_write_outline_structure(db: Database, conversation_id: int) -> Callable
 
 
 def make_modify_outline_structure(db: Database, conversation_id: int) -> Callable:
-    """Modify outline: pure DB ops execute directly; content ops create placeholders."""
 
-    async def _modify_outline_structure(operations: list[dict]) -> str:
-        """Modify the outline structure with one or more operations.
+    async def _modify_outline_structure(operations: list[dict]) -> dict:
+        """Modify the outline structure. All operations use slide IDs, NOT indices.
 
-        Pure DB ops execute immediately:
-        - rename_slide: {op, slide_index, new_title}
-        - delete_slide: {op, slide_index}
-        - reorder_slides: {op, slide_order: [new_index_order...]}
+        Batch pre-check: every slide_id/target_id/after_id/merge_id must be unique.
+        Duplicate slide IDs will cause the entire batch to be rejected.
+        is_copy and is_change_section are bool flags, default False. 
 
-        Content ops create placeholder slides, copying content to preserve context,
-        requiring a subsequent modify_outline_section call:
-        - merge_slides: {op, slide_indices: [idx, ...], new_title}
-        - split_slide: {op, slide_index}
-        - insert_slide: {op, after_slide_index, title}
+        Operations:
+          rename: {op, slide_id, new_title}
+          delete: {op, target_id, merge_id?} — delete target_id. merge_id appends target's
+                   content to merge, tags merge title "待合并".
+          insert: {op, after_id, is_copy?} — insert after after_id. is_copy=true copies
+                   content from after_id (split), tags both "待分割". New slide inherits
+                   after_id's section_id.
+          move:   {op, target_id, after_id, is_change_section?} — move target_id after
+                   after_id. Inherits section_id. If section changes, is_change_section
+                   must be true or rejected.
+
+        Returns {summary, placeholder_slide_ids} where placeholder_slide_ids lists
+        slides that need content regeneration via modify_outline_section.
 
         Args:
-            operations: List of operation dicts. Order matters — deletions before
-                insertions to avoid index conflicts.
+            operations: List of operation dicts, executed in order.
         """
+        # ── pre-validation: duplicate slide IDs ──
+        err = _check_duplicates(_extract_slide_ids(operations))
+        if err:
+            return {"error": err}
+
         conv = await db.get_conversation(conversation_id)
         if conv is None or conv.current_outline_id is None:
-            return "错误: 没有选中大纲，请先切换或创建大纲"
+            return {"error": "没有选中大纲"}
 
         outline_id = conv.current_outline_id
-        slides = await db.get_slides_by_outline_id(outline_id)
-        # Build slide lookup: we need both by-index and by-id since indexes shift
-        slide_by_id = {sl.id: sl for sl in slides}
-
-        pure_count = {"rename": 0, "delete": 0, "reorder": 0}
-        placeholder_count = 0
+        rename_count = 0
+        placeholder_ids: list[int] = []
         notes: list[str] = []
 
         for op in operations:
             op_type = op.get("op")
 
-            if op_type == "rename_slide":
-                si = op["slide_index"]
-                sl = _find_by_index(slides, si)
-                if sl:
-                    await db.update_outline_slide(sl.id, title=op["new_title"])
-                    pure_count["rename"] += 1
+            if op_type == "rename":
+                sid, new_title = op["slide_id"], op["new_title"]
+                ok = await db.update_outline_slide(sid, title=new_title)
+                if ok:
+                    rename_count += 1
                 else:
-                    notes.append(f"rename failed: slide_index={si} not found")
+                    notes.append(f"rename 失败: slide {sid} 不存在")
 
-            elif op_type == "delete_slide":
-                si = op["slide_index"]
-                sl = _find_by_index(slides, si)
-                if sl:
-                    await db.delete_outline_slide(sl.id)
-                    pure_count["delete"] += 1
-                    # Refresh slide list since delete reindexes
-                    slides = await db.get_slides_by_outline_id(outline_id)
-                    slide_by_id = {sl.id: sl for sl in slides}
-                else:
-                    notes.append(f"delete failed: slide_index={si} not found")
+            elif op_type == "delete":
+                target_id, merge_id = op["target_id"], op.get("merge_id")
+                target = await db.get_outline_slide(target_id)
+                if target is None:
+                    notes.append(f"delete 失败: target_id={target_id} 不存在")
+                    continue
+                if merge_id is not None:
+                    merge = await db.get_outline_slide(merge_id)
+                    if merge is None:
+                        notes.append(f"delete 失败: merge_id={merge_id} 不存在")
+                        continue
+                    _merge_into(target, merge)
+                    old_title = merge.title or ""
+                    if _TAG_MERGE not in old_title:
+                        await db.update_outline_slide(merge_id, title=old_title + _TAG_MERGE)
+                    placeholder_ids.append(merge_id)
+                await db.delete_outline_slide(target_id)
 
-            elif op_type == "reorder_slides":
-                order = op.get("slide_order", [])
-                # Slide_order lists all current slide_index values in desired new order.
-                # After reorder, slide 1→new index 1, slide N→new index N.
-                slides = await db.get_slides_by_outline_id(outline_id)
-                old_to_new = {}
-                for new_idx, old_idx in enumerate(order, start=1):
-                    sl = _find_by_index(slides, old_idx)
-                    if sl:
-                        old_to_new[sl.id] = new_idx
-                for sid, new_idx in old_to_new.items():
-                    await db.update_outline_slide_index(sid, new_idx)
-                slides = await db.get_slides_by_outline_id(outline_id)
-                slide_by_id = {sl.id: sl for sl in slides}
-                pure_count["reorder"] += 1
-
-            elif op_type == "merge_slides":
-                indices = sorted(op["slide_indices"])
-                new_title = op.get("new_title", "合并页")
-                # Collect content from merged slides
-                merged_content = _collect_content(slides, indices)
-                # Use proper delete (triggers reindex)
-                first_si = indices[0]
-                for si in reversed(indices):
-                    sl = _find_by_index(slides, si)
-                    if sl:
-                        await db.delete_outline_slide(sl.id)
-                slides = await db.get_slides_by_outline_id(outline_id)
-                # Insert placeholder with merged content
-                await db.insert_outline_slide_after(
-                    outline_id=outline_id, after_index=first_si - 1,
-                    title=new_title, layout_type="content",
-                    content_json=merged_content,
+            elif op_type == "insert":
+                after_id, is_copy = op["after_id"], op.get("is_copy", False)
+                after = await db.get_outline_slide(after_id)
+                if after is None:
+                    notes.append(f"insert 失败: after_id={after_id} 不存在")
+                    continue
+                new_title = "新页"
+                content = None
+                if is_copy:
+                    old_title = after.title or ""
+                    if _TAG_SPLIT not in old_title:
+                        await db.update_outline_slide(after_id, title=old_title + _TAG_SPLIT)
+                    new_title = (after.title or "新页").rstrip(_TAG_SPLIT) + _TAG_SPLIT
+                    content = dict(after.content_json) if after.content_json else None
+                    placeholder_ids.append(after_id)
+                new_slide = await db.insert_outline_slide_after(
+                    outline_id=outline_id, after_slide_id=after_id,
+                    title=new_title, section_id=after.section_id,
+                    content_json=content,
                 )
-                placeholder_count += 1
-                slides = await db.get_slides_by_outline_id(outline_id)
-                slide_by_id = {sl.id: sl for sl in slides}
+                placeholder_ids.append(new_slide.id)
 
-            elif op_type == "split_slide":
-                si = op["slide_index"]
-                sl = _find_by_index(slides, si)
-                if sl:
-                    # Copy original content to both new slides as baseline
-                    await db.insert_outline_slide_after(
-                        outline_id=outline_id, after_index=si,
-                        title=f"{sl.title}(拆分A)", layout_type=sl.layout_type,
-                        content_json=_copy_content(sl.content_json),
+            elif op_type == "move":
+                target_id, after_id = op["target_id"], op["after_id"]
+                is_change_section = op.get("is_change_section", False)
+                target = await db.get_outline_slide(target_id)
+                after = await db.get_outline_slide(after_id)
+                if target is None or after is None:
+                    notes.append(f"move 失败: slide 不存在")
+                    continue
+                if target.section_id != after.section_id and not is_change_section:
+                    notes.append(
+                        f"move: slide {target_id} 跨 section→{after.section_id}, "
+                        f"需设置 is_change_section=true"
                     )
-                    # Update the original (now shifted) to be the B part
-                    slides = await db.get_slides_by_outline_id(outline_id)
-                    orig = _find_by_index(slides, si)
-                    if orig:
-                        await db.update_outline_slide(
-                            orig.id,
-                            title=f"{sl.title}(拆分B)",
-                            content_json=_copy_content(sl.content_json),
-                        )
-                    placeholder_count += 2
-                    slides = await db.get_slides_by_outline_id(outline_id)
-                    slide_by_id = {sl.id: sl for sl in slides}
+                    continue
+                # Reindex: shift slides between target and after
+                all_slides = await db.get_slides_by_outline_id(outline_id)
+                tgt_idx = target.slide_index
+                aft_idx = after.slide_index
+                if tgt_idx < aft_idx:
+                    # target is before after: shift slides (tgt+1 .. aft) down by 1
+                    for s in all_slides:
+                        if tgt_idx < s.slide_index <= aft_idx:
+                            await db.update_outline_slide_index(s.id, s.slide_index - 1)
+                    # target now goes at aft_idx
+                    await db.update_outline_slide_index(target_id, aft_idx)
+                elif tgt_idx > aft_idx:
+                    # target is after after: shift slides (aft+1 .. tgt-1) up by 1
+                    for s in all_slides:
+                        if aft_idx < s.slide_index < tgt_idx:
+                            await db.update_outline_slide_index(s.id, s.slide_index + 1)
+                    # target now goes after after
+                    await db.update_outline_slide_index(target_id, aft_idx + 1)
+                # else tgt_idx == aft_idx: no-op (shouldn't happen with unique check)
+                await db.update_outline_slide(target_id, section_id=after.section_id)
 
-            elif op_type == "insert_slide":
-                after_idx = op["after_slide_index"]
-                await db.insert_outline_slide_after(
-                    outline_id=outline_id, after_index=after_idx,
-                    title=op.get("title", "新页"), layout_type="content",
-                )
-                placeholder_count += 1
-                slides = await db.get_slides_by_outline_id(outline_id)
-                slide_by_id = {sl.id: sl for sl in slides}
-
-        result_parts = []
-        for k in ("rename", "delete", "reorder"):
-            if pure_count[k]:
-                result_parts.append(f"{k}×{pure_count[k]}")
-        if placeholder_count:
-            result_parts.append(f"占位×{placeholder_count}")
-
-        result = f"完成: {', '.join(result_parts) if result_parts else '无操作'}"
-        if placeholder_count:
-            result += "。占位 slide 需调用 modify_outline_section 填充内容"
+        # ── result ──
+        parts = []
+        if rename_count:
+            parts.append(f"rename×{rename_count}")
+        if placeholder_ids:
+            parts.append(f"占位×{len(placeholder_ids)}")
+        summary = f"完成: {', '.join(parts) if parts else '无操作'}"
+        if placeholder_ids:
+            summary += f"。需要生成内容的 slide ID: {placeholder_ids}"
         if notes:
-            result += f"\n注意: {'; '.join(notes)}"
+            summary += f"\n注意: {'; '.join(notes)}"
 
-        return result
+        return {"summary": summary, "placeholder_slide_ids": placeholder_ids}
 
     return tool(wrap_tool_with_sse(_modify_outline_structure))
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
-def _find_by_index(slides: list, index: int):
-    for sl in slides:
-        if sl.slide_index == index:
-            return sl
+def _find(slides: list, slide_id: int):
+    for s in slides:
+        if s.id == slide_id:
+            return s
     return None
 
 
-def _collect_content(slides: list, indices: list[int]) -> dict | None:
-    """Merge main_points and detailed_content from multiple slides."""
-    all_points = []
-    all_detail = []
-    for si in indices:
-        sl = _find_by_index(slides, si)
-        if sl and sl.content_json:
-            all_points.extend(sl.content_json.get("main_points", []))
-            d = sl.content_json.get("detailed_content", "")
-            if d:
-                all_detail.append(d)
-    if not all_points and not all_detail:
-        return None
-    return {
-        "main_points": all_points,
-        "detailed_content": "\n---\n".join(all_detail) if all_detail else "",
-    }
-
-
-def _copy_content(content_json: dict | None) -> dict | None:
-    """Shallow copy content_json, preserving original structure."""
-    if content_json is None:
-        return None
-    return dict(content_json)
+def _merge_into(target, into) -> None:
+    """Copy target's content_json into 'into'. Both are ORM objects mutated in-place."""
+    tc = target.content_json or {}
+    ic = into.content_json or {}
+    if not ic:
+        ic = {"main_points": [], "detailed_content": ""}
+    ic.setdefault("main_points", [])
+    ic["main_points"].extend(tc.get("main_points", []))
+    if tc.get("detailed_content"):
+        ic["detailed_content"] = ic.get("detailed_content", "") + "\n---\n" + tc["detailed_content"]
+    into.content_json = ic

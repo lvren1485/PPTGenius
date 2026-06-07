@@ -115,63 +115,126 @@ class TestStructureTools:
         assert len(sections) == 2
 
     @pytest.mark.asyncio
-    async def test_modify_outline_structure_rename(self, db):
+    async def test_modify_rename(self, db):
         d = Database(db)
-        u = await d.create_user("mo_user")
+        u = await d.create_user("mo2_user")
         conv = await d.create_conversation(u.id)
         o = await d.create_outline(u.id, conv.id, "Modify Test")
         sl = await d.create_outline_slide(o.id, 1, "Old Name")
         await d.set_conversation_outline(conv.id, o.id)
         tool = make_modify_outline_structure(d, conv.id)
-        result = await tool.ainvoke({
-            "operations": [{"op": "rename_slide", "slide_index": 1, "new_title": "New Name"}],
-        })
-        assert "rename×1" in result
-        fetched = await d.get_outline_slide(sl.id)
-        assert fetched.title == "New Name"
+        r = await make_modify_outline_structure(d, conv.id).ainvoke({"operations": [{"op": "rename", "slide_id": sl.id, "new_title": "New Name"}]})
+        assert "rename×1" in r["summary"]
+        assert (await d.get_outline_slide(sl.id)).title == "New Name"
 
     @pytest.mark.asyncio
-    async def test_modify_outline_structure_delete(self, db):
+    async def test_modify_delete_simple(self, db):
         d = Database(db)
-        u = await d.create_user("md_user")
+        u = await d.create_user("md2_user")
         conv = await d.create_conversation(u.id)
-        o = await d.create_outline(u.id, conv.id, "Delete Test")
+        o = await d.create_outline(u.id, conv.id, "Test")
         await d.create_outline_slide(o.id, 1, "Keep")
-        await d.create_outline_slide(o.id, 2, "Delete Me")
+        s2 = await d.create_outline_slide(o.id, 2, "Delete Me")
         await d.set_conversation_outline(conv.id, o.id)
-        tool = make_modify_outline_structure(d, conv.id)
-        result = await tool.ainvoke({
-            "operations": [{"op": "delete_slide", "slide_index": 2}],
-        })
-        assert "delete×1" in result
-        slides = await d.get_slides_by_outline_id(o.id)
-        assert len(slides) == 1
+        r = await make_modify_outline_structure(d, conv.id).ainvoke(
+            {"operations": [{"op": "delete", "target_id": s2.id}]})
+        assert len(await d.get_slides_by_outline_id(o.id)) == 1
 
     @pytest.mark.asyncio
-    async def test_modify_outline_structure_insert(self, db):
+    async def test_modify_delete_with_merge(self, db):
         d = Database(db)
-        u = await d.create_user("mi_user")
+        u = await d.create_user("dm2_user")
         conv = await d.create_conversation(u.id)
-        o = await d.create_outline(u.id, conv.id, "Insert Test")
-        await d.create_outline_slide(o.id, 1, "First")
-        await d.create_outline_slide(o.id, 2, "Third")
+        o = await d.create_outline(u.id, conv.id, "Merge Test")
+        s1 = await d.create_outline_slide(o.id, 1, "A", content_json={"main_points": ["A1"]})
+        s2 = await d.create_outline_slide(o.id, 2, "B", content_json={"main_points": ["B1"]})
         await d.set_conversation_outline(conv.id, o.id)
-        tool = make_modify_outline_structure(d, conv.id)
-        result = await tool.ainvoke({
-            "operations": [{"op": "insert_slide", "after_slide_index": 1, "title": "Second"}],
-        })
-        assert "占位×1" in result
-        slides = await d.get_slides_by_outline_id(o.id)
-        assert len(slides) == 3
+        r = await make_modify_outline_structure(d, conv.id).ainvoke(
+            {"operations": [{"op": "delete", "target_id": s2.id, "merge_id": s1.id}]})
+        assert "占位" in r["summary"]
+        s1f = await d.get_outline_slide(s1.id)
+        assert "B1" in str(s1f.content_json)
+        assert "待合并" in (s1f.title or "")
 
     @pytest.mark.asyncio
-    async def test_modify_outline_no_outline_error(self, db):
+    async def test_modify_insert_simple(self, db):
         d = Database(db)
-        u = await d.create_user("moe_user")
+        u = await d.create_user("mi2_user")
+        conv = await d.create_conversation(u.id)
+        o = await d.create_outline(u.id, conv.id, "Test")
+        s1 = await d.create_outline_slide(o.id, 1, "First")
+        await d.set_conversation_outline(conv.id, o.id)
+        r = await make_modify_outline_structure(d, conv.id).ainvoke(
+            {"operations": [{"op": "insert", "after_id": s1.id}]})
+        assert len(await d.get_slides_by_outline_id(o.id)) == 2
+
+    @pytest.mark.asyncio
+    async def test_modify_insert_split(self, db):
+        d = Database(db)
+        u = await d.create_user("ms2_user")
+        conv = await d.create_conversation(u.id)
+        o = await d.create_outline(u.id, conv.id, "Test")
+        s1 = await d.create_outline_slide(o.id, 1, "Original")
+        await d.set_conversation_outline(conv.id, o.id)
+        r = await make_modify_outline_structure(d, conv.id).ainvoke(
+            {"operations": [{"op": "insert", "after_id": s1.id, "is_copy": True}]})
+        s1f = await d.get_outline_slide(s1.id)
+        assert "待分割" in (s1f.title or "")
+        slides = await d.get_slides_by_outline_id(o.id)
+        assert len(slides) == 2
+
+    @pytest.mark.asyncio
+    async def test_modify_move(self, db):
+        d = Database(db)
+        u = await d.create_user("mm2_user")
+        conv = await d.create_conversation(u.id)
+        o = await d.create_outline(u.id, conv.id, "Test")
+        sec = await d.create_outline_section(o.id, 1, "S1")
+        s1 = await d.create_outline_slide(o.id, 1, "A", section_id=sec.id)
+        s2 = await d.create_outline_slide(o.id, 2, "B", section_id=sec.id)
+        await d.set_conversation_outline(conv.id, o.id)
+        r = await make_modify_outline_structure(d, conv.id).ainvoke(
+            {"operations": [{"op": "move", "target_id": s1.id, "after_id": s2.id}]})
+        slides = await d.get_slides_by_outline_id(o.id)
+        assert slides[-1].id == s1.id
+
+    @pytest.mark.asyncio
+    async def test_modify_move_cross_section_rejected(self, db):
+        d = Database(db)
+        u = await d.create_user("mx2_user")
+        conv = await d.create_conversation(u.id)
+        o = await d.create_outline(u.id, conv.id, "Test")
+        sec1 = await d.create_outline_section(o.id, 1, "S1")
+        sec2 = await d.create_outline_section(o.id, 2, "S2")
+        s1 = await d.create_outline_slide(o.id, 1, "A", section_id=sec1.id)
+        s2 = await d.create_outline_slide(o.id, 2, "B", section_id=sec2.id)
+        await d.set_conversation_outline(conv.id, o.id)
+        r = await make_modify_outline_structure(d, conv.id).ainvoke(
+            {"operations": [{"op": "move", "target_id": s1.id, "after_id": s2.id}]})
+        assert "is_change_section=true" in r.get("summary", "")
+
+    @pytest.mark.asyncio
+    async def test_modify_duplicate_ids_rejected(self, db):
+        d = Database(db)
+        u = await d.create_user("dup_user")
+        conv = await d.create_conversation(u.id)
+        o = await d.create_outline(u.id, conv.id, "Test")
+        s1 = await d.create_outline_slide(o.id, 1, "X")
+        await d.set_conversation_outline(conv.id, o.id)
+        r = await make_modify_outline_structure(d, conv.id).ainvoke({"operations": [
+            {"op": "rename", "slide_id": s1.id, "new_title": "A"},
+            {"op": "rename", "slide_id": s1.id, "new_title": "B"},
+        ]})
+        assert "重复" in r["error"]
+
+    @pytest.mark.asyncio
+    async def test_modify_no_outline_error(self, db):
+        d = Database(db)
+        u = await d.create_user("moe2_user")
         conv = await d.create_conversation(u.id)
         tool = make_modify_outline_structure(d, conv.id)
-        result = await tool.ainvoke({"operations": [{"op": "rename_slide", "slide_index": 1, "new_title": "X"}]})
-        assert "错误" in result or "error" in result.lower()
+        r = await make_modify_outline_structure(d, conv.id).ainvoke({"operations": [{"op": "rename", "slide_id": 99999, "new_title": "X"}]})
+        assert "error" in r
 
 
 # Import tool factories at module level for test discovery

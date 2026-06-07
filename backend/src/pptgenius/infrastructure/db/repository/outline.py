@@ -235,6 +235,7 @@ async def update_outline_slide(
     layout_type: str | None = None,
     notes: str | None = None,
     status: str | None = None,
+    section_id: int | None = None,
 ) -> bool:
     slide = await db.get(OutlineSlide, slide_id)
     if slide is None:
@@ -249,6 +250,8 @@ async def update_outline_slide(
         slide.notes = notes
     if status is not None:
         slide.status = status
+    if section_id is not None:
+        slide.section_id = section_id
     await db.commit()
     return True
 
@@ -312,16 +315,23 @@ async def delete_outline_slide(db: AsyncSession, slide_id: int) -> bool:
 async def insert_outline_slide_after(
     db: AsyncSession,
     outline_id: int,
-    after_index: int,
+    after_slide_id: int,
     title: str,
     section_id: int | None = None,
     content_json: dict | None = None,
     layout_type: str = "content",
     notes: str | None = None,
 ) -> OutlineSlide:
-    """Insert a slide after the given index. All slides with index > after_index
-    are shifted up by 1.  The new slide gets index = after_index + 1."""
+    """Insert a slide after the slide identified by *after_slide_id*.
+
+    All slides with index > the reference slide's index are shifted up by 1.
+    The new slide gets index = reference.index + 1.
+    """
     from sqlalchemy import update
+    ref = await db.get(OutlineSlide, after_slide_id)
+    if ref is None:
+        raise ValueError(f"Reference slide {after_slide_id} not found")
+    after_index = ref.slide_index
     new_index = after_index + 1
     await db.execute(
         update(OutlineSlide)
