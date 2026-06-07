@@ -11,6 +11,7 @@ from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import TokenCounter
 
 from .common.model_builder import build_llm
+from .tools.outline_evaluate import make_outline_evaluate
 from .tools.outline_section import make_generate_outline_content, make_modify_outline_section
 from .tools.perception import (
     make_get_conversation_status,
@@ -22,6 +23,7 @@ from .tools.perception import (
     make_switch_outline,
 )
 from .tools.structure import make_modify_outline_structure, make_write_outline_structure
+from .tools.summarize_file import make_summarize_file
 
 
 def _assemble_tools(db: Database, conversation_id: int) -> list:
@@ -38,11 +40,11 @@ def _assemble_tools(db: Database, conversation_id: int) -> list:
         # Structure (Phase 2)
         make_write_outline_structure(db, conversation_id),
         make_modify_outline_structure(db, conversation_id),
-        # Outline content (Phase 2 stubs, Phase 3 real)
+        # Outline content (Phase 3 — thin wrappers over outline/)
         make_generate_outline_content(db, conversation_id),
         make_modify_outline_section(db, conversation_id),
-        # outline_evaluate (Phase 3) — TODO
-        # summarize_file (Phase 3) — TODO
+        make_outline_evaluate(db, conversation_id),
+        make_summarize_file(db, conversation_id),
         # ppt_style (Phase 4) — TODO
         # slides_content (Phase 4) — TODO
     ]
