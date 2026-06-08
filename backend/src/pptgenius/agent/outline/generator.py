@@ -1,4 +1,4 @@
-"""Outline content generator sub-agent — ReAct agent for generating slide content."""
+"""Outline content generator — fills content_json for existing slides only."""
 
 from __future__ import annotations
 
@@ -14,12 +14,14 @@ from pptgenius.infrastructure.rag import KnowledgeService, WebSearchService
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.model_builder import build_llm
-from .prompts import build_generator_system_prompt
+from .prompts import build_generator_system_prompt, build_generator_user_prompt
 
 _log = get_logger("pptgenius.agent.outline.generator")
 
 _web_search = WebSearchService()
 _knowledge = KnowledgeService()
+
+_FLAGS = ("待合并", "待分割", "待填充", "新页", "待修改")
 
 
 def _get_writer():
@@ -29,7 +31,7 @@ def _get_writer():
         return lambda _: None
 
 
-# ── tool factories (capture db / state at runtime via closure) ────────────────
+# ── knowledge tools ───────────────────────────────────────────────────────────
 
 
 def _make_search_knowledge(user_id: int):
@@ -72,35 +74,23 @@ def _make_search_web():
 def _make_fetch_web(db: Database, user_id: int, conv_id: int, fetch_count: list[int]):
     @tool
     async def fetch_web(url: str) -> str:
-        """Fetch and index a web page. The content is added to the knowledge base.
-
-        Use after search_web to read a promising result. Max 4 fetches per round.
-        """
+        """Fetch and index a web page. Max 4 per round."""
         if fetch_count[0] >= 4:
-            return "本轮抓取已达上限 (4次)。请基于已有信息生成内容。"
+            return "本轮抓取已达上限 (4次)。"
         fetch_count[0] += 1
         result = await _web_search.fetch_and_ingest(db, url, user_id, conv_id)
         if result.get("ingested"):
-            return (
-                f"页面已抓取并索引。\n"
-                f"标题: {result['title']}\n域名: {result['domain']}\n"
-                f"内容长度: {result['char_count']} 字符\n"
-                f"内容预览:\n{result['text'][:1000]}"
-            )
-        return f"抓取失败。标题: {result.get('title', 'N/A')}"
-
+            return f"已抓取: {result['title']}\n{result['text'][:1000]}"
+        return f"抓取失败。{result.get('title', 'N/A')}"
     return fetch_web
 
 
 def _make_read_file(db: Database, fetch_count: list[int], fetched_ids: set[int]):
     @tool
     async def read_file(file_id: int) -> str:
-        """Read the full content of a knowledge file by id. Max 4 reads per round.
-
-        Use after list_knowledge_files to get complete content of a relevant file.
-        """
+        """Read full content of a knowledge file. Max 4 per round."""
         if fetch_count[0] >= 4:
-            return "本轮读取已达上限 (4次)。请基于已有信息生成内容。"
+            return "本轮读取已达上限 (4次)。"
         if file_id in fetched_ids:
             return f"already fetched (file_id={file_id})"
         fetch_count[0] += 1
@@ -108,41 +98,62 @@ def _make_read_file(db: Database, fetch_count: list[int], fetched_ids: set[int])
         chunks = await db.list_chunks_by_file(file_id)
         if not chunks:
             return f"文件 {file_id} 没有内容。"
-        parts = []
-        for c in sorted(chunks, key=lambda x: x.chunk_index):
-            parts.append(c.chunk_text)
+        parts = [c.chunk_text for c in sorted(chunks, key=lambda x: x.chunk_index)]
         return "\n\n".join(parts)[:8000]
-
     return read_file
 
 
-def _make_write_outline_slides(db: Database, outline_id: int, section_id: int):
-    """Returns (tool, was_called).  write_outline_slides persists slides for one section."""
+# ── write tool (overwrite only, no create/delete) ─────────────────────────────
+
+
+def _make_write_slides(db: Database, outline_id: int, section_id: int):
     _called: list[bool] = [False]
 
     @tool
-    async def write_outline_slides(
+    async def write_slides(
         design_rationale: str,
         slides: list[dict],
     ) -> str:
-        """Write generated slides for this section to the database. MUST be called last.
+        """Overwrite content for existing section slides. MUST be called last.
+
+        Only fills content_json / has_image / has_chart / notes on pre-created
+        slides. Does NOT create or delete slides. Target slides by slide_index.
 
         Parameters
         ----------
-        design_rationale : str — Design rationale for this section's content.
-        slides : list[dict] — Each slide:
-            {title, content_json, layout_type, has_image, has_chart, notes}
-            content_json MUST include: main_points, detailed_content, key_data,
-            visual_note, recommended_ppt_format.
+        design_rationale : str — Design rationale.
+        slides : list[dict] — [{slide_index, content_json, has_image, has_chart, notes}, ...]
         """
-        await db.replace_section_slides(outline_id, section_id, slides)
+        existing = await db.get_slides_by_outline_id(outline_id)
+        sec_slides = sorted(
+            [s for s in existing if s.section_id == section_id],
+            key=lambda s: s.slide_index,
+        )
+        index_map = {s.slide_index: s for s in sec_slides}
+        updated = 0
+        for sl in slides:
+            si = sl.get("slide_index")
+            target = index_map.get(si)
+            if target is None:
+                continue
+            updates = {"status": "completed"}
+            if "content_json" in sl:
+                updates["content_json"] = sl["content_json"]
+            if "has_image" in sl:
+                updates["has_image"] = sl["has_image"]
+            if "has_chart" in sl:
+                updates["has_chart"] = sl["has_chart"]
+            if "notes" in sl:
+                updates["notes"] = sl["notes"]
+            await db.update_outline_slide(target.id, **updates)
+            updated += 1
         _called[0] = True
-        return json.dumps({"section_id": section_id, "slide_count": len(slides), "status": "ok"})
+        return json.dumps({"section_id": section_id, "updated": updated, "status": "ok"})
 
-    return write_outline_slides, _called
+    return write_slides, _called
 
 
-# ── main entry ─────────────────────────────────────────────────────────────────
+# ── main entry ────────────────────────────────────────────────────────────────
 
 
 async def run_outline_generator(
@@ -152,9 +163,8 @@ async def run_outline_generator(
     *,
     query: str | None = None,
     knowledge_mode: str = "auto",
-    regenerate_slides: list[int] | None = None,
 ) -> str:
-    """Run the outline content generator ReAct agent for one section."""
+    """Fill content for one section's pre-created slides."""
     writer = _get_writer()
 
     section = await db.get_outline_section(section_id)
@@ -168,7 +178,7 @@ async def run_outline_generator(
     fetch_count = [0]
     fetched_ids: set[int] = set()
 
-    write_tool, was_called = _make_write_outline_slides(db, section.outline_id, section_id)
+    write_tool, was_called = _make_write_slides(db, section.outline_id, section_id)
     tools = [
         _make_search_knowledge(user_id),
         _make_search_web(),
@@ -178,62 +188,41 @@ async def run_outline_generator(
     ]
 
     system_prompt = build_generator_system_prompt()
-    is_regenerate = bool(regenerate_slides)
-    user_prompt = _build_user_prompt(
-        section.title or "",
-        section.description or "",
-        query,
-        is_regenerate,
+    user_prompt = build_generator_user_prompt(
+        db=db,
+        outline_id=section.outline_id,
+        section_id=section_id,
+        query=query,
+        knowledge_mode=knowledge_mode,
     )
 
     llm, agent_id, mw = build_llm(conversation_id)
     agent = create_agent(
-        model=llm,
-        tools=tools,
+        model=llm, tools=tools,
         system_prompt=system_prompt,
         middleware=[mw],
     )
 
-    writer({"type": "outline_generator_start", "section": section.title,
-            "is_regenerate": is_regenerate})
+    writer({"type": "outline_generator_start", "section": section.title})
     result = await agent.ainvoke(
         {"messages": [HumanMessage(content=user_prompt)]},
         config={"recursion_limit": 30},
     )
 
     if not was_called[0]:
-        _log.warning("write_outline_slides not called — retrying")
-        retry_msg = HumanMessage(content="请立即调用 write_outline_slides 工具保存内容。不要再搜索或分析，直接保存。")
-        clean_msgs = _strip_dangling_tool_calls(result["messages"])
+        _log.warning("write_slides not called — retrying")
+        retry_msg = HumanMessage(content="请立即调用 write_slides 工具写入内容。不要再搜索或分析，直接写入。")
+        clean = _strip_dangling_tool_calls(result["messages"])
         await agent.ainvoke(
-            {"messages": clean_msgs + [retry_msg]},
+            {"messages": clean + [retry_msg]},
             config={"recursion_limit": 30},
         )
 
     writer({"type": "outline_generator_end", "section": section.title})
-    return f"章节'{section.title}'生成完成"
-
-
-def _build_user_prompt(
-    section_title: str,
-    section_description: str,
-    query: str | None,
-    is_regenerate: bool,
-) -> str:
-    parts = [f"## 章节: {section_title}"]
-    if section_description:
-        parts.append(f"描述: {section_description}")
-    if query:
-        parts.append(f"用户要求: {query}")
-    if is_regenerate:
-        parts.append("注意: 这是**修改已有内容**。只重新生成需要修改的页面，保留其他页面不变。")
-    else:
-        parts.append("请根据章节主题设计该章节的幻灯片内容，使用 write_outline_slides 保存。")
-    return "\n".join(parts)
+    return f"章节'{section.title}'填充完成"
 
 
 def _strip_dangling_tool_calls(messages: list) -> list:
-    """Remove trailing AIMessages with tool_calls lacking matching ToolMessages."""
     cleaned = list(messages)
     while cleaned and isinstance(cleaned[-1], AIMessage) and cleaned[-1].tool_calls:
         cleaned.pop()

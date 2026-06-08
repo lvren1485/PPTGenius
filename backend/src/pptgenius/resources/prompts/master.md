@@ -28,17 +28,18 @@
   在 sections 列表中手动添加这些页面。每个 section 必须有 `slide_number` 字段指定
   该章节页数（含第1页 section 标题页），至少 2 页（1 section + 1 content）。
   **默认 18 页**（含封面+目录+结束），范围 12-24，按章节重要性分配。
-- `generate_outline_content`：**主要生成入口**。一键为所有章节生成内容，生成完毕
-  自动重排全局页码。新建大纲后直接调用此工具即可。
-- `modify_outline_section`：**仅用于修改已有内容**。指定 section_id 重新生成某章节，
-  通过 regenerate_slides 可定向更新特定页面。`generate_outline_content` 完成后的
-  局部修改才使用此工具。
+- `generate_outline_content`：**主要生成入口**。一键填充所有章节 slide 的 content_json。
+  会自动跳过已有内容的页面，只处理空白页和带标记页。
+- `modify_outline_section`：**仅用于修改已有内容**。先通过 `modify_outline_structure
+  (rename)` 给目标 slide 标题打标记（如加"待修改"），再调用此工具。只处理带标记或
+  空白的 slide。
 - `modify_outline_structure`：结构性编辑。所有操作使用 slide_id（非 index），支持：
-  `rename`（改标题）、`delete`（删除，可选 merge_id 合并内容，标记"待合并"）、
+  `rename`（改标题）、`delete`（删除，可选 merge_id 合并7内容，标记"待合并"）、
   `insert`（插入，is_copy=true 时拆分并标记"待分割"）、
   `move`（移动，跨 section 需 is_change_section=true）。
-  **重要**：操作后必须 `get_outline` 重读结构。如果**只调用了 rename**（无占位页），
-  则无需调用 `modify_outline_section`；否则需用 `modify_outline_section` 填充
+  **重要**：每次调用后必须 `get_outline` 重读结构。
+  结构修改后，相关页面会被标记（如"待修改"/"待合并"/"待分割"），需要调用
+   `generate_outline_content` 重新生成这些页面内容，可以多轮调用本结构性编辑工具标记多页，再一次性生成。
   `placeholder_slide_ids` 中的页面。
 - `summarize_file`：为知识文件生成摘要。已在 `get_knowledge_files` 中显示
   has_full_summary=true 的文件无需再次调用。
@@ -47,12 +48,14 @@
   Agent 根据大纲主题自动选择。
 - `slides_content`：生成 PPT 页面。传入 modify_instructions 进行单页定向修改。
 
-## 知识模式
-`modify_outline_section` 和 `generate_outline_content` 共享知识搜索模式：
-- "auto"（默认）：有相关知识文件时自动搜索
-- "refresh"：重新搜索知识，忽略已有引用
-- "reuse"：复用已有引用，不重新搜索
-- "extend"：在已有基础上扩展搜索
+## 内容填充与标记
+- `generate_outline_content` 一键填充所有章节的空白 slide。空白 slide 和标题中带有
+  标记（待合并/待分割/待填充/待修改）的 slide 会被优先处理，主要用于生成全新大纲。
+- 修改已有内容前，先用 `modify_outline_structure(rename)` 将需要修改的 slide 标题
+  加上标记（如"待修改"）或者修改outline结构，再调用 `modify_outline_section`。
+  Generator 只处理带标记或空白的 slide，不会触碰已有完整内容的页面，也不会添加或删除页面（即不进行结构性编辑）。
+- 可以多次调用 `modify_outline_structure` 标记多页，再一次 `modify_outline_section`
+  批量处理。
 
 ## 索引规则
 - 封面页和目录页属于特殊 section 0，不参与内容生成。

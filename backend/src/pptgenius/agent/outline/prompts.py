@@ -5,6 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 
 from pptgenius.infrastructure.config.settings import RESOURCES_DIR
+from pptgenius.infrastructure.db.database import Database
 
 _PROMPT_DIR = RESOURCES_DIR / "prompts" / "outline"
 
@@ -23,23 +24,96 @@ def build_generator_system_prompt() -> str:
     return _load_generator_system()
 
 
-def build_generator_user_prompt(
-    section_title: str,
-    section_description: str,
+_FLAGS = ("待合并", "待分割", "待填充", "新页", "待修改")
+
+
+async def build_generator_user_prompt(
+    *,
+    db: Database,
+    outline_id: int,
+    section_id: int,
     query: str | None = None,
-    slide_titles: list[str] | None = None,
-    is_regenerate: bool = False,
+    knowledge_mode: str = "auto",
 ) -> str:
-    parts = [f"## 章节: {section_title}"]
-    if section_description:
-        parts.append(f"描述: {section_description}")
+    """Build the generator user prompt: all-section summaries + current section full."""
+
+    sections = await db.get_sections_by_outline_id(outline_id)
+    all_slides = await db.get_slides_by_outline_id(outline_id)
+
+    current_section = None
+    for s in sections:
+        if s.id == section_id:
+            current_section = s
+            break
+
+    parts = []
+
+    # 1. All sections brief
+    parts.append("## 大纲概览")
+    for s in sections:
+        sec_slides = sorted(
+            [sl for sl in all_slides if sl.section_id == s.id],
+            key=lambda x: x.slide_index,
+        )
+        marker = " ← 当前" if s.id == section_id else ""
+        parts.append(f"- {s.title} ({len(sec_slides)}页){marker}")
+    parts.append("")
+
+    # 2. Current section full slides
+    if current_section:
+        parts.append(f"## 当前章节: {current_section.title}")
+        if current_section.description:
+            parts.append(f"描述: {current_section.description}")
+        parts.append("")
+
+        sec_slides = sorted(
+            [sl for sl in all_slides if sl.section_id == current_section.id],
+            key=lambda x: x.slide_index,
+        )
+        for sl in sec_slides:
+            flag = _detect_flag(sl)
+            parts.append(_format_slide(sl, flag))
+
+    # 3. Query
     if query:
-        parts.append(f"用户要求: {query}")
-    if slide_titles:
-        parts.append(f"需生成的页面: {', '.join(slide_titles)}")
-    if is_regenerate:
-        parts.append("注意: 这是重新生成，请根据现有内容进行改进。")
+        parts.append(f"## 用户说明\n{query}\n")
+
+    # 4. Flagged slides notice
+    flagged = [sl for sl in all_slides
+               if sl.section_id == section_id and _detect_flag(sl)]
+    if flagged:
+        ids = [str(sl.slide_index) for sl in flagged]
+        parts.append(f"**待处理**: slide {', '.join(ids)} 标记为空白或待修改，优先填充。\n")
+    parts.append("幻灯片已预先创建且不可增删。使用 write_slides 按 slide_index 写入 content_json。")
+
     return "\n".join(parts)
+
+
+def _detect_flag(slide) -> str | None:
+    if not slide.content_json or not slide.content_json.get("main_points"):
+        return "空白"
+    title = slide.title or ""
+    for flag in _FLAGS:
+        if flag in title:
+            return flag
+    return None
+
+
+def _format_slide(sl, flag: str | None) -> str:
+    tag = f" [{flag}]" if flag else ""
+    content = sl.content_json or {}
+    mp = content.get("main_points", [])
+    dc = content.get("detailed_content", "")
+
+    lines = [f"### slide_index={sl.slide_index}: {sl.title} ({sl.layout_type}){tag}"]
+    if mp:
+        lines.append(f"main_points: {'; '.join(mp[:5])}")
+    if dc:
+        preview = dc[:200] + "..." if len(dc) > 200 else dc
+        lines.append(f"detailed: {preview}")
+    if not mp and not dc:
+        lines.append("(空白)")
+    return "\n".join(lines) + "\n"
 
 
 def build_evaluator_system_prompt() -> str:
