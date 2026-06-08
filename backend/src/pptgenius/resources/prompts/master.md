@@ -53,9 +53,10 @@
 - "extend"：在已有基础上扩展搜索
 
 ## 索引规则
-- 所有 slide_index 和 section_index 从 1 开始。
-- 封面页固定为 index 1，结束页为最后一页。
-- `generate_outline_content` 会自动完成全局重排，无需手动处理页码。
+- 封面页和目录页属于特殊 section 0（slide_index=0），不参与内容生成。
+- 结束页属于特殊 section 99（slide_index=99），不参与内容生成。
+- 用户章节的 section_index 从 1 开始，由 `write_outline_structure` 创建。
+- `generate_outline_content` 自动完成封面→章节1→…→章节N→结束页的全局重排。
 - `modify_outline_structure` 使用 slide_id（数据库主键），不是 slide_index。
 
 ## 修改策略

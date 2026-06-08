@@ -53,10 +53,11 @@ def make_write_outline_structure(db: Database, conversation_id: int) -> Callable
         title: str,
         sections: list[dict],
     ) -> str:
-        """Create a new outline skeleton with sections, auto-adding title/TOC/ending slides.
+        """Create a new outline skeleton with sections, auto-adding title/TOC/ending.
 
-        The title_slide (index 1), TOC slide (index 2), and ending_slide (last index)
-        are created automatically. Do NOT include them in the sections list.
+        Title and TOC slides use slide_index=0. Ending slide uses slide_index=99.
+        They belong to no section — only user sections (section_index ≥ 1) trigger
+        content generation. Do NOT include title/TOC/ending in the sections list.
 
         Args:
             title: The presentation title.
@@ -80,9 +81,9 @@ def make_write_outline_structure(db: Database, conversation_id: int) -> Callable
                 description=s.get("description", ""),
             )
 
-        await db.create_outline_slide(outline.id, 1, title, layout_type="title")
-        await db.create_outline_slide(outline.id, 2, "目录", layout_type="content")
-        await db.create_outline_slide(outline.id, 3, "谢谢", layout_type="thanks")
+        await db.create_outline_slide(outline.id, 0, title, layout_type="title")
+        await db.create_outline_slide(outline.id, 0, "目录", layout_type="content")
+        await db.create_outline_slide(outline.id, 99, "谢谢", layout_type="thanks")
 
         await db.set_conversation_outline(conversation_id, outline.id)
         return (
