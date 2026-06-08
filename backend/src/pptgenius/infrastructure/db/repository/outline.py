@@ -236,6 +236,8 @@ async def update_outline_slide(
     notes: str | None = None,
     status: str | None = None,
     section_id: int | None = None,
+    has_image: bool | None = None,
+    has_chart: bool | None = None,
 ) -> bool:
     slide = await db.get(OutlineSlide, slide_id)
     if slide is None:
@@ -252,6 +254,10 @@ async def update_outline_slide(
         slide.status = status
     if section_id is not None:
         slide.section_id = section_id
+    if has_image is not None:
+        slide.has_image = has_image
+    if has_chart is not None:
+        slide.has_chart = has_chart
     await db.commit()
     return True
 

@@ -99,20 +99,29 @@ class TestStructureTools:
         result = await tool.ainvoke({
             "title": "AI报告",
             "sections": [
-                {"section_index": 1, "title": "引言", "description": "背景"},
-                {"section_index": 2, "title": "方法", "description": "技术"},
+                {"section_index": 1, "title": "引言", "description": "背景", "slide_number": 3},
+                {"section_index": 2, "title": "方法", "description": "技术", "slide_number": 4},
             ],
         })
         assert "已创建大纲" in result
         conv2 = await d.get_conversation(conv.id)
         assert conv2.current_outline_id is not None
-        # title_slide and ending_slide should be auto-created
         outline = await d.get_outline(conv2.current_outline_id)
         slides = await d.get_slides_by_outline_id(outline.id)
         assert any(s.layout_type == "title" for s in slides)
         assert any(s.layout_type == "thanks" for s in slides)
+        # Section slides should be pre-created (section + content per section)
+        assert any(s.layout_type == "section" for s in slides)
+        assert any(s.layout_type == "content" for s in slides)
+        # Each section should have slides assigned
         sections = await d.get_sections_by_outline_id(outline.id)
         assert len(sections) == 2
+        for sec in sections:
+            sec_slides = [s for s in slides if s.section_id == sec.id]
+            assert len(sec_slides) >= 2
+        # Verify slide_number is respected: 3 + 4 = 7 body slides
+        body = [s for s in slides if s.layout_type in ("section", "content") and s.section_id]
+        assert len(body) == 7
 
     @pytest.mark.asyncio
     async def test_modify_rename(self, db):

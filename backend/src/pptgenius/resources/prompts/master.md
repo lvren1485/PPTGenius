@@ -25,7 +25,9 @@
 - `get_knowledge_files`：查看可用的知识库文件及其摘要。
 - `list_styles`：浏览可选视觉风格。
 - `write_outline_structure`：创建新大纲骨架。封面页、目录页和结束页会自动添加，**不要**
-  在 sections 列表中手动添加这些页面。
+  在 sections 列表中手动添加这些页面。每个 section 必须有 `slide_number` 字段指定
+  该章节页数（含第1页 section 标题页），至少 2 页（1 section + 1 content）。
+  **默认 18 页**（含封面+目录+结束），范围 12-24，按章节重要性分配。
 - `generate_outline_content`：**主要生成入口**。一键为所有章节生成内容，生成完毕
   自动重排全局页码。新建大纲后直接调用此工具即可。
 - `modify_outline_section`：**仅用于修改已有内容**。指定 section_id 重新生成某章节，
@@ -53,11 +55,17 @@
 - "extend"：在已有基础上扩展搜索
 
 ## 索引规则
-- 封面页和目录页属于特殊 section 0（slide_index=0），不参与内容生成。
-- 结束页属于特殊 section 99（slide_index=99），不参与内容生成。
-- 用户章节的 section_index 从 1 开始，由 `write_outline_structure` 创建。
-- `generate_outline_content` 自动完成封面→章节1→…→章节N→结束页的全局重排。
+- 封面页和目录页属于特殊 section 0，不参与内容生成。
+- 结束页属于特殊 section 99，不参与内容生成。
+- 用户章节的 section_index 从 1 开始。
+- `write_outline_structure` 自动按章节分配 slide：每章第1页为 section 章标题页，
+  后续为 content 内容页。`generate_outline_content` 负责填充内容并全局重排。
 - `modify_outline_structure` 使用 slide_id（数据库主键），不是 slide_index。
+
+## 页数规则
+- 如果用户未指定页数，默认生成 **18 页**（含封面+目录+结束），范围 12-24。
+- 每个 section 至少 2 页（1 页 section 标题 + 1 页 content），通过 `slide_number` 字段指定。
+- 如果用户指定了页数，优先满足用户要求，按章节重要性分配 `slide_number`。
 
 ## 修改策略
 - **修改后必须重读**：`modify_outline_structure` 执行后，必须调用 `get_outline`。

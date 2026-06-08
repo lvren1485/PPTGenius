@@ -53,34 +53,67 @@ def make_write_outline_structure(db: Database, conversation_id: int) -> Callable
         title: str,
         sections: list[dict],
     ) -> str:
-        """Create a new outline skeleton with sections, auto-adding title/TOC/ending.
+        """Create a new outline skeleton with auto-created section slides.
 
-        Title and TOC slides use slide_index=0. Ending slide uses slide_index=99.
-        They belong to no section — only user sections (section_index ≥ 1) trigger
-        content generation. Do NOT include title/TOC/ending in the sections list.
+        Title/TOC/ending are auto-added. Each section's slide_number field
+        determines how many slides to pre-create for that section.
+        First slide per section = layout_type="section", remaining = "content".
+        All section slides are created with content_json=null, status="pending".
 
         Args:
             title: The presentation title.
-            sections: List of {section_index, title, description}. section_index starts at 1.
+            sections: List of {section_index, title, description, slide_number}.
+                section_index starts at 1. slide_number includes the section page.
+                Minimum 2 (1 section + 1 content).
         """
         conv = await db.get_conversation(conversation_id)
         if conv is None:
             return f"错误: 对话 {conversation_id} 不存在"
 
+        n_sections = len(sections)
+        if n_sections == 0:
+            return "错误: 至少需要1个章节"
+
+        total_body = sum(max(s.get("slide_number", 2), 2) for s in sections)
+        total = total_body + 3
+
         outline = await db.create_outline(
             user_id=conv.user_id,
             conversation_id=conversation_id,
             title=title,
+            slide_count=total,
         )
 
+        slide_index = 2
         for s in sections:
-            await db.create_outline_section(
+            sec = await db.create_outline_section(
                 outline_id=outline.id,
                 section_index=s["section_index"],
                 title=s["title"],
                 description=s.get("description", ""),
             )
+            count = max(s.get("slide_number", 2), 2)
 
+            # First slide: section divider
+            await db.create_outline_slide(
+                outline_id=outline.id, slide_index=slide_index,
+                title=s["title"], layout_type="section",
+                section_id=sec.id,
+            )
+            slide_index += 1
+
+            # Remaining: content slides
+            for j in range(count - 1):
+                await db.create_outline_slide(
+                    outline_id=outline.id, slide_index=slide_index,
+                    title=f"{s['title']} - {j + 1}", layout_type="content",
+                    section_id=sec.id,
+                )
+                slide_index += 1
+
+            total_body += count
+
+        # Title at 0, TOC at 0, ending at 99
         await db.create_outline_slide(outline.id, 0, title, layout_type="title")
         await db.create_outline_slide(outline.id, 0, "目录", layout_type="content")
         await db.create_outline_slide(outline.id, 99, "谢谢", layout_type="thanks")
@@ -88,7 +121,7 @@ def make_write_outline_structure(db: Database, conversation_id: int) -> Callable
         await db.set_conversation_outline(conversation_id, outline.id)
         return (
             f"已创建大纲:'{title}'(id={outline.id}), "
-            f"{len(sections)} sections, title+TOC+ending 已自动添加"
+            f"{n_sections} sections, 共 {total} 页"
         )
 
     return tool(wrap_tool_with_sse(_write_outline_structure))
