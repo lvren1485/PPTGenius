@@ -17,10 +17,15 @@ _log = get_logger("pptgenius.bm25")
 
 
 class BM25Manager:
-    """Build / persist / query a BM25 index for one user."""
+    """Build / persist / query a BM25 index for one user.
 
-    def __init__(self, index_path: str | Path) -> None:
+    When *persist* is False, ``save()`` and ``load()`` are no-ops — used
+    for dynamic in-memory conversation-level indexes.
+    """
+
+    def __init__(self, index_path: str | Path, persist: bool = True) -> None:
         self.index_path = Path(index_path)
+        self.persist = persist
         self._index: BM25Okapi | None = None
         self._chunks: list[str] = []  # corpus, mirrors index order
 
@@ -73,6 +78,8 @@ class BM25Manager:
 
     def save(self) -> None:
         """Pickle the BM25Okapi object + chunks to disk."""
+        if not self.persist:
+            return
         self.index_path.parent.mkdir(parents=True, exist_ok=True)
         data = {"index": self._index, "chunks": self._chunks}
         with open(self.index_path, "wb") as f:
@@ -80,7 +87,9 @@ class BM25Manager:
         _log.debug("index saved → %s (%d docs)", self.index_path, len(self._chunks))
 
     def load(self) -> bool:
-        """Load pickled index. Returns False if file missing."""
+        """Load pickled index. Returns False if file missing or not persisted."""
+        if not self.persist:
+            return False
         if not self.index_path.exists():
             _log.debug("index file not found: %s", self.index_path)
             return False

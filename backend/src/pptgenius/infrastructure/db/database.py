@@ -25,6 +25,9 @@ class Database:
     async def get_user_by_name(self, *a, **kw): return await user_repo.get_user_by_name(self.db, *a, **kw)
     async def get_or_create_default_user(self): return await user_repo.get_or_create_default_user(self.db)
     async def delete_user(self, *a, **kw): return await user_repo.delete_user(self.db, *a, **kw)
+    async def update_user_other(self, *a, **kw): return await user_repo.update_user_other(self.db, *a, **kw)
+    async def get_rag_mode(self, *a, **kw): return await user_repo.get_rag_mode(self.db, *a, **kw)
+    async def set_rag_mode(self, *a, **kw): return await user_repo.set_rag_mode(self.db, *a, **kw)
 
     # ─── conversation ───
     async def create_conversation(self, *a, **kw): return await conv_repo.create_conversation(self.db, *a, **kw)
@@ -114,6 +117,7 @@ class Database:
     async def get_chunk_by_id(self, *a, **kw): return await kn_repo.get_chunk_by_id(self.db, *a, **kw)
     async def list_chunks_by_file(self, *a, **kw): return await kn_repo.list_chunks_by_file(self.db, *a, **kw)
     async def get_all_chunks_for_user(self, *a, **kw): return await kn_repo.get_all_chunks_for_user(self.db, *a, **kw)
+    async def get_all_chunks_for_conversation(self, *a, **kw): return await kn_repo.get_all_chunks_for_conversation(self.db, *a, **kw)
 
     # ─── snapshot ───
     async def create_snapshot(self, *a, **kw): return await snap_repo.create_snapshot(self.db, *a, **kw)

@@ -45,3 +45,34 @@ async def delete_user(db: AsyncSession, user_id: int) -> bool:
     await db.delete(u)
     await db.commit()
     return True
+
+
+async def update_user_other(db: AsyncSession, user_id: int, other: dict) -> bool:
+    u = await db.get(User, user_id)
+    if u is None:
+        return False
+    u.other = other
+    await db.commit()
+    return True
+
+
+async def get_rag_mode(db: AsyncSession, user_id: int) -> str:
+    """Read rag_mode from users.other. Defaults to 'user'."""
+    u = await db.get(User, user_id)
+    if u is None:
+        return "user"
+    return (u.other or {}).get("rag_mode", "user")
+
+
+async def set_rag_mode(db: AsyncSession, user_id: int, mode: str) -> bool:
+    """Set rag_mode in users.other ('user' or 'conversation')."""
+    if mode not in ("user", "conversation"):
+        return False
+    u = await db.get(User, user_id)
+    if u is None:
+        return False
+    other = dict(u.other or {})
+    other["rag_mode"] = mode
+    u.other = other
+    await db.commit()
+    return True

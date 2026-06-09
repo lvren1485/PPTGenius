@@ -173,3 +173,17 @@ async def get_all_chunks_for_user(db: AsyncSession, user_id: int) -> list[Knowle
     )
     result = await db.execute(stmt)
     return list(result.scalars().all())
+
+
+async def get_all_chunks_for_conversation(
+    db: AsyncSession, conversation_id: int
+) -> list[KnowledgeChunk]:
+    """获取某会话所有 chunk，用于会话级 BM25 动态索引。"""
+    stmt = (
+        select(KnowledgeChunk)
+        .join(KnowledgeFile)
+        .where(KnowledgeFile.conversation_id == conversation_id)
+        .order_by(KnowledgeChunk.id.asc())
+    )
+    result = await db.execute(stmt)
+    return list(result.scalars().all())

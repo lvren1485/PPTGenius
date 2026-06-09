@@ -39,23 +39,37 @@ def _get_writer():
 
 # ── chunk-id map (BM25 returns text only, cross-reference with DB) ────────────
 
-async def _build_chunk_map(db: Database, user_id: int) -> dict[str, tuple[int, int]]:
-    """Return {chunk_text: (chunk_id, file_id)} for all chunks owned by *user_id*."""
-    chunks = await db.get_all_chunks_for_user(user_id)
-    return {c.chunk_text: (c.id, c.file_id) for c in chunks}
+async def _build_chunk_map(
+    db: Database,
+    user_id: int,
+    conversation_id: int,
+    rag_mode: str,
+) -> dict[str, tuple[int, int]]:
+    """Return {chunk_text: (chunk_id, file_id)} for the active scope."""
+    if rag_mode == "conversation":
+        chunks = await db.get_all_chunks_for_conversation(conversation_id)
+    else:
+        chunks = await db.get_all_chunks_for_user(user_id)
+    return {c.chunk_text[:20]: (c.id, c.file_id) for c in chunks}
 
 
 # ── knowledge tools ───────────────────────────────────────────────────────────
 
 
-def _make_search_knowledge(db: Database, user_id: int, count: list[int]):
+def _make_search_knowledge(
+    db: Database,
+    user_id: int,
+    conversation_id: int,
+    rag_mode: str,
+    count: list[int],
+):
     # Lazy-loaded chunk text → (chunk_id, file_id) map
     _chunk_map: dict[str, tuple[int, int]] | None = None
 
     async def _ensure_map():
         nonlocal _chunk_map
         if _chunk_map is None:
-            _chunk_map = await _build_chunk_map(db, user_id)
+            _chunk_map = await _build_chunk_map(db, user_id, conversation_id, rag_mode)
 
     @tool
     async def search_knowledge(query: str, top_k: int = 5) -> str:
@@ -69,13 +83,20 @@ def _make_search_knowledge(db: Database, user_id: int, count: list[int]):
         count[0] += 1
 
         await _ensure_map()
-        results = await _knowledge.search(user_id, query, top_k)
+
+        if rag_mode == "conversation":
+            results = await _knowledge.search_by_conversation(
+                db, conversation_id, query, top_k,
+            )
+        else:
+            results = await _knowledge.search(user_id, query, top_k)
+
         if not results:
             return "知识库中未找到相关文档。"
         items = []
         for r in results:
             chunk_text = r.get("chunk", r.get("text", ""))
-            cid, fid = _chunk_map.get(chunk_text, (None, None))
+            cid, fid = _chunk_map.get(chunk_text[:20], (None, None))
             items.append(
                 f"[score={r.get('score', 0):.2f}] "
                 f"chunk_id={cid} file_id={fid}\n"
@@ -239,6 +260,7 @@ async def run_outline_generator(
     outline = await db.get_outline(section.outline_id)
     conv = await db.get_conversation(conversation_id)
     user_id = conv.user_id if conv else 0
+    rag_mode = await db.get_rag_mode(user_id) if user_id else "user"
 
     kb_count = [0]
     web_count = [0]
@@ -248,7 +270,7 @@ async def run_outline_generator(
 
     write_tool, was_called = _make_write_slides(db, section.outline_id, section_id)
     tools = [
-        _make_search_knowledge(db, user_id, kb_count),
+        _make_search_knowledge(db, user_id, conversation_id, rag_mode, kb_count),
         _make_search_web(web_count),
         _make_fetch_web(db, user_id, conversation_id, fetch_count),
         _make_read_file(db, read_count, fetched_ids),
