@@ -8,7 +8,9 @@ from langgraph.config import get_stream_writer
 
 from pptgenius.infrastructure.config.settings import RESOURCES_DIR
 from pptgenius.infrastructure.db.database import Database
-from pptgenius.infrastructure.utils import TokenCounter
+from pptgenius.infrastructure.utils import TokenCounter, get_logger
+
+_log = get_logger("pptgenius.agent.master")
 
 from .common.model_builder import build_llm
 from .tools.outline_evaluate import make_outline_evaluate
@@ -72,11 +74,12 @@ async def run_master_agent(
     writer = _build_sse_writer()
 
     # --- 1. Build LLM + middleware ---
-    # Master agent persists its own token cost to a message row
     llm, agent_id, mw = build_llm(conversation_id)
+    _log.info("master agent start conv=%d agent=%s", conversation_id, agent_id)
 
     # --- 2. Assemble tools ---
     tools = _assemble_tools(db, conversation_id)
+    _log.debug("assembled %d tools for conv=%d", len(tools), conversation_id)
 
     # --- 3. Build agent ---
     prompt_path = RESOURCES_DIR / "prompts" / "master.md"
@@ -93,6 +96,7 @@ async def run_master_agent(
     state = {"messages": [HumanMessage(content=user_message)]}
     result = await agent.ainvoke(state, config={"recursion_limit": recursion_limit})
     writer({"type": "master_done"})
+    _log.info("master agent done conv=%d agent=%s", conversation_id, agent_id)
 
     # --- 5. Extract reply ---
     reply = ""
@@ -125,7 +129,11 @@ async def run_master_agent(
     outline_changed = _has_outline_changed(result)
     presentation_changed = _has_presentation_changed(result)
 
+    _log.debug("conv=%d outline_changed=%s presentation_changed=%s",
+               conversation_id, outline_changed, presentation_changed)
+
     if outline_changed:
+        conv = await db.get_conversation(conversation_id)
         await db.increase_outline_version(conv.current_outline_id, "patch")
 
     if outline_changed:

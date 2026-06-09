@@ -7,9 +7,12 @@ from typing import Callable
 from langchain_core.tools import tool
 
 from pptgenius.infrastructure.db.database import Database
+from pptgenius.infrastructure.utils import get_logger
 
 from ..common.tool_sse_wrapper import wrap_tool_with_sse
 from ..outline.generator import run_outline_generator
+
+_log = get_logger("pptgenius.agent.tools.outline_section")
 
 
 def make_generate_outline_content(db: Database, conversation_id: int) -> Callable:
@@ -35,6 +38,7 @@ def make_generate_outline_content(db: Database, conversation_id: int) -> Callabl
         if not sections:
             return "错误：当前大纲没有章节"
 
+        _log.info("batch generate start: outline=%d sections=%d", outline_id, len(sections))
         for sec in sections:
             await run_outline_generator(
                 db, conversation_id,
@@ -65,6 +69,7 @@ def make_modify_outline_section(db: Database, conversation_id: int) -> Callable:
             section_id: The section to regenerate.
             query: Optional specific requirements or instructions.
         """
+        _log.info("modify section: section_id=%d query=%s", section_id, query or "-")
         return await run_outline_generator(
             db, conversation_id,
             section_id=section_id,
