@@ -23,6 +23,12 @@ _knowledge = KnowledgeService()
 
 _FLAGS = ("待合并", "待分割", "待填充", "新页", "待修改")
 
+# ── limits (from improvement.md §9) ──────────────────────────────────────────
+_KB_SEARCH_LIMIT = 12
+_WEB_SEARCH_LIMIT = 8
+_FETCH_LIMIT = 6
+_READ_LIMIT = 5
+
 
 def _get_writer():
     try:
@@ -31,35 +37,67 @@ def _get_writer():
         return lambda _: None
 
 
+# ── chunk-id map (BM25 returns text only, cross-reference with DB) ────────────
+
+async def _build_chunk_map(db: Database, user_id: int) -> dict[str, tuple[int, int]]:
+    """Return {chunk_text: (chunk_id, file_id)} for all chunks owned by *user_id*."""
+    chunks = await db.get_all_chunks_for_user(user_id)
+    return {c.chunk_text: (c.id, c.file_id) for c in chunks}
+
+
 # ── knowledge tools ───────────────────────────────────────────────────────────
 
 
-def _make_search_knowledge(user_id: int):
+def _make_search_knowledge(db: Database, user_id: int, count: list[int]):
+    # Lazy-loaded chunk text → (chunk_id, file_id) map
+    _chunk_map: dict[str, tuple[int, int]] | None = None
+
+    async def _ensure_map():
+        nonlocal _chunk_map
+        if _chunk_map is None:
+            _chunk_map = await _build_chunk_map(db, user_id)
+
     @tool
     async def search_knowledge(query: str, top_k: int = 5) -> str:
         """Search the user's personal knowledge base (BM25) for relevant documents.
 
-        Use this first before searching the open web.
+        Use this first before searching the open web. Max 12 calls per round.
+        Each result includes a chunk_id for citation.
         """
+        if count[0] >= _KB_SEARCH_LIMIT:
+            return f"搜索已达上限 ({_KB_SEARCH_LIMIT}次)。"
+        count[0] += 1
+
+        await _ensure_map()
         results = await _knowledge.search(user_id, query, top_k)
         if not results:
             return "知识库中未找到相关文档。"
         items = []
         for r in results:
             chunk_text = r.get("chunk", r.get("text", ""))
-            items.append(f"[score={r.get('score', 0):.2f}] {chunk_text[:500]}")
+            cid, fid = _chunk_map.get(chunk_text, (None, None))
+            items.append(
+                f"[score={r.get('score', 0):.2f}] "
+                f"chunk_id={cid} file_id={fid}\n"
+                f"{chunk_text[:500]}"
+            )
         return "\n\n---\n".join(items)
 
     return search_knowledge
 
 
-def _make_search_web():
+def _make_search_web(count: list[int]):
     @tool
     async def search_web(query: str, max_results: int = 5) -> str:
         """Search the web for information. Returns title, URL, and snippet.
 
         Use this when the knowledge base doesn't have enough information.
+        Max 8 calls per round.
         """
+        if count[0] >= _WEB_SEARCH_LIMIT:
+            return f"搜索已达上限 ({_WEB_SEARCH_LIMIT}次)。"
+        count[0] += 1
+
         results = await _web_search.search(query, max_results)
         if not results:
             return "未找到相关网络结果。"
@@ -71,35 +109,40 @@ def _make_search_web():
     return search_web
 
 
-def _make_fetch_web(db: Database, user_id: int, conv_id: int, fetch_count: list[int]):
+def _make_fetch_web(db: Database, user_id: int, conv_id: int, count: list[int]):
     @tool
     async def fetch_web(url: str) -> str:
-        """Fetch and index a web page. Max 4 per round."""
-        if fetch_count[0] >= 4:
-            return "本轮抓取已达上限 (4次)。"
-        fetch_count[0] += 1
+        """Fetch and index a web page. The content is added to the knowledge base.
+
+        Use after search_web to read a promising result. Max 6 fetches per round.
+        """
+        if count[0] >= _FETCH_LIMIT:
+            return f"抓取已达上限 ({_FETCH_LIMIT}次)。"
+        count[0] += 1
         result = await _web_search.fetch_and_ingest(db, url, user_id, conv_id)
         if result.get("ingested"):
-            return f"已抓取: {result['title']}\n{result['text'][:1000]}"
+            return f"已抓取: {result['title']}\n{result['text'][:1000]}\n详细内容已加入知识库。"
         return f"抓取失败。{result.get('title', 'N/A')}"
+
     return fetch_web
 
 
-def _make_read_file(db: Database, fetch_count: list[int], fetched_ids: set[int]):
+def _make_read_file(db: Database, count: list[int], fetched_ids: set[int]):
     @tool
     async def read_file(file_id: int) -> str:
-        """Read full content of a knowledge file. Max 4 per round."""
-        if fetch_count[0] >= 4:
-            return "本轮读取已达上限 (4次)。"
+        """Read full content of a knowledge file. Max 5 per round."""
+        if count[0] >= _READ_LIMIT:
+            return f"读取已达上限 ({_READ_LIMIT}次)。"
         if file_id in fetched_ids:
             return f"already fetched (file_id={file_id})"
-        fetch_count[0] += 1
+        count[0] += 1
         fetched_ids.add(file_id)
         chunks = await db.list_chunks_by_file(file_id)
         if not chunks:
             return f"文件 {file_id} 没有内容。"
         parts = [c.chunk_text for c in sorted(chunks, key=lambda x: x.chunk_index)]
         return "\n\n".join(parts)[:8000]
+
     return read_file
 
 
@@ -111,8 +154,8 @@ def _make_write_slides(db: Database, outline_id: int, section_id: int):
 
     @tool
     async def write_slides(
-        design_rationale: str,
         slides: list[dict],
+        citations: list[dict] | None = None,
     ) -> str:
         """Overwrite content for existing section slides. MUST be called last.
 
@@ -121,8 +164,8 @@ def _make_write_slides(db: Database, outline_id: int, section_id: int):
 
         Parameters
         ----------
-        design_rationale : str — Design rationale.
         slides : list[dict] — [{slide_index, content_json, has_image, has_chart, notes}, ...]
+        citations : list[dict] | None — [{chunk_id, reason}, ...], cite knowledge sources used.
         """
         existing = await db.get_slides_by_outline_id(outline_id)
         sec_slides = sorted(
@@ -130,13 +173,30 @@ def _make_write_slides(db: Database, outline_id: int, section_id: int):
             key=lambda s: s.slide_index,
         )
         index_map = {s.slide_index: s for s in sec_slides}
+
+        # Resolve chunk_id → file_id for citations
+        resolved_citations: list[dict] | None = None
+        if citations:
+            resolved_citations = []
+            for c in citations:
+                cid = c.get("chunk_id")
+                if cid is None:
+                    continue
+                chunk = await db.get_chunk_by_id(cid)
+                fid = chunk.file_id if chunk else None
+                resolved_citations.append({
+                    "chunk_id": cid,
+                    "knowledge_file_id": fid,
+                    "reason": c.get("reason", ""),
+                })
+
         updated = 0
         for sl in slides:
             si = sl.get("slide_index")
             target = index_map.get(si)
             if target is None:
                 continue
-            updates = {"status": "completed"}
+            updates: dict = {"status": "completed"}
             if "content_json" in sl:
                 updates["content_json"] = sl["content_json"]
             if "has_image" in sl:
@@ -146,9 +206,14 @@ def _make_write_slides(db: Database, outline_id: int, section_id: int):
             if "notes" in sl:
                 updates["notes"] = sl["notes"]
             await db.update_outline_slide(target.id, **updates)
+            if resolved_citations:
+                await db.update_outline_slide_citations(target.id, resolved_citations)
             updated += 1
+
         _called[0] = True
-        return json.dumps({"section_id": section_id, "updated": updated, "status": "ok"})
+        return json.dumps({"section_id": section_id, "updated": updated,
+                           "citations": len(resolved_citations) if resolved_citations else 0,
+                           "status": "ok"})
 
     return write_slides, _called
 
@@ -175,20 +240,23 @@ async def run_outline_generator(
     conv = await db.get_conversation(conversation_id)
     user_id = conv.user_id if conv else 0
 
+    kb_count = [0]
+    web_count = [0]
     fetch_count = [0]
+    read_count = [0]
     fetched_ids: set[int] = set()
 
     write_tool, was_called = _make_write_slides(db, section.outline_id, section_id)
     tools = [
-        _make_search_knowledge(user_id),
-        _make_search_web(),
+        _make_search_knowledge(db, user_id, kb_count),
+        _make_search_web(web_count),
         _make_fetch_web(db, user_id, conversation_id, fetch_count),
-        _make_read_file(db, fetch_count, fetched_ids),
+        _make_read_file(db, read_count, fetched_ids),
         write_tool,
     ]
 
     system_prompt = build_generator_system_prompt()
-    user_prompt = build_generator_user_prompt(
+    user_prompt = await build_generator_user_prompt(
         db=db,
         outline_id=section.outline_id,
         section_id=section_id,
