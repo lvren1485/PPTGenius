@@ -234,10 +234,10 @@ def make_get_knowledge_files(db: Database, conversation_id: int) -> Callable:
     """Return a tool to list knowledge files for this conversation."""
 
     async def _get_knowledge_files() -> list[dict]:
-        """List all knowledge files for the current conversation with their LLM summaries.
+        """List all knowledge files for the current conversation.
 
-        Files with has_full_summary=true have already been summarized and do not
-        need summarize_file called again.
+        Shows filename, type, and chunk count for each file.
+        To explore file contents for structure suggestions, use explore_knowledge.
         """
         conv = await db.get_conversation(conversation_id)
         if conv is None:
