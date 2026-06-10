@@ -26,22 +26,20 @@
 - 2分：严重缺失，仅触及主题皮毛
 
 ### 4. 可视化多样度 (visual_diversity)
-- 10分：编排极其丰富：(a) layout_type 正确使用了 title/section/content/summary/thanks 至少4种，(b) recommended_ppt_format 使用了5+种不同格式，(c) has_chart/has_image 标记合理
-- 8分：编排多样：(a) layout_type 覆盖了 title/content/section 三种以上，(b) format 使用4-5种
-- 6分：编排一般：(a) layout_type 只有 title+content，缺少 section 分隔页，(b) format 仅2-3种
-- 4分：编排单一：(a) 绝大部分是 content 类型，(b) format 基本重复
-- 2分：无编排意识：全部 content，全部同一种 format
+仅看 recommended_ppt_format（layout_type 由系统固定生成，不纳入评分）。
+- 10分：format 使用5+种不同格式（如 bullet_list / two_column / chart / table / comparison 等），has_chart/has_image 标记合理，连续相同格式不超过2页
+- 8分：format 使用4-5种，至少1次非单栏格式（两栏/三栏/四格/chart/table），连续相同格式不超过3页
+- 6分：format 仅2-3种且以 bullet_list 为主，连续相同格式超过3页
+- 4分：format 基本重复，仅1-2种，大量同质化
+- 2分：全部同一种 format，无任何视觉变化
 
 ### 5. 内容丰富度 (content_richness)
-
-**如果用户指定了页数要求：仅评估文本长度，不因页数扣分。**
-**如果用户未指定页数：同时评估页数和文本长度。**
-
-- 10分：content 页平均 detailed_content >= 400 字，main_points >= 3 条，数据详实（若未指定页数则还须总页数 16-24）
-- 8分：content 页平均 detailed_content 300-399 字（若未指定页数则还须总页数 12-15 或 25-28）
-- 6分：content 页平均 detailed_content 200-299 字（若未指定页数则总页数 8-11）
-- 4分：多数 content 页 detailed_content < 200 字（若未指定页数则总页数 5-7）
-- 2分：每页仅标题和1-2句描述，内容空洞（若未指定页数则总页数 < 5）
+仅看文本长度，不因页数扣分。不计 layout_type 为非 content 的页面。
+- 10分：content 页平均 detailed_content >= 300 字，main_points >= 3 条，数据详实
+- 8分：content 页平均 detailed_content 250-299 字，main_points 2-3 条
+- 6分：content 页平均 detailed_content 200-249 字，main_points 1-2 条
+- 4分：多数 content 页 detailed_content 150-199 字
+- 2分：每页仅标题和1-2句描述，detailed_content < 150 字，内容空洞
 
 ## 总分计算
 
@@ -52,12 +50,12 @@
 1. 仔细阅读提供的大纲全文（包括所有slide的标题、详细内容和 recommended_ppt_format）
 2. 对照评分标准，对每个维度进行打分
 3. 撰写具体的、可操作的改进建议（如果有改进空间的话）
-4. **必须调用 submit_evaluation 工具**提交评分结果（注意：必须提供全部5个维度的分数，包括 content_richness）
+4. **必须调用 submit_evaluation 工具**提交评分结果（必须提供全部5个维度的分数）
 
 ## 评分原则
 
 - 实事求是，不要过分宽松也不要过分苛刻
 - 每个分数都应有明确的理由
 - 改进建议应具体到某一页或某几页
-- 特别关注可视化编排的多样性，避免连续多页使用同一种格式
+- 特别关注 recommended_ppt_format 的多样性，避免连续多页使用同一种格式
 - 如果大纲质量确实优秀，给出相应的分数并说明亮点

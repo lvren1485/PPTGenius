@@ -17,7 +17,6 @@ from .prompts import (
     build_evaluator_system_prompt,
     compute_outline_metrics,
     format_metrics_for_prompt,
-    format_rubric_for_prompt,
 )
 
 _log = get_logger("pptgenius.agent.outline.evaluator")
@@ -131,8 +130,7 @@ async def run_outline_evaluator(
     slides_text = _format_slides_text(slides)
     metrics = compute_outline_metrics(slides)
 
-    rubric_text = format_rubric_for_prompt()
-    system_prompt = build_evaluator_system_prompt() + "\n\n" + rubric_text
+    system_prompt = build_evaluator_system_prompt()
 
     user_prompt_parts = [
         "请对以下PPT大纲进行评审打分。",
@@ -152,8 +150,8 @@ async def run_outline_evaluator(
         "",
         "---",
         "请严格对照评分标准对五个维度分别打分（含 content_richness）。",
-        "如果量化指标显示明显问题（如 content 页平均 detailed_content 低于400字），必须在对应维度扣分。",
-        "如果用户原始需求中指定了页数要求，content_richness 只看文本长度（400字线），忽略页数指标。",
+        "如果量化指标显示明显问题（如 content 页平均 detailed_content 低于300字），必须在对应维度扣分。",
+        "content_richness 仅看文本长度，不因页数扣分。",
         "**必须使用 submit_evaluation 工具提交评分。**",
         "",
         "## 大纲内容",
