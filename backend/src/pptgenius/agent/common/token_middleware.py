@@ -1,18 +1,15 @@
-"""Token-counting middleware + tool token persistence utility."""
+"""Token-counting middleware — accumulates token usage per conversation + per agent."""
 
 from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
-from typing import Any, TYPE_CHECKING
+from typing import Any
 
 from langchain.agents.middleware import AgentMiddleware, AgentState
 from langgraph.runtime import Runtime
 
 from pptgenius.infrastructure.utils import TokenCounter
-
-if TYPE_CHECKING:
-    from pptgenius.infrastructure.db.database import Database
 
 
 class TokenCountingMiddleware(AgentMiddleware):
@@ -57,28 +54,5 @@ class TokenCountingMiddleware(AgentMiddleware):
         return None
 
 
-async def persist_agent_tokens(
-    db: "Database",
-    message_id: int,
-    agent_id: str,
-) -> None:
-    """Read agent counter, write token_cost_json + estimated_cost to message.
 
-    Called at the end of each tool implementation (not via middleware — LangChain
-    has no after_tool hook, so tool implementations must call this directly).
-    """
-    tc = TokenCounter.get_agent(agent_id)
-    if tc is None:
-        return
-    snap = tc.snapshot()
-    cost = tc.estimate_cost()
-    await db.set_message_cost(
-        message_id,
-        token_cost_json={
-            "input_tokens": snap["prompt_tokens"],
-            "output_tokens": snap["completion_tokens"],
-            "total_tokens": snap["total_tokens"],
-        },
-        estimated_cost=cost,
-    )
 

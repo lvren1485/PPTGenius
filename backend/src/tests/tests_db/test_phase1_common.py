@@ -82,37 +82,6 @@ class TestTokenCountingMiddleware:
         assert mw.on_tokens is not None
 
 
-class TestPersistAgentTokens:
-    @pytest.mark.asyncio
-    async def test_persist_writes_to_message(self, db):
-        from pptgenius.infrastructure.db.database import Database
-        from pptgenius.agent.common.token_middleware import persist_agent_tokens
-        d = Database(db)
-        u = await d.create_user("pat_user")
-        conv = await d.create_conversation(u.id)
-        msg = await d.create_message(conv.id, "tool", "{}", content_type="toolresult_test")
-        agent_id = "pat_agent_1"
-        TokenCounter.for_agent(agent_id).add({
-            "input_tokens": 300, "output_tokens": 150, "total_tokens": 450,
-        })
-        await persist_agent_tokens(d, msg.id, agent_id)
-        fetched = (await d.get_messages_by_conversation(conv.id))[0]
-        assert fetched.token_cost_json["total_tokens"] == 450
-        assert fetched.estimated_cost > 0
-
-    @pytest.mark.asyncio
-    async def test_persist_unknown_agent_does_nothing(self, db):
-        from pptgenius.infrastructure.db.database import Database
-        from pptgenius.agent.common.token_middleware import persist_agent_tokens
-        d = Database(db)
-        u = await d.create_user("pat2_user")
-        conv = await d.create_conversation(u.id)
-        msg = await d.create_message(conv.id, "tool", "{}")
-        await persist_agent_tokens(d, msg.id, "nonexistent_agent")
-        fetched = (await d.get_messages_by_conversation(conv.id))[0]
-        assert fetched.token_cost_json is None
-
-
 class TestSetMessageCost:
     @pytest.mark.asyncio
     async def test_set_message_cost(self, db):

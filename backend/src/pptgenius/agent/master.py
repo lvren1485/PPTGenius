@@ -138,21 +138,13 @@ async def run_master_agent(
     # --- 7. Persist Master's own token cost ---
     tc = TokenCounter.get_agent(agent_id)
     if tc:
-        snap = tc.snapshot()
-        cost = tc.estimate_cost()
-        # Create message row for the master's own text response
         await db.create_message(
             conversation_id=conversation_id,
             role="assistant",
             content=reply,
             content_type="text",
-            estimated_cost=cost,
-            token_cost_json={
-                "input_tokens": snap["prompt_tokens"],
-                "output_tokens": snap["completion_tokens"],
-                "total_tokens": snap["total_tokens"],
-                "cache_tokens": snap["cache_tokens"],
-            },
+            estimated_cost=tc.snapshot()["estimated_cost_cny"],
+            token_cost_json=tc.to_json(),
         )
 
     # --- 8. Snapshot on exit ---
@@ -308,22 +300,16 @@ async def _persist_tool_messages(
             if ctype in _SUB_AGENT_TOOLS:
                 agent_ids = pop_until_sentinel(conversation_id)
                 if agent_ids:
-                    total_input = total_output = total_tokens = 0
+                    summed: dict = {}
                     total_cost = 0.0
                     for aid in agent_ids:
                         tc = TokenCounter.get_agent(aid)
                         if tc:
-                            s = tc.snapshot()
-                            total_input += s["prompt_tokens"]
-                            total_output += s["completion_tokens"]
-                            total_tokens += s["total_tokens"]
-                            total_cost += tc.estimate_cost()
+                            for k, v in tc.to_json().items():
+                                summed[k] = summed.get(k, 0) + v
+                            total_cost += tc.snapshot()["estimated_cost_cny"]
                     await db.set_message_cost(msg.id,
-                        token_cost_json={
-                            "input_tokens": total_input,
-                            "output_tokens": total_output,
-                            "total_tokens": total_tokens,
-                        },
+                        token_cost_json=summed,
                         estimated_cost=total_cost,
                     )
                     _log.debug("persisted tokens for tool=%s agents=%d msg=%d cost=%.4f",

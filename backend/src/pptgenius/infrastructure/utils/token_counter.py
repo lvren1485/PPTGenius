@@ -171,6 +171,17 @@ class TokenCounter:
             + self._completion_tokens * p["output"]
         ) / 1_000_000
 
+    def to_json(self) -> dict:
+        """Billing-relevant token breakdown for message persistence."""
+        return {
+            "input_tokens": self._prompt_tokens,
+            "output_tokens": self._completion_tokens,
+            "total_tokens": self._total_tokens,
+            "cache_hit_tokens": self._cache_hit_tokens,
+            "cache_miss_tokens": self._cache_miss_tokens,
+            "reasoning_tokens": self._reasoning_tokens,
+        }
+
     def snapshot(self) -> dict:
         """Return a summary dict of accumulated usage."""
         return {
