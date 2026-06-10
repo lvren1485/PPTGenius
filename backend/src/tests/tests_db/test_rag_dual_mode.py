@@ -291,7 +291,7 @@ class TestKnowledgeServiceConvSearch:
 class TestBuildChunkMap:
     @pytest.mark.asyncio
     async def test_build_chunk_map_user_mode(self, db):
-        from pptgenius.agent.outline.generator import _build_chunk_map
+        from pptgenius.agent.outline.knowledge_tools import _build_chunk_map
 
         d = Database(db)
         u = await d.create_user("bcm_user")
@@ -308,7 +308,7 @@ class TestBuildChunkMap:
 
     @pytest.mark.asyncio
     async def test_build_chunk_map_conversation_mode(self, db):
-        from pptgenius.agent.outline.generator import _build_chunk_map
+        from pptgenius.agent.outline.knowledge_tools import _build_chunk_map
 
         d = Database(db)
         u = await d.create_user("bcm_conv")
@@ -330,7 +330,7 @@ class TestBuildChunkMap:
 
     @pytest.mark.asyncio
     async def test_build_chunk_map_key_is_first_20_chars(self, db):
-        from pptgenius.agent.outline.generator import _build_chunk_map
+        from pptgenius.agent.outline.knowledge_tools import _build_chunk_map
 
         d = Database(db)
         u = await d.create_user("bcm_key")

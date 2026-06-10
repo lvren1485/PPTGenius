@@ -30,13 +30,14 @@ _TOOL_CTYPE: dict[str, str] = {
     "generate_outline_content": "gen_content",
     "modify_outline_section":   "mod_section",
     "outline_evaluate":         "evaluate",
-    "summarize_file":           "summarize_file",
+    "explore_knowledge":        "explore",
 }
 
 # Tools that spawn a sub-agent (have their own LLM + TokenCountingMiddleware)
-_SUB_AGENT_TOOLS: set[str] = {"gen_content", "mod_section", "evaluate"}
+_SUB_AGENT_TOOLS: set[str] = {"gen_content", "mod_section", "evaluate", "explore"}
 
 from .common.model_builder import build_llm
+from .tools.explore_knowledge import make_explore_knowledge
 from .tools.outline_evaluate import make_outline_evaluate
 from .tools.outline_section import make_generate_outline_content, make_modify_outline_section
 from .tools.perception import (
@@ -49,7 +50,6 @@ from .tools.perception import (
     make_switch_outline,
 )
 from .tools.structure import make_modify_outline_structure, make_write_outline_structure
-from .tools.summarize_file import make_summarize_file
 
 
 def _assemble_tools(db: Database, conversation_id: int) -> list:
@@ -70,7 +70,7 @@ def _assemble_tools(db: Database, conversation_id: int) -> list:
         make_generate_outline_content(db, conversation_id),
         make_modify_outline_section(db, conversation_id),
         make_outline_evaluate(db, conversation_id),
-        make_summarize_file(db, conversation_id),
+        make_explore_knowledge(db, conversation_id),
         # ppt_style (Phase 4) — TODO
         # slides_content (Phase 4) — TODO
     ]
@@ -196,6 +196,10 @@ async def _load_context_messages(
 
     for r in rows:
         if r.role == "user" and r.content_type == "text":
+            msgs.append(HumanMessage(content=r.content))
+
+        elif r.role in ("file", "image") and r.content:
+            # File/image uploads as user-provided context
             msgs.append(HumanMessage(content=r.content))
 
         elif r.role == "tool_call":

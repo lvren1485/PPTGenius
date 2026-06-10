@@ -112,7 +112,7 @@ async def upload_files(
 
             try:
                 doc = parse_file(str(dest))
-                preview = doc.text[:1000].strip()
+                preview = doc.text[:200].strip()
                 if preview:
                     await db.create_message(
                         conversation_id=conversation_id,
