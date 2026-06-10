@@ -9,6 +9,7 @@ from langchain_core.tools import tool
 from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import get_logger
 
+from ..common.agent_registry import push_sentinel
 from ..common.tool_sse_wrapper import wrap_tool_with_sse
 from ..outline.generator import run_outline_generator
 
@@ -39,6 +40,7 @@ def make_generate_outline_content(db: Database, conversation_id: int) -> Callabl
             return "错误：当前大纲没有章节"
 
         _log.info("batch generate start: outline=%d sections=%d", outline_id, len(sections))
+        push_sentinel(conversation_id)
         for sec in sections:
             await run_outline_generator(
                 db, conversation_id,
@@ -47,6 +49,7 @@ def make_generate_outline_content(db: Database, conversation_id: int) -> Callabl
             )
 
         await db.update_outline_status(outline_id, "completed")
+        await db.increase_outline_version(conv.current_outline_id, "major")
         return f"全部生成完成: {len(sections)} 章节"
 
     return tool(wrap_tool_with_sse(_generate_outline_content))
@@ -70,6 +73,12 @@ def make_modify_outline_section(db: Database, conversation_id: int) -> Callable:
             query: Optional specific requirements or instructions.
         """
         _log.info("modify section: section_id=%d query=%s", section_id, query or "-")
+        conv = await db.get_conversation(conversation_id)
+        if conv is None or conv.current_outline_id is None:
+            return "错误：没有选中大纲"
+
+        await db.increase_outline_version(conv.current_outline_id, "minor")
+        push_sentinel(conversation_id)
         return await run_outline_generator(
             db, conversation_id,
             section_id=section_id,

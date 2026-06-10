@@ -2,15 +2,39 @@
 
 from __future__ import annotations
 
+import uuid
+
 from langchain.agents import create_agent
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.config import get_stream_writer
 
 from pptgenius.infrastructure.config.settings import RESOURCES_DIR
 from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import TokenCounter, get_logger
 
+from .common.agent_registry import pop_until_sentinel
+
 _log = get_logger("pptgenius.agent.master")
+
+# tool_name → content_type (≤32 chars, VARCHAR limit)
+_TOOL_CTYPE: dict[str, str] = {
+    "get_conversation_status":  "conv_status",
+    "switch_outline":           "switch_outline",
+    "get_outline":              "get_outline",
+    "get_outline_slide":        "get_slide",
+    "get_presentation":         "get_pres",
+    "get_knowledge_files":      "get_kfiles",
+    "list_styles":              "list_styles",
+    "write_outline_structure":  "write_outline",
+    "modify_outline_structure": "mod_outline",
+    "generate_outline_content": "gen_content",
+    "modify_outline_section":   "mod_section",
+    "outline_evaluate":         "evaluate",
+    "summarize_file":           "summarize_file",
+}
+
+# Tools that spawn a sub-agent (have their own LLM + TokenCountingMiddleware)
+_SUB_AGENT_TOOLS: set[str] = {"gen_content", "mod_section", "evaluate"}
 
 from .common.model_builder import build_llm
 from .tools.outline_evaluate import make_outline_evaluate
@@ -91,21 +115,27 @@ async def run_master_agent(
         middleware=[mw],
     )
 
-    # --- 4. Run ---
+    # --- 4. Load context + run ---
     writer({"type": "master_start"})
-    state = {"messages": [HumanMessage(content=user_message)]}
+    context = await _load_context_messages(db, conversation_id)
+    context.append(HumanMessage(content=user_message))
+    state = {"messages": context}
+    _log.debug("loaded %d context messages for conv=%d", len(context) - 1, conversation_id)
     result = await agent.ainvoke(state, config={"recursion_limit": recursion_limit})
     writer({"type": "master_done"})
     _log.info("master agent done conv=%d agent=%s", conversation_id, agent_id)
 
-    # --- 5. Extract reply ---
+    # --- 5. Persist tool messages + sub-agent tokens ---
+    await _persist_tool_messages(db, conversation_id, result["messages"])
+
+    # --- 6. Extract reply ---
     reply = ""
     messages = result.get("messages", [])
     if messages:
         last = messages[-1]
         reply = last.content if hasattr(last, "content") else str(last)
 
-    # --- 6. Persist Master's own token cost ---
+    # --- 7. Persist Master's own token cost ---
     tc = TokenCounter.get_agent(agent_id)
     if tc:
         snap = tc.snapshot()
@@ -125,7 +155,7 @@ async def run_master_agent(
             },
         )
 
-    # --- 7. Snapshot on exit ---
+    # --- 8. Snapshot on exit ---
     outline_changed = _has_outline_changed(result)
     presentation_changed = _has_presentation_changed(result)
 
@@ -134,11 +164,8 @@ async def run_master_agent(
 
     if outline_changed:
         conv = await db.get_conversation(conversation_id)
-        await db.increase_outline_version(conv.current_outline_id, "patch")
-
-    if outline_changed:
-        conv = await db.get_conversation(conversation_id)
         if conv and conv.current_outline_id:
+            await db.increase_outline_version(conv.current_outline_id, "patch")
             outline = await db.get_outline(conv.current_outline_id)
             if outline:
                 await db.create_outline_snapshot(
@@ -157,6 +184,150 @@ async def run_master_agent(
         "outline_changed": outline_changed,
         "presentation_changed": presentation_changed,
     }
+
+
+async def _load_context_messages(
+    db: Database, conversation_id: int, *, max_turns: int = 20,
+) -> list:
+    """Load recent messages from DB, reconstruct full LangChain message chain.
+
+    User/assistant text messages are reconstructed directly.  Tool messages
+    are paired via tool_call_id so the LLM sees the complete AIMessage(tool_calls)
+    → ToolMessage sequence it originally produced.
+    """
+    rows = await db.get_messages_by_conversation(conversation_id)
+    rows = rows[-max_turns:]
+
+    msgs: list = []
+    # tool_result rows indexed by tool_call_id for pairing
+    pending_results: dict[str, dict] = {}
+
+    for r in rows:
+        if r.role == "user" and r.content_type == "text":
+            msgs.append(HumanMessage(content=r.content))
+
+        elif r.role == "tool_call":
+            meta = r.metadata_json or {}
+            tc_id = meta.get("tool_call_id", "") or str(uuid.uuid4())
+            tc = {
+                "name": meta.get("tool_name", ""),
+                "args": meta.get("args", {}),
+                "id": tc_id,
+                "type": "tool_call",
+            }
+            # Check if result already seen (stored after tool_call in some edge case)
+            if tc_id in pending_results:
+                result = pending_results.pop(tc_id)
+                msgs.append(AIMessage(content="", tool_calls=[tc]))
+                msgs.append(ToolMessage(
+                    content=result["content"],
+                    tool_call_id=tc_id,
+                    name=result.get("tool_name", ""),
+                ))
+            else:
+                msgs.append(AIMessage(content="", tool_calls=[tc]))
+
+        elif r.role == "tool_result":
+            meta = r.metadata_json or {}
+            tc_id = meta.get("tool_call_id", "") or ""
+            # Pair with the preceding AIMessage if it has a matching tool_call
+            paired = False
+            if tc_id and msgs:
+                last = msgs[-1]
+                if isinstance(last, AIMessage) and last.tool_calls:
+                    for tc in last.tool_calls:
+                        if tc.get("id") == tc_id:
+                            msgs.append(ToolMessage(
+                                content=r.content,
+                                tool_call_id=tc_id,
+                                name=meta.get("tool_name", ""),
+                            ))
+                            paired = True
+                            break
+            if not paired:
+                # Result without a matching tool_call yet — stash it
+                pending_results[tc_id] = {
+                    "content": r.content,
+                    "tool_name": meta.get("tool_name", ""),
+                }
+
+        elif r.role == "assistant" and r.content_type == "text":
+            # Flush any dangling pending results before the final reply
+            for tc_id, result in pending_results.items():
+                msgs.append(ToolMessage(
+                    content=result["content"],
+                    tool_call_id=tc_id,
+                    name=result.get("tool_name", ""),
+                ))
+            pending_results.clear()
+            msgs.append(AIMessage(content=r.content))
+
+    return msgs
+
+
+async def _persist_tool_messages(
+    db: Database, conversation_id: int, messages: list,
+) -> None:
+    """Persist tool_call / tool_result message pairs with token costs.
+
+    Stores LangChain's tool_call_id so _load_context_messages can
+    reconstruct AIMessage(tool_calls) + ToolMessage pairs correctly.
+    """
+
+    for m in messages:
+        if isinstance(m, AIMessage) and m.tool_calls:
+            for tc in m.tool_calls:
+                ctype = _TOOL_CTYPE.get(tc.get("name", ""), "tool_call")
+                await db.create_message(
+                    conversation_id=conversation_id,
+                    role="tool_call",
+                    content=tc.get("args", {}).get("query", "") or "",
+                    content_type=ctype,
+                    metadata_json={
+                        "tool_name": tc.get("name"),
+                        "args": tc.get("args", {}),
+                        "tool_call_id": tc.get("id", ""),
+                    },
+                )
+
+        elif isinstance(m, ToolMessage):
+            name = getattr(m, "name", "") or ""
+            ctype = _TOOL_CTYPE.get(name, "tool_result")
+            tool_content = str(m.content) if hasattr(m, "content") else ""
+            tc_id = getattr(m, "tool_call_id", "") or ""
+
+            msg = await db.create_message(
+                conversation_id=conversation_id,
+                role="tool_result",
+                content=tool_content,
+                content_type=ctype,
+                metadata_json={"tool_name": name, "tool_call_id": tc_id},
+            )
+
+            # For sub-agent tools, flush all concurrent agent token counters
+            if ctype in _SUB_AGENT_TOOLS:
+                agent_ids = pop_until_sentinel(conversation_id)
+                if agent_ids:
+                    total_input = total_output = total_tokens = 0
+                    total_cost = 0.0
+                    for aid in agent_ids:
+                        tc = TokenCounter.get_agent(aid)
+                        if tc:
+                            s = tc.snapshot()
+                            total_input += s["prompt_tokens"]
+                            total_output += s["completion_tokens"]
+                            total_tokens += s["total_tokens"]
+                            total_cost += tc.estimate_cost()
+                    await db.set_message_cost(msg.id,
+                        token_cost_json={
+                            "input_tokens": total_input,
+                            "output_tokens": total_output,
+                            "total_tokens": total_tokens,
+                        },
+                        estimated_cost=total_cost,
+                    )
+                    _log.debug("persisted tokens for tool=%s agents=%d msg=%d cost=%.4f",
+                               ctype, len(agent_ids), msg.id, total_cost)
 
 
 def _has_outline_changed(state: dict) -> bool:

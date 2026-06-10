@@ -8,6 +8,7 @@ from langchain_core.tools import tool
 
 from pptgenius.infrastructure.db.database import Database
 
+from ..common.agent_registry import push_sentinel
 from ..common.tool_sse_wrapper import wrap_tool_with_sse
 from ..outline.evaluator import run_outline_evaluator
 
@@ -24,6 +25,7 @@ def make_outline_evaluate(db: Database, conversation_id: int) -> Callable:
         Args:
             query: Optional specific evaluation criteria from the user.
         """
+        push_sentinel(conversation_id)
         return await run_outline_evaluator(db, conversation_id, query=query)
 
     return tool(wrap_tool_with_sse(_outline_evaluate))

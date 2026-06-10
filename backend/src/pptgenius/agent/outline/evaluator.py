@@ -12,6 +12,7 @@ from langgraph.config import get_stream_writer
 from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import get_logger
 
+from ..common.agent_registry import push_agent
 from ..common.model_builder import build_llm
 from .prompts import (
     build_evaluator_system_prompt,
@@ -161,6 +162,7 @@ async def run_outline_evaluator(
     user_prompt = "\n".join(user_prompt_parts)
 
     llm, agent_id, mw = build_llm(conversation_id)
+    push_agent(conversation_id, agent_id)
     agent = create_agent(
         model=llm,
         tools=[_make_submit_evaluation(db, outline_id)],

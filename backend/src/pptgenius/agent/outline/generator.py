@@ -13,6 +13,7 @@ from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.rag import KnowledgeService, WebSearchService
 from pptgenius.infrastructure.utils import get_logger
 
+from ..common.agent_registry import push_agent
 from ..common.model_builder import build_llm
 from .prompts import build_generator_system_prompt, build_generator_user_prompt
 
@@ -287,6 +288,7 @@ async def run_outline_generator(
     )
 
     llm, agent_id, mw = build_llm(conversation_id)
+    push_agent(conversation_id, agent_id)
     agent = create_agent(
         model=llm, tools=tools,
         system_prompt=system_prompt,
