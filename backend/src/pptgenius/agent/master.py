@@ -194,23 +194,22 @@ async def _load_context_messages(
     rows = rows[-max_turns:]
 
     msgs: list = []
-    # Stash the previous row's tool_call metadata for pairing with the next row
-    pending_tc: dict | None = None
+    # Pending tool_calls keyed by tool_call_id (handles parallel calls)
+    pending: dict[str, dict] = {}
 
     for r in rows:
         if r.role == "user" and r.content_type == "text":
-            pending_tc = None  # incomplete tool_call before user message → drop
+            pending.clear()
             msgs.append(HumanMessage(content=r.content))
 
         elif r.role in ("file", "image") and r.content:
-            pending_tc = None
+            pending.clear()
             msgs.append(HumanMessage(content=r.content))
 
         elif r.role == "tool_call":
-            # Drop any previous incomplete tool_call
             meta = r.metadata_json or {}
             tc_id = meta.get("tool_call_id", "") or str(uuid.uuid4())
-            pending_tc = {
+            pending[tc_id] = {
                 "name": meta.get("tool_name", ""),
                 "args": meta.get("args", {}),
                 "id": tc_id,
@@ -220,19 +219,17 @@ async def _load_context_messages(
         elif r.role == "tool_result":
             meta = r.metadata_json or {}
             tc_id = meta.get("tool_call_id", "") or ""
-            if pending_tc and pending_tc.get("id") == tc_id:
-                # Complete pair: emit both
-                msgs.append(AIMessage(content="", tool_calls=[pending_tc]))
+            tc = pending.pop(tc_id, None)
+            if tc:
+                msgs.append(AIMessage(content="", tool_calls=[tc]))
                 msgs.append(ToolMessage(
                     content=r.content,
                     tool_call_id=tc_id,
                     name=meta.get("tool_name", ""),
                 ))
-            # else: orphaned result without matching tool_call → drop
-            pending_tc = None
 
         elif r.role == "assistant" and r.content_type == "text":
-            pending_tc = None  # incomplete tool_call before assistant → drop
+            pending.clear()
             msgs.append(AIMessage(content=r.content))
 
     return msgs
@@ -262,8 +259,7 @@ async def _persist_tool_messages(
             for tc in m.tool_calls:
                 tc_id = tc.get("id", "")
                 if tc_id in seen_ids:
-                    continue
-                seen_ids.add(tc_id)
+                    continue  # already persisted from a previous turn
                 ctype = _TOOL_CTYPE.get(tc.get("name", ""), "tool_call")
                 await db.create_message(
                     conversation_id=conversation_id,
@@ -280,8 +276,7 @@ async def _persist_tool_messages(
         elif isinstance(m, ToolMessage):
             tc_id = getattr(m, "tool_call_id", "") or ""
             if tc_id in seen_ids:
-                continue
-            seen_ids.add(tc_id)
+                continue  # already persisted from a previous turn
             name = getattr(m, "name", "") or ""
             ctype = _TOOL_CTYPE.get(name, "tool_result")
             tool_content = str(m.content) if hasattr(m, "content") else ""

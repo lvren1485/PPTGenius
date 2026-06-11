@@ -112,33 +112,36 @@ def _make_write_slides(db: Database, outline_id: int, section_id: int):
 
 
 async def run_outline_generator(
-    db: Database,
+    db: Database,  # unused for heavy work, kept for backward compat
     conversation_id: int,
     section_id: int,
     *,
     query: str | None = None,
     knowledge_mode: str = "auto",
 ) -> str:
-    """Fill content for one section's pre-created slides."""
+    """Fill content for one section's pre-created slides.
+
+    Uses an independent DB session for all work — safe for concurrent execution.
+    """
     writer = _get_writer()
 
-    # Read section metadata from the caller's session
-    section = await db.get_outline_section(section_id)
-    if section is None:
-        return f"错误: section {section_id} 不存在"
-    outline_id = section.outline_id
-    section_title = section.title
-
-    outline = await db.get_outline(outline_id)
-    conv = await db.get_conversation(conversation_id)
-    user_id = conv.user_id if conv else 0
-    rag_mode = await db.get_rag_mode(user_id) if user_id else "user"
-
-    # Use an independent session for all generator work (avoids asyncmy concurrent read issue)
     sm = get_session_manager()
     gdb = None
     try:
         gdb = sm.new_session()
+
+        # All reads from the independent session
+        section = await gdb.get_outline_section(section_id)
+        if section is None:
+            return f"错误: section {section_id} 不存在"
+        outline_id = section.outline_id
+        section_title = section.title
+
+        outline = await gdb.get_outline(outline_id)
+        conv = await gdb.get_conversation(conversation_id)
+        user_id = conv.user_id if conv else 0
+        rag_mode = await gdb.get_rag_mode(user_id) if user_id else "user"
+
         kb_count = [0]
         web_count = [0]
         fetch_count = [0]

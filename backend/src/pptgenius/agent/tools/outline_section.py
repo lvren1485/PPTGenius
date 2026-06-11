@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Callable
 
 from langchain_core.tools import tool
@@ -41,12 +42,10 @@ def make_generate_outline_content(db: Database, conversation_id: int) -> Callabl
 
         _log.info("batch generate start: outline=%d sections=%d", outline_id, len(sections))
         push_sentinel(conversation_id)
-        for sec in sections:
-            await run_outline_generator(
-                db, conversation_id,
-                section_id=sec.id,
-                query=query,
-            )
+        await asyncio.gather(*[
+            run_outline_generator(db, conversation_id, section_id=sec.id, query=query)
+            for sec in sections
+        ])
 
         await db.update_outline_status(outline_id, "completed")
         await db.increase_outline_version(conv.current_outline_id, "major")

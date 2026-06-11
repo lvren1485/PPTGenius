@@ -143,7 +143,10 @@ class SessionManager:
             await db.db.rollback()
         except Exception:
             pass
-        await db.db.close()
+        try:
+            await db.db.close()
+        except Exception:
+            pass
 
 
 # Singleton — shared across the app
