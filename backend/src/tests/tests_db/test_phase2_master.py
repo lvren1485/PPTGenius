@@ -246,6 +246,125 @@ class TestStructureTools:
         assert "error" in r
 
 
+class TestWriteThenReadOutline:
+    """Verify current_outline_id persists after write_outline_structure."""
+
+    @pytest.mark.asyncio
+    async def test_write_then_conv_status_sees_outline(self, db):
+        d = Database(db)
+        u = await d.create_user("wtro_user")
+        conv = await d.create_conversation(u.id)
+
+        write_tool = make_write_outline_structure(d, conv.id)
+        await write_tool.ainvoke({
+            "title": "Test",
+            "sections": [{"section_index": 1, "title": "S1", "description": "", "slide_number": 2}],
+        })
+
+        # Immediately check conv_status
+        status_tool = make_get_conversation_status(d, conv.id)
+        status = await status_tool.ainvoke({})
+        assert status["current_outline_id"] is not None, \
+            f"current_outline_id should be set after write_outline, got {status['current_outline_id']}"
+        assert len(status["outlines"]) >= 1, \
+            f"outlines should include the newly created one, got {len(status['outlines'])}"
+
+    @pytest.mark.asyncio
+    async def test_write_then_get_outline_sees_it(self, db):
+        d = Database(db)
+        u = await d.create_user("wtro2_user")
+        conv = await d.create_conversation(u.id)
+
+        write_tool = make_write_outline_structure(d, conv.id)
+        await write_tool.ainvoke({
+            "title": "Test2",
+            "sections": [{"section_index": 1, "title": "Ch1", "description": "", "slide_number": 2}],
+        })
+
+        get_tool = make_get_outline(d, conv.id)
+        result = await get_tool.ainvoke({})
+        assert "error" not in result, f"get_outline should succeed, got: {result}"
+        assert result["title"] == "Test2"
+        assert len(result["sections"]) == 1
+
+    @pytest.mark.asyncio
+    async def test_current_outline_id_survives_commit_roundtrip(self, db):
+        d = Database(db)
+        u = await d.create_user("wtro3_user")
+        conv = await d.create_conversation(u.id)
+
+        write_tool = make_write_outline_structure(d, conv.id)
+        await write_tool.ainvoke({
+            "title": "RT",
+            "sections": [{"section_index": 1, "title": "X", "description": "", "slide_number": 2}],
+        })
+
+        # Simulate what happens between turns: commit + re-read
+        await db.commit()
+
+        # Read from fresh session perspective
+        conv2 = await d.get_conversation(conv.id)
+        assert conv2.current_outline_id is not None, \
+            f"current_outline_id lost after commit: {conv2.current_outline_id}"
+
+        outlines = await d.list_outlines_by_conversation(conv.id)
+        assert len(outlines) >= 1, \
+            f"outlines lost after commit: {len(outlines)}"
+
+
+class TestConvStatusAfterWrite:
+    """Simulate API flow: write_outline in one call, conv_status in another."""
+
+    @pytest.mark.asyncio
+    async def test_conv_status_sees_outline_across_turns(self, db):
+        """Turn 1: write_outline → Turn 2: conv_status (same session, simulating API flow)."""
+        d = Database(db)
+        u = await d.create_user("csaw_user")
+        conv = await d.create_conversation(u.id)
+
+        # Turn 1: create outline (like Master calling write_outline_structure)
+        w = make_write_outline_structure(d, conv.id)
+        r = await w.ainvoke({
+            "title": "Cross-Turn Test",
+            "sections": [{"section_index": 1, "title": "S1", "description": "", "slide_number": 2}],
+        })
+        assert "已创建大纲" in r
+
+        # Simulate what the API does after tool returns: persist messages, snapshot, etc.
+        # create_message (simulating _persist_tool_messages)
+        msg = await d.create_message(conv.id, "tool_result", r, content_type="write_outline")
+        # increase_outline_version (simulating snapshot step)
+        conv2 = await d.get_conversation(conv.id)
+        if conv2 and conv2.current_outline_id:
+            await d.increase_outline_version(conv2.current_outline_id, "patch")
+
+        # Turn 2: conv_status should see the outline
+        cs = make_get_conversation_status(d, conv.id)
+        status = await cs.ainvoke({})
+        assert status["current_outline_id"] is not None, \
+            f"FAIL: current_outline_id is null after write+persist. Full status: {status}"
+        assert len(status["outlines"]) >= 1, \
+            f"FAIL: outlines is empty after write+persist. Full status: {status}"
+
+    @pytest.mark.asyncio
+    async def test_conv_status_sees_outline_no_message_persist(self, db):
+        """Simplest case: just write then read, no extra operations."""
+        d = Database(db)
+        u = await d.create_user("csaw2_user")
+        conv = await d.create_conversation(u.id)
+
+        w = make_write_outline_structure(d, conv.id)
+        await w.ainvoke({
+            "title": "Minimal",
+            "sections": [{"section_index": 1, "title": "X", "description": "", "slide_number": 2}],
+        })
+
+        cs = make_get_conversation_status(d, conv.id)
+        status = await cs.ainvoke({})
+        assert status["current_outline_id"] is not None
+        assert len(status["outlines"]) >= 1
+
+
 # Import tool factories at module level for test discovery
 from pptgenius.agent.tools.perception import (
     make_get_conversation_status,

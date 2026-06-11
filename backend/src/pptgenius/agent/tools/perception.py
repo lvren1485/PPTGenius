@@ -7,6 +7,7 @@ descriptions for the LLM.
 
 from __future__ import annotations
 
+import json
 from typing import Callable
 
 from langchain_core.tools import tool
@@ -283,11 +284,14 @@ def make_list_styles(db: Database, conversation_id: int) -> Callable:
 def _slide_summary(sl) -> str:
     """Compact summary of a slide for get_outline overview."""
     parts = []
-    if sl.content_json:
-        main = sl.content_json.get("main_points", [])
+    cj = sl.content_json
+    if isinstance(cj, str):
+        cj = json.loads(cj)
+    if cj:
+        main = cj.get("main_points", [])
         if main:
             parts.append(f"main:{'|'.join(main[:3])}")
-        detail = sl.content_json.get("detailed_content", "")
+        detail = cj.get("detailed_content", "")
         if detail:
             parts.append(f"~{len(detail)}chars")
     if sl.has_chart:

@@ -52,7 +52,7 @@ def _make_write_slides(db: Database, outline_id: int, section_id: int):
 
         Parameters
         ----------
-        slides : list[dict] — [{slide_index, content_json, has_image, has_chart, notes}, ...]
+        slides : list[dict] — [{slide_index, title, content_json, has_image, has_chart, notes}, ...]. title is REQUIRED — provides a clean, descriptive title (flag tags like 待修改 are stripped).
         citations : list[dict] | None — [{chunk_id, reason}, ...], cite knowledge sources used.
         """
         existing = await db.get_slides_by_outline_id(outline_id)
@@ -85,7 +85,8 @@ def _make_write_slides(db: Database, outline_id: int, section_id: int):
             if target is None:
                 continue
             updates: dict = {"status": "completed"}
-            if "content_json" in sl:
+            if "title" in sl:
+                updates["title"] = sl["title"]
                 updates["content_json"] = sl["content_json"]
             if "has_image" in sl:
                 updates["has_image"] = sl["has_image"]
@@ -164,7 +165,7 @@ async def run_outline_generator(
     writer({"type": "outline_generator_start", "section": section.title})
     result = await agent.ainvoke(
         {"messages": [HumanMessage(content=user_prompt)]},
-        config={"recursion_limit": 30},
+        config={"recursion_limit": 50},
     )
 
     if not was_called[0]:

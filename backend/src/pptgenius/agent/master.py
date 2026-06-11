@@ -17,20 +17,21 @@ from .common.agent_registry import pop_until_sentinel
 _log = get_logger("pptgenius.agent.master")
 
 # tool_name → content_type (≤32 chars, VARCHAR limit)
+# Tool names come from inner function __name__ (wrap_tool_with_sse preserves it)
 _TOOL_CTYPE: dict[str, str] = {
-    "get_conversation_status":  "conv_status",
-    "switch_outline":           "switch_outline",
-    "get_outline":              "get_outline",
-    "get_outline_slide":        "get_slide",
-    "get_presentation":         "get_pres",
-    "get_knowledge_files":      "get_kfiles",
-    "list_styles":              "list_styles",
-    "write_outline_structure":  "write_outline",
-    "modify_outline_structure": "mod_outline",
-    "generate_outline_content": "gen_content",
-    "modify_outline_section":   "mod_section",
-    "outline_evaluate":         "evaluate",
-    "explore_knowledge":        "explore",
+    "_get_conversation_status":  "conv_status",
+    "_switch_outline":           "switch_outline",
+    "_get_outline":              "get_outline",
+    "_get_outline_slide":        "get_slide",
+    "_get_presentation":         "get_pres",
+    "_get_knowledge_files":      "get_kfiles",
+    "_list_styles":              "list_styles",
+    "_write_outline_structure":  "write_outline",
+    "_modify_outline_structure": "mod_outline",
+    "_generate_outline_content": "gen_content",
+    "_modify_outline_section":   "mod_section",
+    "_outline_evaluate":         "evaluate",
+    "_explore_knowledge":        "explore",
 }
 
 # Tools that spawn a sub-agent (have their own LLM + TokenCountingMiddleware)
@@ -171,6 +172,9 @@ async def run_master_agent(
                     ),
                 )
 
+    # Ensure all DB changes are committed before the session closes
+    await db.db.commit()
+
     return {
         "reply": reply,
         "outline_changed": outline_changed,
@@ -248,8 +252,14 @@ async def _load_context_messages(
                 }
 
         elif r.role == "assistant" and r.content_type == "text":
-            # Flush any dangling pending results before the final reply
+            # Flush pending results WITH matching AIMessage(tool_calls)
             for tc_id, result in pending_results.items():
+                msgs.append(AIMessage(content="", tool_calls=[{
+                    "name": result.get("tool_name", ""),
+                    "args": {},
+                    "id": tc_id,
+                    "type": "tool_call",
+                }]))
                 msgs.append(ToolMessage(
                     content=result["content"],
                     tool_call_id=tc_id,
@@ -257,6 +267,11 @@ async def _load_context_messages(
                 ))
             pending_results.clear()
             msgs.append(AIMessage(content=r.content))
+
+    # Strip trailing unmatched AIMessage(tool_calls) — API 400 if
+    # tool_calls not followed by matching ToolMessages
+    while msgs and isinstance(msgs[-1], AIMessage) and msgs[-1].tool_calls:
+        msgs.pop()
 
     return msgs
 
@@ -327,8 +342,8 @@ def _has_outline_changed(state: dict) -> bool:
     # modify_outline_structure, assume outline changed.
     for m in msgs:
         name = getattr(m, "name", "")
-        if name in ("write_outline_structure", "modify_outline_structure",
-                     "generate_outline_content", "modify_outline_section"):
+        if name in ("_write_outline_structure", "_modify_outline_structure",
+                     "_generate_outline_content", "_modify_outline_section"):
             return True
     return False
 
@@ -337,7 +352,7 @@ def _has_presentation_changed(state: dict) -> bool:
     msgs = state.get("messages", [])
     for m in msgs:
         name = getattr(m, "name", "")
-        if name in ("slides_content", "ppt_style"):
+        if name in ("_slides_content", "_ppt_style"):
             return True
     return False
 
@@ -348,16 +363,23 @@ def _build_outline_snapshot_json(outline, sections, slides) -> dict:
         "status": outline.status,
         "version": f"{outline.version_major}.{outline.version_minor}.{outline.version_patch}",
         "slide_count": outline.slide_count,
+        "eval_score": outline.eval_score,
         "sections": [
             {
                 "section_index": s.section_index,
                 "title": s.title,
+                "description": s.description,
                 "slides": [
                     {
                         "slide_index": sl.slide_index,
                         "title": sl.title,
                         "layout_type": sl.layout_type,
                         "status": sl.status,
+                        "content_json": sl.content_json,
+                        "notes": sl.notes,
+                        "has_image": sl.has_image,
+                        "has_chart": sl.has_chart,
+                        "citations": sl.citations,
                     }
                     for sl in slides if sl.section_id == s.id
                 ],

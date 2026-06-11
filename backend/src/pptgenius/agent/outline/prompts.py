@@ -85,6 +85,7 @@ async def build_generator_user_prompt(
         ids = [str(sl.slide_index) for sl in flagged]
         parts.append(f"**待处理**: slide {', '.join(ids)} 标记为空白或待修改，优先填充。\n")
     parts.append("幻灯片已预先创建且不可增删。使用 write_slides 按 slide_index 写入 content_json。")
+    parts.append("**每页 slide 的 title 字段必须填写**——覆盖原有标题（含标记），提供干净、具体的标题。")
 
     return "\n".join(parts)
 

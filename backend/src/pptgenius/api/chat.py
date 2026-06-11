@@ -1,6 +1,6 @@
 """SSE streaming chat endpoint — single entry point for all user messages.
 
-The coordinator agent analyses intent and dispatches to sub-agents.
+Routes user messages to the Unified Master Agent.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from typing import AsyncGenerator
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
-from pptgenius.agent import run_coordinator
+from pptgenius.agent.master import run_master_agent
 from pptgenius.infrastructure.db import Database
 from pptgenius.infrastructure.utils import TokenCounter, get_logger
 
@@ -25,7 +25,6 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 
 def _sse(event: str, data: dict) -> str:
-    """Format an SSE message."""
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
@@ -35,13 +34,8 @@ async def chat_send(
     request: Request,
     db: Database = Depends(get_db),
 ) -> StreamingResponse:
-    """Send a user message and receive SSE stream of agent progress.
+    """Send a user message and receive SSE stream of agent progress."""
 
-    The agent supervisor inspects ``conversation.current_phase`` and the latest
-    outline/presentation state to decide the next action.
-    """
-
-    # Verify conversation exists
     conv = await db.get_conversation(req.conversation_id)
     if conv is None:
         return StreamingResponse(
@@ -55,11 +49,17 @@ async def chat_send(
     async def event_stream() -> AsyncGenerator[str, None]:
         t0 = time.time()
         try:
-            async for event in _run_agent(req, db):
-                if await request.is_disconnected():
-                    _log.debug("client disconnected, stopping stream")
-                    return
-                yield event
+            yield _sse("message", {"type": "master_start", "content": req.message})
+
+            result = await run_master_agent(db, req.conversation_id, req.message)
+
+            yield _sse("message", {
+                "type": "master_reply",
+                "reply": result["reply"],
+                "outline_changed": result["outline_changed"],
+                "presentation_changed": result["presentation_changed"],
+            })
+
             elapsed = round(time.time() - t0, 2)
             token_snapshot = TokenCounter.for_conversation(req.conversation_id).snapshot()
             yield _sse("done", {
@@ -72,11 +72,3 @@ async def chat_send(
             yield _sse("error", {"code": 40200, "message": str(exc), "retryable": True})
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
-
-
-async def _run_agent(req: ChatSendRequest, db: Database) -> AsyncGenerator[str, None]:
-    """Run the coordinator agent — analyses intent and dispatches to sub-agents."""
-    _log.info("coordinator start: conv=%d msg=%r", req.conversation_id, req.message)
-
-    async for event in run_coordinator(db, req.conversation_id, req.message):
-        yield event
