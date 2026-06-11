@@ -108,6 +108,17 @@ async def init_db() -> None:
     await seed(_get_engine())
 
 
+_session_manager: "SessionManager | None" = None
+
+
+def get_session_manager() -> "SessionManager":
+    """Module-level singleton for sub-agents to get independent sessions."""
+    global _session_manager
+    if _session_manager is None:
+        _session_manager = SessionManager()
+    return _session_manager
+
+
 class SessionManager:
     """Provides independent DB sessions for parallel agent execution.
 

@@ -12,6 +12,7 @@ from langgraph.config import get_stream_writer
 
 from pptgenius.infrastructure.config.settings import RESOURCES_DIR
 from pptgenius.infrastructure.db.database import Database
+from pptgenius.infrastructure.db.engine import get_session_manager
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_agent
@@ -88,33 +89,16 @@ async def run_knowledge_agent(
     user_id = conv.user_id
     rag_mode = await db.get_rag_mode(user_id) if user_id else "user"
 
-    kb_count = [0]
-    web_count = [0]
-    fetch_count = [0]
-    read_count = [0]
-    fetched_ids: set[int] = set()
-
-    submit_tool, was_called = _make_submit_exploration()
-    tools = [
-        make_search_knowledge(db, user_id, conversation_id, rag_mode, kb_count),
-        make_search_web(web_count),
-        make_fetch_web(db, user_id, conversation_id, fetch_count),
-        make_read_file(db, read_count, fetched_ids),
-        submit_tool,
-    ]
-
-    system_prompt = _load_system_prompt()
-
+    # Read file list from caller's session, do agent work in independent session
+    kf_list = await db.list_knowledge_files(user_id, conversation_id=conversation_id)
     user_prompt_parts = ["请探索以下知识文件并给出大纲结构建议。"]
     if file_ids:
         user_prompt_parts.append(f"\n指定文件 ID: {file_ids}")
-        kf_list = await db.list_knowledge_files(user_id, conversation_id=conversation_id)
         for fid in file_ids:
             kf = next((f for f in kf_list if f.id == fid), None)
             if kf:
                 user_prompt_parts.append(f"  - [{fid}] {kf.filename} ({kf.file_type})")
     else:
-        kf_list = await db.list_knowledge_files(user_id, conversation_id=conversation_id)
         if kf_list:
             user_prompt_parts.append("\n可用文件:")
             for kf in kf_list:
@@ -124,22 +108,44 @@ async def run_knowledge_agent(
     if query:
         user_prompt_parts.append(f"\n用户需求: {query}")
     user_prompt_parts.append("\n请先阅读文件，然后使用 submit_exploration 提交结果。")
-
     user_prompt = "\n".join(user_prompt_parts)
+    system_prompt = _load_system_prompt()
 
-    llm, agent_id, mw = build_llm(conversation_id)
-    push_agent(conversation_id, agent_id)
-    agent = create_agent(
-        model=llm, tools=tools,
-        system_prompt=system_prompt,
-        middleware=[mw],
-    )
+    sm = get_session_manager()
+    kdb = None
+    try:
+        kdb = sm.new_session()
+        kb_count = [0]
+        web_count = [0]
+        fetch_count = [0]
+        read_count = [0]
+        fetched_ids: set[int] = set()
 
-    writer({"type": "knowledge_agent_start"})
-    result = await agent.ainvoke(
-        {"messages": [HumanMessage(content=user_prompt)]},
-        config={"recursion_limit": 20},
-    )
+        submit_tool, was_called = _make_submit_exploration()
+        tools = [
+            make_search_knowledge(kdb, user_id, conversation_id, rag_mode, kb_count),
+            make_search_web(web_count),
+            make_fetch_web(kdb, user_id, conversation_id, fetch_count),
+            make_read_file(kdb, read_count, fetched_ids),
+            submit_tool,
+        ]
+
+        llm, agent_id, mw = build_llm(conversation_id)
+        push_agent(conversation_id, agent_id)
+        agent = create_agent(
+            model=llm, tools=tools,
+            system_prompt=system_prompt,
+            middleware=[mw],
+        )
+
+        writer({"type": "knowledge_agent_start"})
+        result = await agent.ainvoke(
+            {"messages": [HumanMessage(content=user_prompt)]},
+            config={"recursion_limit": 20},
+        )
+    finally:
+        if kdb is not None:
+            await sm.close(kdb)
 
     if not was_called[0]:
         _log.warning("submit_exploration not called — retrying")

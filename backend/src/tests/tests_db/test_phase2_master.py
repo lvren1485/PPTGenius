@@ -365,6 +365,42 @@ class TestConvStatusAfterWrite:
         assert len(status["outlines"]) >= 1
 
 
+class TestIdentityMapCache:
+    """Simulate chat_send loading conversation before tools run."""
+
+    @pytest.mark.asyncio
+    async def test_conv_preload_then_write_then_reread(self, db):
+        """chat_send loads conv first → identity map caches current_outline_id=None.
+        write_outline_structure sets it → subsequent get_conversation must see the new value."""
+        d = Database(db)
+        u = await d.create_user("imc_user")
+        conv = await d.create_conversation(u.id)
+
+        # Step 1: chat_send loads the conversation (puts it in identity map)
+        conv1 = await d.get_conversation(conv.id)
+        assert conv1.current_outline_id is None
+
+        # Step 2: write_outline_structure runs, sets current_outline_id
+        write_tool = make_write_outline_structure(d, conv.id)
+        await write_tool.ainvoke({
+            "title": "IMC Test",
+            "sections": [{"section_index": 1, "title": "Ch1", "description": "", "slide_number": 2}],
+        })
+
+        # Step 3: get_conversation_status must return the NEW current_outline_id
+        status_tool = make_get_conversation_status(d, conv.id)
+        status = await status_tool.ainvoke({})
+        assert status["current_outline_id"] is not None, \
+            f"Identity map returned stale null after set_conversation_outline: {status}"
+        assert len(status["outlines"]) >= 1, \
+            f"Outlines still empty after write_outline: {status}"
+
+        # Step 4: direct get_conversation also must see it
+        conv2 = await d.get_conversation(conv.id)
+        assert conv2.current_outline_id == status["current_outline_id"], \
+            f"get_conversation returned different value: {conv2.current_outline_id} vs {status['current_outline_id']}"
+
+
 # Import tool factories at module level for test discovery
 from pptgenius.agent.tools.perception import (
     make_get_conversation_status,

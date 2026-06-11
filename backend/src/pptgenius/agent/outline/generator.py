@@ -10,6 +10,7 @@ from langchain_core.tools import tool
 from langgraph.config import get_stream_writer
 
 from pptgenius.infrastructure.db.database import Database
+from pptgenius.infrastructure.db.engine import get_session_manager
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_agent
@@ -121,64 +122,75 @@ async def run_outline_generator(
     """Fill content for one section's pre-created slides."""
     writer = _get_writer()
 
+    # Read section metadata from the caller's session
     section = await db.get_outline_section(section_id)
     if section is None:
         return f"错误: section {section_id} 不存在"
+    outline_id = section.outline_id
+    section_title = section.title
 
-    outline = await db.get_outline(section.outline_id)
+    outline = await db.get_outline(outline_id)
     conv = await db.get_conversation(conversation_id)
     user_id = conv.user_id if conv else 0
     rag_mode = await db.get_rag_mode(user_id) if user_id else "user"
 
-    kb_count = [0]
-    web_count = [0]
-    fetch_count = [0]
-    read_count = [0]
-    fetched_ids: set[int] = set()
+    # Use an independent session for all generator work (avoids asyncmy concurrent read issue)
+    sm = get_session_manager()
+    gdb = None
+    try:
+        gdb = sm.new_session()
+        kb_count = [0]
+        web_count = [0]
+        fetch_count = [0]
+        read_count = [0]
+        fetched_ids: set[int] = set()
 
-    write_tool, was_called = _make_write_slides(db, section.outline_id, section_id)
-    tools = [
-        make_search_knowledge(db, user_id, conversation_id, rag_mode, kb_count),
-        make_search_web(web_count),
-        make_fetch_web(db, user_id, conversation_id, fetch_count),
-        make_read_file(db, read_count, fetched_ids),
-        write_tool,
-    ]
+        write_tool, was_called = _make_write_slides(gdb, outline_id, section_id)
+        tools = [
+            make_search_knowledge(gdb, user_id, conversation_id, rag_mode, kb_count),
+            make_search_web(web_count),
+            make_fetch_web(gdb, user_id, conversation_id, fetch_count),
+            make_read_file(gdb, read_count, fetched_ids),
+            write_tool,
+        ]
 
-    system_prompt = build_generator_system_prompt()
-    user_prompt = await build_generator_user_prompt(
-        db=db,
-        outline_id=section.outline_id,
-        section_id=section_id,
-        query=query,
-        knowledge_mode=knowledge_mode,
-    )
-
-    llm, agent_id, mw = build_llm(conversation_id)
-    push_agent(conversation_id, agent_id)
-    agent = create_agent(
-        model=llm, tools=tools,
-        system_prompt=system_prompt,
-        middleware=[mw],
-    )
-
-    writer({"type": "outline_generator_start", "section": section.title})
-    result = await agent.ainvoke(
-        {"messages": [HumanMessage(content=user_prompt)]},
-        config={"recursion_limit": 50},
-    )
-
-    if not was_called[0]:
-        _log.warning("write_slides not called — retrying")
-        retry_msg = HumanMessage(content="请立即调用 write_slides 工具写入内容。不要再搜索或分析，直接写入。")
-        clean = _strip_dangling_tool_calls(result["messages"])
-        await agent.ainvoke(
-            {"messages": clean + [retry_msg]},
-            config={"recursion_limit": 30},
+        system_prompt = build_generator_system_prompt()
+        user_prompt = await build_generator_user_prompt(
+            db=gdb,
+            outline_id=outline_id,
+            section_id=section_id,
+            query=query,
+            knowledge_mode=knowledge_mode,
         )
 
-    writer({"type": "outline_generator_end", "section": section.title})
-    return f"章节'{section.title}'填充完成"
+        llm, agent_id, mw = build_llm(conversation_id)
+        push_agent(conversation_id, agent_id)
+        agent = create_agent(
+            model=llm, tools=tools,
+            system_prompt=system_prompt,
+            middleware=[mw],
+        )
+
+        writer({"type": "outline_generator_start", "section": section_title})
+        result = await agent.ainvoke(
+            {"messages": [HumanMessage(content=user_prompt)]},
+            config={"recursion_limit": 50},
+        )
+
+        if not was_called[0]:
+            _log.warning("write_slides not called — retrying")
+            retry_msg = HumanMessage(content="请立即调用 write_slides 工具写入内容。不要再搜索或分析，直接写入。")
+            clean = _strip_dangling_tool_calls(result["messages"])
+            await agent.ainvoke(
+                {"messages": clean + [retry_msg]},
+                config={"recursion_limit": 30},
+            )
+
+        writer({"type": "outline_generator_end", "section": section_title})
+        return f"章节'{section_title}'填充完成"
+    finally:
+        if gdb is not None:
+            await sm.close(gdb)
 
 
 def _strip_dangling_tool_calls(messages: list) -> list:

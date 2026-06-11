@@ -66,6 +66,8 @@ async def set_conversation_outline(
         return False
     conv.current_outline_id = outline_id
     await db.commit()
+    # Refresh to ensure identity map is consistent with DB
+    await db.refresh(conv)
     return True
 
 

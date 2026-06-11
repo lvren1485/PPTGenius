@@ -10,6 +10,7 @@ from langchain_core.tools import tool
 from langgraph.config import get_stream_writer
 
 from pptgenius.infrastructure.db.database import Database
+from pptgenius.infrastructure.db.engine import get_session_manager
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_agent
@@ -161,21 +162,29 @@ async def run_outline_evaluator(
     ])
     user_prompt = "\n".join(user_prompt_parts)
 
-    llm, agent_id, mw = build_llm(conversation_id)
-    push_agent(conversation_id, agent_id)
-    agent = create_agent(
-        model=llm,
-        tools=[_make_submit_evaluation(db, outline_id)],
-        system_prompt=system_prompt,
-        middleware=[mw],
-    )
+    # Use independent session for evaluator agent work
+    sm = get_session_manager()
+    edb = None
+    try:
+        edb = sm.new_session()
+        llm, agent_id, mw = build_llm(conversation_id)
+        push_agent(conversation_id, agent_id)
+        agent = create_agent(
+            model=llm,
+            tools=[_make_submit_evaluation(edb, outline_id)],
+            system_prompt=system_prompt,
+            middleware=[mw],
+        )
 
-    writer({"type": "outline_evaluator_start", "outline": outline.title})
-    result = await agent.ainvoke(
-        {"messages": [HumanMessage(content=user_prompt)]},
-        config={"recursion_limit": 20},
-    )
-    writer({"type": "outline_evaluator_end"})
+        writer({"type": "outline_evaluator_start", "outline": outline.title})
+        result = await agent.ainvoke(
+            {"messages": [HumanMessage(content=user_prompt)]},
+            config={"recursion_limit": 20},
+        )
+        writer({"type": "outline_evaluator_end"})
+    finally:
+        if edb is not None:
+            await sm.close(edb)
 
     eval_score: float = 0.0
     eval_suggestions = ""
