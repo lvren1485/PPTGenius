@@ -126,7 +126,7 @@ async def run_master_agent(
     writer({"type": "master_done"})
     _log.info("master agent done conv=%d agent=%s", conversation_id, agent_id)
 
-    # --- 5. Persist tool messages + sub-agent tokens ---
+    # --- 5. Persist tool messages + sub-agent tokens (deduplicated by tool_call_id) ---
     await _persist_tool_messages(db, conversation_id, result["messages"])
 
     # --- 6. Extract reply ---
@@ -245,11 +245,25 @@ async def _persist_tool_messages(
 
     Stores LangChain's tool_call_id so _load_context_messages can
     reconstruct AIMessage(tool_calls) + ToolMessage pairs correctly.
+    Deduplicates by tool_call_id — messages already persisted from
+    earlier turns are skipped.
     """
+    # Collect already-persisted tool_call_ids for this conversation
+    existing = await db.get_messages_by_conversation(conversation_id)
+    seen_ids: set[str] = set()
+    for r in existing:
+        meta = r.metadata_json or {}
+        tc_id = meta.get("tool_call_id", "")
+        if tc_id:
+            seen_ids.add(tc_id)
 
     for m in messages:
         if isinstance(m, AIMessage) and m.tool_calls:
             for tc in m.tool_calls:
+                tc_id = tc.get("id", "")
+                if tc_id in seen_ids:
+                    continue
+                seen_ids.add(tc_id)
                 ctype = _TOOL_CTYPE.get(tc.get("name", ""), "tool_call")
                 await db.create_message(
                     conversation_id=conversation_id,
@@ -264,10 +278,13 @@ async def _persist_tool_messages(
                 )
 
         elif isinstance(m, ToolMessage):
+            tc_id = getattr(m, "tool_call_id", "") or ""
+            if tc_id in seen_ids:
+                continue
+            seen_ids.add(tc_id)
             name = getattr(m, "name", "") or ""
             ctype = _TOOL_CTYPE.get(name, "tool_result")
             tool_content = str(m.content) if hasattr(m, "content") else ""
-            tc_id = getattr(m, "tool_call_id", "") or ""
 
             msg = await db.create_message(
                 conversation_id=conversation_id,

@@ -28,26 +28,31 @@ _ID_KEYS = {
 }
 
 
-def _extract_slide_ids(operations: list[dict]) -> list[int]:
-    ids: list[int] = []
-    for op in operations:
+def _check_duplicates(operations: list[dict]) -> str | None:
+    """Pre-validate: no slide ID may appear in multiple operations.
+
+    Returns an error message listing which IDs are duplicated and in which
+    operations, plus a suggestion to split into separate calls.  Returns
+    None if all IDs are unique.
+    """
+    # {slide_id: [op_index, ...]}
+    id_positions: dict[int, list[int]] = {}
+    for i, op in enumerate(operations):
         for key in _ID_KEYS.get(op.get("op", ""), []):
             v = op.get(key)
             if v is not None:
-                ids.append(v)
-    return ids
+                id_positions.setdefault(v, []).append(i)
 
+    duplicates = {k: v for k, v in id_positions.items() if len(v) > 1}
+    if not duplicates:
+        return None
 
-def _check_duplicates(ids: list[int]) -> str | None:
-    seen = set()
-    dup = set()
-    for i in ids:
-        if i in seen:
-            dup.add(i)
-        seen.add(i)
-    if dup:
-        return f"错误: 以下 slide ID 重复出现: {sorted(dup)}"
-    return None
+    lines = ["错误: 以下 slide ID 在多个操作中重复出现，请拆分为多次独立调用:"]
+    for sid, positions in sorted(duplicates.items()):
+        ops = [f"#{p+1}({operations[p].get('op','?')})" for p in positions]
+        lines.append(f"  slide_id={sid} 出现在: {', '.join(ops)}")
+    lines.append("建议: 将冲突的操作分批，每批调用一次 modify_outline_structure")
+    return "\n".join(lines)
 
 
 def make_write_outline_structure(db: Database, conversation_id: int) -> Callable:
@@ -159,7 +164,7 @@ def make_modify_outline_structure(db: Database, conversation_id: int) -> Callabl
             operations: List of operation dicts, executed in order.
         """
         # ── pre-validation: duplicate slide IDs ──
-        err = _check_duplicates(_extract_slide_ids(operations))
+        err = _check_duplicates(operations)
         if err:
             return {"error": err}
 

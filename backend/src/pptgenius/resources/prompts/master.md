@@ -34,7 +34,8 @@
 ### 场景 C：修改大纲结构
 ```
 1. get_outline()  → 查看当前结构
-2. modify_outline_structure(operations)  → 执行结构变更
+2a. modify_outline_structure(operations)  → 执行结构变更，修改要求涉及某些页面调用
+2b. write_outline_structure(title, sections)  → 直接重写结构，修改要求涉及章节或整个ppt时调用
 3. get_outline()  → **必须重读**确认变更
 4. generate_outline_content()  → 重新填充被标记的页面
 ```
