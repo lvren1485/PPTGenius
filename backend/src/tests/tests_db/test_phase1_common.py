@@ -59,27 +59,13 @@ class TestTokenCounterDualLayer:
 
 
 class TestTokenCountingMiddleware:
-    """Validate middleware structure and hook signature."""
+    """Validate middleware structure."""
 
     def test_middleware_creation(self):
         from pptgenius.agent.common.token_middleware import TokenCountingMiddleware
-        mw = TokenCountingMiddleware(
-            conversation_id=1,
-            agent_id="test_agent",
-        )
+        mw = TokenCountingMiddleware(conversation_id=1, agent_id="test_agent")
         assert mw.conversation_id == 1
         assert mw.agent_id == "test_agent"
-        assert mw.on_tokens is None
-
-    def test_middleware_with_callback(self):
-        from pptgenius.agent.common.token_middleware import TokenCountingMiddleware
-        called = []
-
-        async def on_tokens(usage):
-            called.append(usage)
-
-        mw = TokenCountingMiddleware(1, "test", on_tokens=on_tokens)
-        assert mw.on_tokens is not None
 
 
 class TestSetMessageCost:

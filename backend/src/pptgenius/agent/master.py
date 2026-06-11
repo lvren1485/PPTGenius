@@ -185,93 +185,55 @@ async def run_master_agent(
 async def _load_context_messages(
     db: Database, conversation_id: int, *, max_turns: int = 20,
 ) -> list:
-    """Load recent messages from DB, reconstruct full LangChain message chain.
+    """Load recent messages from DB, reconstruct LangChain message chain.
 
-    User/assistant text messages are reconstructed directly.  Tool messages
-    are paired via tool_call_id so the LLM sees the complete AIMessage(tool_calls)
-    → ToolMessage sequence it originally produced.
+    Only emits complete AIMessage(tool_calls) → ToolMessage pairs.
+    Incomplete pairs (from partial persistence) are silently dropped.
     """
     rows = await db.get_messages_by_conversation(conversation_id)
     rows = rows[-max_turns:]
 
     msgs: list = []
-    # tool_result rows indexed by tool_call_id for pairing
-    pending_results: dict[str, dict] = {}
+    # Stash the previous row's tool_call metadata for pairing with the next row
+    pending_tc: dict | None = None
 
     for r in rows:
         if r.role == "user" and r.content_type == "text":
+            pending_tc = None  # incomplete tool_call before user message → drop
             msgs.append(HumanMessage(content=r.content))
 
         elif r.role in ("file", "image") and r.content:
-            # File/image uploads as user-provided context
+            pending_tc = None
             msgs.append(HumanMessage(content=r.content))
 
         elif r.role == "tool_call":
+            # Drop any previous incomplete tool_call
             meta = r.metadata_json or {}
             tc_id = meta.get("tool_call_id", "") or str(uuid.uuid4())
-            tc = {
+            pending_tc = {
                 "name": meta.get("tool_name", ""),
                 "args": meta.get("args", {}),
                 "id": tc_id,
                 "type": "tool_call",
             }
-            # Check if result already seen (stored after tool_call in some edge case)
-            if tc_id in pending_results:
-                result = pending_results.pop(tc_id)
-                msgs.append(AIMessage(content="", tool_calls=[tc]))
-                msgs.append(ToolMessage(
-                    content=result["content"],
-                    tool_call_id=tc_id,
-                    name=result.get("tool_name", ""),
-                ))
-            else:
-                msgs.append(AIMessage(content="", tool_calls=[tc]))
 
         elif r.role == "tool_result":
             meta = r.metadata_json or {}
             tc_id = meta.get("tool_call_id", "") or ""
-            # Pair with the preceding AIMessage if it has a matching tool_call
-            paired = False
-            if tc_id and msgs:
-                last = msgs[-1]
-                if isinstance(last, AIMessage) and last.tool_calls:
-                    for tc in last.tool_calls:
-                        if tc.get("id") == tc_id:
-                            msgs.append(ToolMessage(
-                                content=r.content,
-                                tool_call_id=tc_id,
-                                name=meta.get("tool_name", ""),
-                            ))
-                            paired = True
-                            break
-            if not paired:
-                # Result without a matching tool_call yet — stash it
-                pending_results[tc_id] = {
-                    "content": r.content,
-                    "tool_name": meta.get("tool_name", ""),
-                }
+            if pending_tc and pending_tc.get("id") == tc_id:
+                # Complete pair: emit both
+                msgs.append(AIMessage(content="", tool_calls=[pending_tc]))
+                msgs.append(ToolMessage(
+                    content=r.content,
+                    tool_call_id=tc_id,
+                    name=meta.get("tool_name", ""),
+                ))
+            # else: orphaned result without matching tool_call → drop
+            pending_tc = None
 
         elif r.role == "assistant" and r.content_type == "text":
-            # Flush pending results WITH matching AIMessage(tool_calls)
-            for tc_id, result in pending_results.items():
-                msgs.append(AIMessage(content="", tool_calls=[{
-                    "name": result.get("tool_name", ""),
-                    "args": {},
-                    "id": tc_id,
-                    "type": "tool_call",
-                }]))
-                msgs.append(ToolMessage(
-                    content=result["content"],
-                    tool_call_id=tc_id,
-                    name=result.get("tool_name", ""),
-                ))
-            pending_results.clear()
+            pending_tc = None  # incomplete tool_call before assistant → drop
             msgs.append(AIMessage(content=r.content))
-
-    # Strip trailing unmatched AIMessage(tool_calls) — API 400 if
-    # tool_calls not followed by matching ToolMessages
-    while msgs and isinstance(msgs[-1], AIMessage) and msgs[-1].tool_calls:
-        msgs.pop()
 
     return msgs
 

@@ -18,12 +18,10 @@ apply_deepseek_patch()
 
 def build_llm(
     conversation_id: int,
-    *,
-    on_tokens=None,
 ) -> tuple[ChatOpenAI, str, TokenCountingMiddleware]:
     """Create a ChatOpenAI instance with token-counting middleware.
 
-    Returns (llm, agent_id, middleware).  Caller can pass middleware to
+    Returns (llm, agent_id, middleware).  Caller passes middleware to
     ``create_agent(..., middleware=[middleware])``.
     """
     settings = get_settings()
@@ -40,7 +38,6 @@ def build_llm(
     middleware = TokenCountingMiddleware(
         conversation_id=conversation_id,
         agent_id=agent_id,
-        on_tokens=on_tokens,
     )
 
     _log.debug("built llm conv=%d agent=%s model=%s", conversation_id, agent_id, settings.llm.model)
