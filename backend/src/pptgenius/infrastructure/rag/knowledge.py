@@ -43,7 +43,7 @@ class KnowledgeService:
 
     # -- ingestion -----------------------------------------------------------
 
-    async def ingest(self, db: Database, file_path: str | Path, user_id: int) -> int | None:
+    async def ingest(self, db: Database, file_path: str | Path, user_id: int, conversation_id: int | None = None) -> int | None:
         """Parse *file_path*, chunk it, persist chunks + rebuild index.
 
         Returns the ``KnowledgeFile.id``, or ``None`` on failure.
@@ -67,6 +67,7 @@ class KnowledgeService:
             file_path=str(path),
             file_type=doc.file_type,
             file_size=path.stat().st_size,
+            conversation_id=conversation_id,
         )
 
         # 3. Chunk

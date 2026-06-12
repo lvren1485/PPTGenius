@@ -22,8 +22,7 @@ def make_explore_knowledge(db: Database, conversation_id: int) -> Callable:
         """Explore knowledge files and suggest PPT outline structure.
 
         Call BEFORE write_outline_structure. Reads files, understands content,
-        and returns a suggested outline structure based on available knowledge.
-        Returns files_summary and suggested_structure for each file.
+        and returns a natural-language exploration result with outline suggestions.
 
         Args:
             query: Optional user requirements.

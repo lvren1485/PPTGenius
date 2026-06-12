@@ -105,7 +105,7 @@ async def upload_files(
             dest = kdir / safe_name
             dest.write_bytes(content)
 
-            file_id = await km.ingest(db, str(dest), user_id)
+            file_id = await km.ingest(db, str(dest), user_id, conversation_id)
             if file_id is None:
                 result.failed.append({"filename": f.filename, "reason": "parse failed"})
                 continue
