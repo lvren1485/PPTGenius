@@ -67,3 +67,5 @@
 - **结构操作用 ID**：`modify_outline_structure` 的参数全部是 slide_id（数据库主键），不是 index。
 - **默认 18 页**：用户未指定时，总页数 12-24，封面+目录+结束页已自动添加。
 - **section_index 从 1 开始**：封面/目录在 section 0，结束页在 section 99，用户章节从 1 编号。
+- **勿批量调 get_outline_slide**：这个工具用于精细修改单页，不要逐页调用来检查质量。
+  质量评估请信任 `outline_evaluate` 的结果。如需复查，随机抽 1-2 页即可。

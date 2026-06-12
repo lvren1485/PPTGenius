@@ -10,10 +10,10 @@ from pptgenius.infrastructure.rag import KnowledgeService, WebSearchService
 _web_search = WebSearchService()
 _knowledge = KnowledgeService()
 
-_KB_SEARCH_LIMIT = 12
-_WEB_SEARCH_LIMIT = 8
-_FETCH_LIMIT = 6
-_READ_LIMIT = 5
+_KB_SEARCH_LIMIT = 9
+_WEB_SEARCH_LIMIT = 6
+_FETCH_LIMIT = 4
+_READ_LIMIT = 3
 
 
 async def _build_chunk_map(

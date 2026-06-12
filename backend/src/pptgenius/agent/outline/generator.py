@@ -13,7 +13,7 @@ from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_agent
-from ..common.message_utils import strip_dangling_tool_calls
+from ..common.message_utils import compress_tool_results, strip_dangling_tool_calls
 from ..common.model_builder import build_llm
 from .knowledge_tools import (
     make_fetch_web,
@@ -174,7 +174,7 @@ async def run_outline_generator(
     try:
         result = await agent.ainvoke(
             {"messages": [HumanMessage(content=user_prompt)]},
-            config={"recursion_limit": 80},
+            config={"recursion_limit": 150},
         )
     except Exception:
         _log.warning("generator failed section=%d — retrying with clean state", section_id)
@@ -184,10 +184,11 @@ async def run_outline_generator(
         _log.warning("write_slides not called section=%d — retrying", section_id)
         retry_msg = HumanMessage(content="请立即调用 write_slides 工具写入内容。不要再搜索或分析，直接写入。")
         clean = strip_dangling_tool_calls(result["messages"])
+        slim = compress_tool_results(clean)
         try:
             await agent.ainvoke(
-                {"messages": clean + [retry_msg]},
-                config={"recursion_limit": 30},
+                {"messages": slim + [retry_msg]},
+                config={"recursion_limit": 50},
             )
         except Exception:
             _log.warning("generator retry failed section=%d — giving up", section_id)

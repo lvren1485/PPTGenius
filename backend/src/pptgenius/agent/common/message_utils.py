@@ -1,4 +1,4 @@
-"""Shared message cleaning — strip orphaned tool calls before retry.
+"""Shared message cleaning — strip orphaned tool calls + compress results before retry.
 
 When a ReAct agent hits recursion limit or crashes mid-tool-execution,
 the message chain may contain AIMessages with tool_calls that have no
@@ -7,13 +7,16 @@ matching ToolMessage. Sending these back to the API causes a 400 error:
   "An assistant message with 'tool_calls' must be followed by tool
    messages responding to each 'tool_call_id'."
 
-This module provides a single function to walk backwards from the end
-and remove any incomplete pairs.
+This module provides:
+- strip_dangling_tool_calls — remove incomplete pairs from the end
+- compress_tool_results   — truncate ToolMessage content to avoid huge payloads on retry
 """
 
 from __future__ import annotations
 
 from langchain_core.messages import AIMessage, ToolMessage
+
+_TOOL_RESULT_MAX_CHARS = 1000
 
 
 def strip_dangling_tool_calls(messages: list) -> list:
@@ -65,3 +68,30 @@ def strip_dangling_tool_calls(messages: list) -> list:
             break
 
     return cleaned
+
+
+def compress_tool_results(messages: list, max_chars: int = _TOOL_RESULT_MAX_CHARS) -> list:
+    """Truncate every ToolMessage's content to *max_chars* chars.
+
+    Keeps the full message chain intact (model knows what tools were called
+    and what they returned), but drops the bulk of large results so retry
+    doesn't hit token limits or cause API errors.
+
+    Only modifies ToolMessage.content — AIMessage, HumanMessage etc. untouched.
+    """
+    compressed = []
+    for m in messages:
+        if isinstance(m, ToolMessage) and hasattr(m, "content") and m.content:
+            content = str(m.content)
+            if len(content) > max_chars:
+                truncated = content[:max_chars] + f"\n... [截断, 原{len(content)}字符]"
+                compressed.append(ToolMessage(
+                    content=truncated,
+                    tool_call_id=getattr(m, "tool_call_id", ""),
+                    name=getattr(m, "name", None),
+                ))
+            else:
+                compressed.append(m)
+        else:
+            compressed.append(m)
+    return compressed

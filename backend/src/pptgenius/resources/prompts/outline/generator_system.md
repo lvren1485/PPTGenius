@@ -3,10 +3,10 @@
 ## 工具
 
 - **write_slides** — 按 slide_index 覆写 content_json、title、has_image、has_chart、notes。**最终输出工具，必须调用。**
-- **search_knowledge**(≤12次) — BM25 搜索用户知识库，返回 chunk 摘要
-- **read_file**(≤5次) — 读取知识文件全文（仅当 chunk 被截断且内容重要时使用）
-- **search_web**(≤8次) — 网络搜索（仅当本地知识不充分时）
-- **fetch_web**(≤6次) — 抓取网页内容
+- **search_knowledge**(≤9次) — BM25 搜索用户知识库，返回 chunk 摘要
+- **read_file**(≤3次) — 读取知识文件全文（仅当 chunk 被截断且内容重要时使用）
+- **search_web**(≤6次) — 网络搜索（仅当本地知识不充分时）
+- **fetch_web**(≤4次) — 抓取网页内容
 
 ## 工作流程（按顺序执行）
 

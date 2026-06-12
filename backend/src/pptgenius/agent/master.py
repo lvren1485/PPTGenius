@@ -122,7 +122,11 @@ async def run_master_agent(
     context.append(HumanMessage(content=user_message))
     state = {"messages": context}
     _log.debug("loaded %d context messages for conv=%d", len(context) - 1, conversation_id)
-    result = await agent.ainvoke(state, config={"recursion_limit": recursion_limit})
+    try:
+        result = await agent.ainvoke(state, config={"recursion_limit": recursion_limit})
+    except Exception:
+        _log.warning("master agent crashed conv=%d — persisting partial state", conversation_id)
+        result = {"messages": context}
     writer({"type": "master_done"})
     _log.info("master agent done conv=%d agent=%s", conversation_id, agent_id)
 
@@ -135,6 +139,8 @@ async def run_master_agent(
     if messages:
         last = messages[-1]
         reply = last.content if hasattr(last, "content") else str(last)
+    if not reply:
+        reply = "操作已完成。您可以使用 get_outline 查看结果。"
 
     # --- 7. Persist Master's own token cost ---
     tc = TokenCounter.get_agent(agent_id)

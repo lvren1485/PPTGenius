@@ -687,7 +687,7 @@ class TestGeneratorPromptKnowledgeFiles:
 
 
 class TestKnowledgeToolLimits:
-    """Verify tool call limits are enforced (search_knowledge ≤12, search_web ≤8, fetch_web ≤6, read_file ≤5)."""
+    """Verify tool call limits are enforced (search_knowledge ≤9, search_web ≤6, fetch_web ≤4, read_file ≤3)."""
 
     @pytest.mark.asyncio
     async def test_search_knowledge_limit(self, db):
@@ -702,12 +702,12 @@ class TestKnowledgeToolLimits:
         count = [0]
         tool = make_search_knowledge(d, u.id, conv.id, "user", count)
 
-        # 12 calls should succeed
-        for i in range(12):
+        # 9 calls should succeed
+        for i in range(9):
             r = await tool.ainvoke({"query": f"test_{i}"})
             assert "已达上限" not in r
 
-        # 13th call should fail
+        # 10th call should fail
         r = await tool.ainvoke({"query": "overflow"})
         assert "已达上限" in r
 
@@ -718,7 +718,7 @@ class TestKnowledgeToolLimits:
         count = [0]
         tool = make_search_web(count)
 
-        for _ in range(8):
+        for _ in range(6):
             r = await tool.ainvoke({"query": "test"})
             assert "已达上限" not in r
 
@@ -739,7 +739,7 @@ class TestKnowledgeToolLimits:
         fetched = set()
         tool = make_read_file(d, count, fetched)
 
-        for _ in range(5):
+        for _ in range(3):
             # Need different file_ids since read_file deduplicates
             kf2 = await d.create_knowledge_file(u.id, f"r{_}.txt", f"/tmp/r{_}.txt", "txt", conversation_id=conv.id)
             await d.create_chunk(kf2.id, 0, f"c{_}")
