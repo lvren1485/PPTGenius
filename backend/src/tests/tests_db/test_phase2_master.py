@@ -401,6 +401,135 @@ class TestIdentityMapCache:
             f"get_conversation returned different value: {conv2.current_outline_id} vs {status['current_outline_id']}"
 
 
+class TestDatabaseConcurrency:
+    """Stress-test Database._lock under asyncio.gather (simulating gen_content)."""
+
+    @pytest.mark.asyncio
+    async def test_concurrent_reads_same_db(self, db):
+        """Multiple coroutines reading from the same Database simultaneously."""
+        import asyncio
+        d = Database(db)
+        u = await d.create_user("conc_r_user")
+        conv = await d.create_conversation(u.id)
+        o = await d.create_outline(u.id, conv.id, "Concurrent Read")
+        await d.set_conversation_outline(conv.id, o.id)
+        for i in range(10):
+            await d.create_outline_slide(o.id, i + 1, f"Slide {i}")
+
+        async def read_conv(n):
+            for _ in range(10):
+                c = await d.get_conversation(conv.id)
+                assert c.current_outline_id == o.id
+
+        async def read_outline(n):
+            for _ in range(10):
+                ol = await d.get_outline(o.id)
+                assert ol.title == "Concurrent Read"
+
+        async def read_slides(n):
+            for _ in range(10):
+                sl = await d.get_slides_by_outline_id(o.id)
+                assert len(sl) == 10
+
+        # 5 coroutines × 3 tasks = 15 concurrent, 10 iterations each = 150 DB ops
+        tasks = []
+        for i in range(5):
+            tasks.append(read_conv(i))
+            tasks.append(read_outline(i))
+            tasks.append(read_slides(i))
+        await asyncio.gather(*tasks)
+
+    @pytest.mark.asyncio
+    async def test_concurrent_writes_same_db(self, db):
+        """Multiple coroutines writing to the same Database simultaneously."""
+        import asyncio
+        d = Database(db)
+        u = await d.create_user("conc_w_user")
+        conv = await d.create_conversation(u.id)
+        o = await d.create_outline(u.id, conv.id, "Concurrent Write")
+        await d.set_conversation_outline(conv.id, o.id)
+
+        async def create_slides(n):
+            for i in range(5):
+                await d.create_outline_slide(o.id, n * 100 + i, f"Slide_{n}_{i}")
+            return n
+
+        # 5 concurrent writers, 5 slides each = 25 writes
+        results = await asyncio.gather(*[create_slides(i) for i in range(5)])
+        assert len(results) == 5
+
+        slides = await d.get_slides_by_outline_id(o.id)
+        assert len(slides) == 25
+
+    @pytest.mark.asyncio
+    async def test_concurrent_read_write_mixed(self, db):
+        """Simulate gen_content pattern: reads + writes on same DB concurrently."""
+        import asyncio
+        d = Database(db)
+        u = await d.create_user("conc_mix_user")
+        conv = await d.create_conversation(u.id)
+
+        async def write_and_read(n):
+            # Write
+            o = await d.create_outline(u.id, conv.id, f"Mix_{n}")
+            await d.create_outline_slide(o.id, 1, f"Mix_Slide_{n}")
+            # Read
+            ol = await d.get_outline(o.id)
+            sl = await d.get_slides_by_outline_id(o.id)
+            return {"title": ol.title, "slides": len(sl)}
+
+        # 8 concurrent mixed read+write
+        results = await asyncio.gather(*[write_and_read(i) for i in range(8)])
+        assert len(results) == 8
+        for r in results:
+            assert r["title"].startswith("Mix_")
+            assert r["slides"] == 1
+
+    @pytest.mark.asyncio
+    async def test_concurrent_with_independent_sessions(self, db):
+        """Simulate gen_content: each task gets its own Database instance.
+
+        Uses the same test sessionmaker (not the global singleton which may
+        point to a different database under test).
+        """
+        import asyncio
+        from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+        from pptgenius.infrastructure.config.settings import get_settings
+
+        # Derive test DB URL from settings (same as conftest)
+        prod_url = get_settings().db.url
+        test_url = prod_url.rsplit("/", 1)[0] + "/pptgenius_test"
+        test_engine = create_async_engine(test_url, echo=False)
+        sm = async_sessionmaker(test_engine, expire_on_commit=False)
+
+        d = Database(db)
+        u = await d.create_user("conc_ind_user")
+        conv = await d.create_conversation(u.id)
+        o = await d.create_outline(u.id, conv.id, "Independent Sessions")
+        await d.set_conversation_outline(conv.id, o.id)
+
+        async def do_work(n):
+            gdb = Database(sm())
+            try:
+                for _ in range(3):
+                    ol = await gdb.get_outline(o.id)
+                    await gdb.create_outline_slide(o.id, n * 100 + _ + 1, f"IS_{n}_{_}")
+                sl = await gdb.get_slides_by_outline_id(o.id)
+                return {"title": ol.title, "total_slides": len(sl)}
+            finally:
+                await gdb.db.close()
+
+        # 12 concurrent independent sessions, 3 writes each = 36 writes
+        results = await asyncio.gather(*[do_work(i) for i in range(12)])
+        assert len(results) == 12
+
+        for r in results:
+            assert r["title"] == "Independent Sessions"
+            assert r["total_slides"] >= 3
+
+        await test_engine.dispose()
+
+
 # Import tool factories at module level for test discovery
 from pptgenius.agent.tools.perception import (
     make_get_conversation_status,

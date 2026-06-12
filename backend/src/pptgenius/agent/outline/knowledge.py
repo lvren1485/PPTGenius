@@ -12,7 +12,6 @@ from langgraph.config import get_stream_writer
 
 from pptgenius.infrastructure.config.settings import RESOURCES_DIR
 from pptgenius.infrastructure.db.database import Database
-from pptgenius.infrastructure.db.engine import get_session_manager
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_agent
@@ -111,41 +110,34 @@ async def run_knowledge_agent(
     user_prompt = "\n".join(user_prompt_parts)
     system_prompt = _load_system_prompt()
 
-    sm = get_session_manager()
-    kdb = None
-    try:
-        kdb = sm.new_session()
-        kb_count = [0]
-        web_count = [0]
-        fetch_count = [0]
-        read_count = [0]
-        fetched_ids: set[int] = set()
+    kb_count = [0]
+    web_count = [0]
+    fetch_count = [0]
+    read_count = [0]
+    fetched_ids: set[int] = set()
 
-        submit_tool, was_called = _make_submit_exploration()
-        tools = [
-            make_search_knowledge(kdb, user_id, conversation_id, rag_mode, kb_count),
-            make_search_web(web_count),
-            make_fetch_web(kdb, user_id, conversation_id, fetch_count),
-            make_read_file(kdb, read_count, fetched_ids),
-            submit_tool,
-        ]
+    submit_tool, was_called = _make_submit_exploration()
+    tools = [
+        make_search_knowledge(db, user_id, conversation_id, rag_mode, kb_count),
+        make_search_web(web_count),
+        make_fetch_web(db, user_id, conversation_id, fetch_count),
+        make_read_file(db, read_count, fetched_ids),
+        submit_tool,
+    ]
 
-        llm, agent_id, mw = build_llm(conversation_id)
-        push_agent(conversation_id, agent_id)
-        agent = create_agent(
-            model=llm, tools=tools,
-            system_prompt=system_prompt,
-            middleware=[mw],
-        )
+    llm, agent_id, mw = build_llm(conversation_id)
+    push_agent(conversation_id, agent_id)
+    agent = create_agent(
+        model=llm, tools=tools,
+        system_prompt=system_prompt,
+        middleware=[mw],
+    )
 
-        writer({"type": "knowledge_agent_start"})
-        result = await agent.ainvoke(
-            {"messages": [HumanMessage(content=user_prompt)]},
-            config={"recursion_limit": 20},
-        )
-    finally:
-        if kdb is not None:
-            await sm.close(kdb)
+    writer({"type": "knowledge_agent_start"})
+    result = await agent.ainvoke(
+        {"messages": [HumanMessage(content=user_prompt)]},
+        config={"recursion_limit": 20},
+    )
 
     if not was_called[0]:
         _log.warning("submit_exploration not called — retrying")

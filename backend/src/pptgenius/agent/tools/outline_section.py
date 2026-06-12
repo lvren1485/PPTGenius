@@ -8,6 +8,7 @@ from typing import Callable
 from langchain_core.tools import tool
 
 from pptgenius.infrastructure.db.database import Database
+from pptgenius.infrastructure.db.engine import get_session_manager
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_sentinel
@@ -26,7 +27,7 @@ def make_generate_outline_content(db: Database, conversation_id: int) -> Callabl
         """Generate slide content for ALL sections at once.
 
         This is the MAIN generation entry point. Invokes the generator for
-        every section and waits for all to complete.
+        every section concurrently — each with its own DB session.
 
         Args:
             query: Optional user requirements or additional instructions.
@@ -42,10 +43,20 @@ def make_generate_outline_content(db: Database, conversation_id: int) -> Callabl
 
         _log.info("batch generate start: outline=%d sections=%d", outline_id, len(sections))
         push_sentinel(conversation_id)
-        await asyncio.gather(*[
-            run_outline_generator(db, conversation_id, section_id=sec.id, query=query)
-            for sec in sections
-        ])
+
+        # Each generator gets its own DB session for safe concurrent execution
+        sm = get_session_manager()
+
+        async def _run_one(sec):
+            gdb = sm.new_session()
+            try:
+                return await run_outline_generator(
+                    gdb, conversation_id, section_id=sec.id, query=query,
+                )
+            finally:
+                await sm.close(gdb)
+
+        await asyncio.gather(*[_run_one(sec) for sec in sections])
 
         await db.update_outline_status(outline_id, "completed")
         await db.increase_outline_version(conv.current_outline_id, "major")
