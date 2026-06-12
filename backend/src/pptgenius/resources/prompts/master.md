@@ -69,3 +69,5 @@
 - **section_index 从 1 开始**：封面/目录在 section 0，结束页在 section 99，用户章节从 1 编号。
 - **勿批量调 get_outline_slide**：这个工具用于精细修改单页，不要逐页调用来检查质量。
   质量评估请信任 `outline_evaluate` 的结果。如需复查，随机抽 1-2 页即可。
+- **generate_outline_content 是全量工具**：除非有重大结构变更，或者evaluate给出评分很差，否则请勿在填充整个outline内容以外的场景调用它。
+  

@@ -1,22 +1,63 @@
-"""Shared message cleaning — strip orphaned tool calls + compress results before retry.
+"""Shared message cleaning — strip orphaned tool calls, sanitize content, compress results.
 
-When a ReAct agent hits recursion limit or crashes mid-tool-execution,
-the message chain may contain AIMessages with tool_calls that have no
-matching ToolMessage. Sending these back to the API causes a 400 error:
+When a ReAct agent hits recursion limit or crashes, the message chain may contain:
+- orphaned tool_calls → 400 "insufficient tool messages"
+- unicode control chars / invalid surrogates → 400 encoding errors
+- huge tool results → token limits / 400
 
-  "An assistant message with 'tool_calls' must be followed by tool
-   messages responding to each 'tool_call_id'."
-
-This module provides:
-- strip_dangling_tool_calls — remove incomplete pairs from the end
-- compress_tool_results   — truncate ToolMessage content to avoid huge payloads on retry
+Events: strip → sanitize → compress (in that order).
 """
 
 from __future__ import annotations
 
-from langchain_core.messages import AIMessage, ToolMessage
+import re
+import unicodedata
 
-_TOOL_RESULT_MAX_CHARS = 1000
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+
+_TOOL_RESULT_MAX_CHARS = 500
+
+# Unicode categories to strip (control chars except common whitespace)
+_CONTROL_CHARS = "".join(
+    chr(c) for c in range(0x00, 0x20) if chr(c) not in ("\t", "\n", "\r")
+) + "".join(chr(c) for c in range(0x7F, 0xA0))  # DEL + C1 controls
+_CONTROL_RE = re.compile("[" + _CONTROL_CHARS + "]")
+_SURROGATE_RE = re.compile("[\uD800-\uDFFF]")
+
+
+def _sanitize_str(text: str) -> str:
+    """Remove or replace characters likely to break JSON/API transport."""
+    # Strip control chars (keep \t \n \r)
+    text = _CONTROL_RE.sub("", text)
+    # Strip surrogates (invalid in JSON)
+    text = _SURROGATE_RE.sub("", text)
+    # Normalize to NFC (composed form, most compatible)
+    text = unicodedata.normalize("NFC", text)
+    return text
+
+
+def _sanitize_message(msg):
+    """Sanitize string content of any message type."""
+    if hasattr(msg, "content") and isinstance(msg.content, str):
+        cleaned = _sanitize_str(msg.content)
+        if isinstance(msg, AIMessage):
+            return AIMessage(content=cleaned)
+        elif isinstance(msg, HumanMessage):
+            return HumanMessage(content=cleaned)
+        elif isinstance(msg, SystemMessage):
+            return SystemMessage(content=cleaned)
+        elif isinstance(msg, ToolMessage):
+            return ToolMessage(
+                content=cleaned,
+                tool_call_id=getattr(msg, "tool_call_id", ""),
+                name=getattr(msg, "name", None),
+            )
+    return msg
+
+
+def sanitize_messages(messages: list) -> list:
+    """Strip dangerous characters from ALL messages' string content."""
+    return [_sanitize_message(m) for m in messages]
 
 
 def strip_dangling_tool_calls(messages: list) -> list:
@@ -29,12 +70,10 @@ def strip_dangling_tool_calls(messages: list) -> list:
     """
     cleaned = list(messages)
 
-    # Keep stripping from the end until invariant holds
     while cleaned:
         last = cleaned[-1]
 
         if isinstance(last, AIMessage) and last.tool_calls:
-            # Check that *every* tool_call in this message has a ToolMessage
             all_paired = True
             for tc in last.tool_calls:
                 tc_id = tc.get("id", "")
@@ -47,12 +86,11 @@ def strip_dangling_tool_calls(messages: list) -> list:
                     all_paired = False
                     break
             if all_paired:
-                break  # this AIMessage is clean
-            cleaned.pop()  # orphaned → remove
+                break
+            cleaned.pop()
 
         elif isinstance(last, ToolMessage):
             tc_id = getattr(last, "tool_call_id", "")
-            # Check that a matching AIMessage(tool_calls) exists
             found = any(
                 isinstance(m, AIMessage)
                 and m.tool_calls
@@ -60,11 +98,10 @@ def strip_dangling_tool_calls(messages: list) -> list:
                 for m in cleaned
             )
             if found:
-                break  # paired → clean
-            cleaned.pop()  # orphaned ToolMessage → remove
+                break
+            cleaned.pop()
 
         else:
-            # HumanMessage, plain AIMessage, SystemMessage → safe
             break
 
     return cleaned
@@ -84,7 +121,7 @@ def compress_tool_results(messages: list, max_chars: int = _TOOL_RESULT_MAX_CHAR
         if isinstance(m, ToolMessage) and hasattr(m, "content") and m.content:
             content = str(m.content)
             if len(content) > max_chars:
-                truncated = content[:max_chars] + f"\n... [截断, 原{len(content)}字符]"
+                truncated = content[:max_chars] + f"\n...[截断, 原{len(content)}字符]"
                 compressed.append(ToolMessage(
                     content=truncated,
                     tool_call_id=getattr(m, "tool_call_id", ""),
@@ -95,3 +132,11 @@ def compress_tool_results(messages: list, max_chars: int = _TOOL_RESULT_MAX_CHAR
         else:
             compressed.append(m)
     return compressed
+
+
+def prepare_retry_messages(messages: list) -> list:
+    """Full retry pipeline: strip → sanitize → compress.  Safe to call on any messages."""
+    clean = strip_dangling_tool_calls(messages)
+    clean = sanitize_messages(clean)
+    clean = compress_tool_results(clean)
+    return clean

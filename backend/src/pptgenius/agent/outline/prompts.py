@@ -55,7 +55,7 @@ async def build_generator_user_prompt(
         kf_list = await db.list_knowledge_files(user_id, conversation_id=conversation_id)
         if kf_list:
             parts.append("## 可用知识文件")
-            parts.append("以下文件已上传到知识库。先用 search_knowledge 搜索，chunk 截断时再用 read_file 读全文。")
+            parts.append("以下文件已上传到知识库。使用 search_knowledge 搜索获取内容。")
             for kf in kf_list:
                 parts.append(f"  - file_id={kf.id}: {kf.filename} ({kf.chunk_count or '?'} chunks)")
             parts.append("")

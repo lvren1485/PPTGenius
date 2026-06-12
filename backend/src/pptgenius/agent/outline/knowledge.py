@@ -14,7 +14,7 @@ from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_agent
-from ..common.message_utils import compress_tool_results, strip_dangling_tool_calls
+from ..common.message_utils import prepare_retry_messages
 from ..common.model_builder import build_llm
 from .knowledge_tools import make_read_file
 
@@ -124,11 +124,10 @@ async def run_knowledge_agent(
     if not final_text and not notes:
         _log.warning("knowledge agent no output conv=%d — retrying", conversation_id)
         retry_prompt = user_prompt + "\n\n**重要：读完所有文件后必须直接在最后一条消息中输出大纲结构建议，不要再调用工具。**"
-        clean = strip_dangling_tool_calls(result["messages"])
-        slim = compress_tool_results(clean)
+        clean = prepare_retry_messages(result["messages"])
         try:
             result2 = await agent.ainvoke(
-                {"messages": slim + [HumanMessage(content=retry_prompt)]},
+                {"messages": clean + [HumanMessage(content=retry_prompt)]},
                 config={"recursion_limit": 30},
             )
             final_text = ""

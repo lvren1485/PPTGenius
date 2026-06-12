@@ -13,11 +13,10 @@ from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_agent
-from ..common.message_utils import compress_tool_results, strip_dangling_tool_calls
+from ..common.message_utils import prepare_retry_messages
 from ..common.model_builder import build_llm
 from .knowledge_tools import (
     make_fetch_web,
-    make_read_file,
     make_search_knowledge,
     make_search_web,
 )
@@ -137,15 +136,12 @@ async def run_outline_generator(
     kb_count = [0]
     web_count = [0]
     fetch_count = [0]
-    read_count = [0]
-    fetched_ids: set[int] = set()
 
     write_tool, was_called = _make_write_slides(db, outline_id, section_id)
     tools = [
         make_search_knowledge(db, user_id, conversation_id, rag_mode, kb_count),
         make_search_web(web_count),
         make_fetch_web(db, user_id, conversation_id, fetch_count),
-        make_read_file(db, read_count, fetched_ids),
         write_tool,
     ]
 
@@ -174,7 +170,7 @@ async def run_outline_generator(
     try:
         result = await agent.ainvoke(
             {"messages": [HumanMessage(content=user_prompt)]},
-            config={"recursion_limit": 150},
+            config={"recursion_limit": 80},
         )
     except Exception:
         _log.warning("generator failed section=%d — retrying with clean state", section_id)
@@ -183,11 +179,10 @@ async def run_outline_generator(
     if not was_called[0]:
         _log.warning("write_slides not called section=%d — retrying", section_id)
         retry_msg = HumanMessage(content="请立即调用 write_slides 工具写入内容。不要再搜索或分析，直接写入。")
-        clean = strip_dangling_tool_calls(result["messages"])
-        slim = compress_tool_results(clean)
+        clean = prepare_retry_messages(result["messages"])
         try:
             await agent.ainvoke(
-                {"messages": slim + [retry_msg]},
+                {"messages": clean + [retry_msg]},
                 config={"recursion_limit": 50},
             )
         except Exception:
