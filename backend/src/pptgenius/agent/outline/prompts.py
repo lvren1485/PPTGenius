@@ -34,6 +34,8 @@ async def build_generator_user_prompt(
     section_id: int,
     query: str | None = None,
     knowledge_mode: str = "auto",
+    user_id: int = 0,
+    conversation_id: int = 0,
 ) -> str:
     """Build the generator user prompt: all-section summaries + current section full."""
 
@@ -47,6 +49,16 @@ async def build_generator_user_prompt(
             break
 
     parts = []
+
+    # 0. Knowledge files (if any)
+    if user_id and conversation_id:
+        kf_list = await db.list_knowledge_files(user_id, conversation_id=conversation_id)
+        if kf_list:
+            parts.append("## 可用知识文件")
+            parts.append("以下文件已上传到知识库。先用 search_knowledge 搜索，chunk 截断时再用 read_file 读全文。")
+            for kf in kf_list:
+                parts.append(f"  - file_id={kf.id}: {kf.filename} ({kf.chunk_count or '?'} chunks)")
+            parts.append("")
 
     # 1. All sections brief
     parts.append("## 大纲概览")

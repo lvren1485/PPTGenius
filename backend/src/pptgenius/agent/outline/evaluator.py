@@ -13,6 +13,7 @@ from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_agent
+from ..common.message_utils import strip_dangling_tool_calls
 from ..common.model_builder import build_llm
 from .prompts import (
     build_evaluator_system_prompt,
@@ -171,10 +172,17 @@ async def run_outline_evaluator(
     )
 
     writer({"type": "outline_evaluator_start", "outline": outline.title})
-    result = await agent.ainvoke(
-        {"messages": [HumanMessage(content=user_prompt)]},
-        config={"recursion_limit": 20},
-    )
+
+    # ── first attempt ──
+    try:
+        result = await agent.ainvoke(
+            {"messages": [HumanMessage(content=user_prompt)]},
+            config={"recursion_limit": 20},
+        )
+    except Exception:
+        _log.warning("evaluator failed outline=%d — retrying", outline_id)
+        result = {"messages": [HumanMessage(content=user_prompt)]}
+
     writer({"type": "outline_evaluator_end"})
 
     eval_score: float = 0.0
@@ -189,6 +197,32 @@ async def run_outline_evaluator(
             except (json.JSONDecodeError, TypeError):
                 pass
             break
+
+    # ── retry if submit_evaluation not called ──
+    if eval_score == 0.0 and not eval_suggestions:
+        _log.warning("evaluator no score outline=%d — retrying", outline_id)
+        retry_prompt = (
+            user_prompt
+            + "\n\n**必须调用 submit_evaluation 工具提交评分。不要再分析，直接提交。**"
+        )
+        clean = strip_dangling_tool_calls(result["messages"])
+        try:
+            result2 = await agent.ainvoke(
+                {"messages": clean + [HumanMessage(content=retry_prompt)]},
+                config={"recursion_limit": 15},
+            )
+            for msg in reversed(result2["messages"]):
+                name = getattr(msg, "name", None)
+                if name == "submit_evaluation":
+                    try:
+                        parsed = json.loads(str(msg.content))
+                        eval_score = parsed.get("total", 0.0)
+                        eval_suggestions = parsed.get("suggestions", "")
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+                    break
+        except Exception:
+            _log.warning("evaluator retry failed outline=%d", outline_id)
 
     return {
         "overall": f"总分 {eval_score}/10",

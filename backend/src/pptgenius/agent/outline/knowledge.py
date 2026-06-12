@@ -14,6 +14,7 @@ from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_agent
+from ..common.message_utils import strip_dangling_tool_calls
 from ..common.model_builder import build_llm
 from .knowledge_tools import make_read_file
 
@@ -99,25 +100,54 @@ async def run_knowledge_agent(
     )
 
     writer({"type": "knowledge_agent_start"})
-    result = await agent.ainvoke(
-        {"messages": [HumanMessage(content=user_prompt)]},
-        config={"recursion_limit": 25},
-    )
+
+    # ── first attempt ──
+    try:
+        result = await agent.ainvoke(
+            {"messages": [HumanMessage(content=user_prompt)]},
+            config={"recursion_limit": 25},
+        )
+    except Exception:
+        _log.warning("knowledge agent failed conv=%d — retrying", conversation_id)
+        result = {"messages": [HumanMessage(content=user_prompt)]}
+
     writer({"type": "knowledge_agent_end"})
 
-    # Get the model's final text response (structure suggestions)
+    # ── extract result ──
     final_text = ""
     for msg in reversed(result["messages"]):
         if isinstance(msg, AIMessage) and msg.content and not msg.tool_calls:
             final_text = str(msg.content)
             break
 
-    # If no final text, call LLM once more with accumulated notes
+    # ── retry if no useful output ──
+    if not final_text and not notes:
+        _log.warning("knowledge agent no output conv=%d — retrying", conversation_id)
+        retry_prompt = user_prompt + "\n\n**重要：读完所有文件后必须直接在最后一条消息中输出大纲结构建议，不要再调用工具。**"
+        clean = strip_dangling_tool_calls(result["messages"])
+        try:
+            result2 = await agent.ainvoke(
+                {"messages": clean + [HumanMessage(content=retry_prompt)]},
+                config={"recursion_limit": 20},
+            )
+            final_text = ""
+            for msg in reversed(result2["messages"]):
+                if isinstance(msg, AIMessage) and msg.content and not msg.tool_calls:
+                    final_text = str(msg.content)
+                    break
+        except Exception:
+            _log.warning("knowledge agent retry failed conv=%d", conversation_id)
+
+    if not final_text and not notes:
+        return {"error": "知识探索未产生有效结果", "status": "error"}
+
+    # If no final text but notes collected — call LLM once without tools
     if not final_text and notes:
         _log.info("no final output — calling LLM with notes")
-        llm2, _, _ = build_llm(conversation_id)
-        notes_text = "\n\n---\n\n".join(notes)
-        summary_prompt = f"""基于以下文件探索笔记，给出PPT大纲结构建议。
+        try:
+            llm2, _, _ = build_llm(conversation_id)
+            notes_text = "\n\n---\n\n".join(notes)
+            summary_prompt = f"""基于以下文件探索笔记，给出PPT大纲结构建议。
 
 ## 笔记
 {notes_text}
@@ -126,8 +156,10 @@ async def run_knowledge_agent(
 {query or '根据笔记内容生成PPT大纲'}
 
 请给出：1. 大纲标题 2. 章节划分（每节含描述和页数） 3. 总共12页"""
-        response = await llm2.ainvoke([HumanMessage(content=summary_prompt)])
-        final_text = str(response.content)
+            response = await llm2.ainvoke([HumanMessage(content=summary_prompt)])
+            final_text = str(response.content)
+        except Exception:
+            _log.warning("knowledge agent fallback LLM call failed")
 
     # Compress notes + structure into one result
     parts = []

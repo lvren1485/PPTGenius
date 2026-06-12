@@ -138,15 +138,14 @@ async def run_master_agent(
 
     # --- 7. Persist Master's own token cost ---
     tc = TokenCounter.get_agent(agent_id)
-    if tc:
-        await db.create_message(
-            conversation_id=conversation_id,
-            role="assistant",
-            content=reply,
-            content_type="text",
-            estimated_cost=tc.snapshot()["estimated_cost_cny"],
-            token_cost_json=tc.to_json(),
-        )
+    await db.create_message(
+        conversation_id=conversation_id,
+        role="assistant",
+        content=reply,
+        content_type="text",
+        estimated_cost=tc.snapshot()["estimated_cost_cny"] if tc else 0.0,
+        token_cost_json=tc.to_json() if tc else None,
+    )
 
     # --- 8. Snapshot on exit ---
     outline_changed = _has_outline_changed(result)

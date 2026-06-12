@@ -530,6 +530,226 @@ class TestDatabaseConcurrency:
         await test_engine.dispose()
 
 
+class TestKnowledgeTools:
+    """Test the knowledge agent notebook tools (submit_note + read_file)."""
+
+    @pytest.mark.asyncio
+    async def test_submit_note_appends(self):
+        """submit_note should accumulate notes across multiple calls."""
+        from pptgenius.agent.outline.knowledge import _make_submit_note
+
+        tool, notes = _make_submit_note()
+        r1 = await tool.ainvoke({"text": "要点1: LangChain是一个LLM框架"})
+        r2 = await tool.ainvoke({"text": "要点2: 支持Agent和Tool"})
+        assert "已记录 (1条)" in r1
+        assert "已记录 (2条)" in r2
+        assert len(notes) == 2
+        assert notes[0] == "要点1: LangChain是一个LLM框架"
+
+    @pytest.mark.asyncio
+    async def test_submit_note_concurrent(self):
+        """Multiple concurrent submit_note calls should all be recorded."""
+        import asyncio
+        from pptgenius.agent.outline.knowledge import _make_submit_note
+
+        tool, notes = _make_submit_note()
+
+        async def write(i):
+            await tool.ainvoke({"text": f"note_{i}"})
+
+        await asyncio.gather(*[write(i) for i in range(20)])
+        assert len(notes) == 20
+        texts = sorted(notes)
+        assert texts[0] == "note_0"
+        assert texts[-1] == "note_9"
+
+    @pytest.mark.asyncio
+    async def test_read_file_tool(self, db):
+        """read_file should return file content from DB chunks."""
+        from pptgenius.agent.outline.knowledge_tools import make_read_file
+
+        d = Database(db)
+        u = await d.create_user("kt_user")
+        conv = await d.create_conversation(u.id)
+        kf = await d.create_knowledge_file(u.id, "test.txt", "/tmp/kttest.txt", "txt", conversation_id=conv.id)
+        await d.create_chunk(kf.id, 0, "chunk zero")
+        await d.create_chunk(kf.id, 1, "chunk one")
+
+        count = [0]
+        fetched = set()
+        tool = make_read_file(d, count, fetched)
+        result = await tool.ainvoke({"file_id": kf.id})
+        assert "chunk zero" in result
+        assert "chunk one" in result
+        assert kf.id in fetched
+        assert count[0] == 1
+
+    @pytest.mark.asyncio
+    async def test_read_file_limit(self, db):
+        """read_file should enforce the 5-call limit."""
+        from pptgenius.agent.outline.knowledge_tools import make_read_file
+
+        d = Database(db)
+        u = await d.create_user("kt2_user")
+        conv = await d.create_conversation(u.id)
+        kf = await d.create_knowledge_file(u.id, "t.txt", "/tmp/kt2.txt", "txt", conversation_id=conv.id)
+        await d.create_chunk(kf.id, 0, "x")
+
+        count = [5]  # already at limit
+        fetched = set()
+        tool = make_read_file(d, count, fetched)
+        result = await tool.ainvoke({"file_id": kf.id})
+        assert "已达上限" in result
+
+    @pytest.mark.asyncio
+    async def test_knowledge_tools_concurrent(self, db):
+        """Concurrent read_file + submit_note should work safely with DB lock."""
+        import asyncio
+        from pptgenius.agent.outline.knowledge import _make_submit_note
+        from pptgenius.agent.outline.knowledge_tools import make_read_file
+
+        d = Database(db)
+        u = await d.create_user("ktc_user")
+        conv = await d.create_conversation(u.id)
+
+        kf = await d.create_knowledge_file(u.id, "ct.txt", "/tmp/ktc.txt", "txt", conversation_id=conv.id)
+        for i in range(10):
+            await d.create_chunk(kf.id, i, f"concurrent chunk {i}")
+
+        count = [0]
+        fetched = set()
+        read_tool = make_read_file(d, count, fetched)
+        note_tool, notes = _make_submit_note()
+
+        async def read_and_note(i):
+            result = await read_tool.ainvoke({"file_id": kf.id})
+            await note_tool.ainvoke({"text": f"from_{i}: {result[:50]}"})
+
+        await asyncio.gather(*[read_and_note(i) for i in range(3)])
+        assert len(notes) >= 1
+        assert count[0] >= 1
+
+
+class TestGeneratorPromptKnowledgeFiles:
+    """Verify build_generator_user_prompt includes knowledge file IDs."""
+
+    @pytest.mark.asyncio
+    async def test_prompt_includes_knowledge_files(self, db):
+        from pptgenius.agent.outline.prompts import build_generator_user_prompt
+
+        d = Database(db)
+        u = await d.create_user("gpkf_user")
+        conv = await d.create_conversation(u.id)
+        o = await d.create_outline(u.id, conv.id, "Test Outline")
+        sec = await d.create_outline_section(o.id, 1, "Section 1")
+        await d.create_outline_slide(o.id, 1, "Slide 1", section_id=sec.id)
+
+        kf = await d.create_knowledge_file(u.id, "doc.pdf", "/tmp/gpkf.pdf", "pdf", conversation_id=conv.id)
+        await d.create_chunk(kf.id, 0, "sample content")
+
+        prompt = await build_generator_user_prompt(
+            db=d, outline_id=o.id, section_id=sec.id, query="test",
+            user_id=u.id, conversation_id=conv.id,
+        )
+        assert "可用知识文件" in prompt
+        assert f"file_id={kf.id}" in prompt
+        assert "doc.pdf" in prompt
+
+    @pytest.mark.asyncio
+    async def test_prompt_no_orphan_file_ids(self, db):
+        """Knowledge files from other conversations should NOT appear."""
+        import secrets
+        from pptgenius.agent.outline.prompts import build_generator_user_prompt
+
+        d = Database(db)
+        u = await d.create_user("gpkf2_user")
+        conv_a = await d.create_conversation(u.id)
+        conv_b = await d.create_conversation(u.id)
+
+        # Unique paths to avoid dedup collision with other tests
+        tag = secrets.token_hex(4)
+        kf_a = await d.create_knowledge_file(u.id, "a.pdf", f"/tmp/gpkf_a_{tag}.pdf", "pdf", conversation_id=conv_a.id)
+        await d.create_chunk(kf_a.id, 0, "content a")
+        kf_b = await d.create_knowledge_file(u.id, "b.pdf", f"/tmp/gpkf_b_{tag}.pdf", "pdf", conversation_id=conv_b.id)
+        await d.create_chunk(kf_b.id, 0, "content b")
+
+        o = await d.create_outline(u.id, conv_a.id, "Outline A")
+        sec = await d.create_outline_section(o.id, 1, "S1")
+        await d.create_outline_slide(o.id, 1, "Slide", section_id=sec.id)
+
+        prompt = await build_generator_user_prompt(
+            db=d, outline_id=o.id, section_id=sec.id,
+            user_id=u.id, conversation_id=conv_a.id,
+        )
+        # Only conv_a's file should appear
+        assert f"file_id={kf_a.id}" in prompt
+        assert f"file_id={kf_b.id}" not in prompt
+
+
+class TestKnowledgeToolLimits:
+    """Verify tool call limits are enforced (search_knowledge ≤12, search_web ≤8, fetch_web ≤6, read_file ≤5)."""
+
+    @pytest.mark.asyncio
+    async def test_search_knowledge_limit(self, db):
+        from pptgenius.agent.outline.knowledge_tools import make_search_knowledge
+
+        d = Database(db)
+        u = await d.create_user("ktl_user")
+        conv = await d.create_conversation(u.id)
+        kf = await d.create_knowledge_file(u.id, "x.txt", "/tmp/x.txt", "txt", conversation_id=conv.id)
+        await d.create_chunk(kf.id, 0, "test content")
+
+        count = [0]
+        tool = make_search_knowledge(d, u.id, conv.id, "user", count)
+
+        # 12 calls should succeed
+        for i in range(12):
+            r = await tool.ainvoke({"query": f"test_{i}"})
+            assert "已达上限" not in r
+
+        # 13th call should fail
+        r = await tool.ainvoke({"query": "overflow"})
+        assert "已达上限" in r
+
+    @pytest.mark.asyncio
+    async def test_search_web_limit(self, db):
+        from pptgenius.agent.outline.knowledge_tools import make_search_web
+
+        count = [0]
+        tool = make_search_web(count)
+
+        for _ in range(8):
+            r = await tool.ainvoke({"query": "test"})
+            assert "已达上限" not in r
+
+        r = await tool.ainvoke({"query": "overflow"})
+        assert "已达上限" in r
+
+    @pytest.mark.asyncio
+    async def test_read_file_limit(self, db):
+        from pptgenius.agent.outline.knowledge_tools import make_read_file
+
+        d = Database(db)
+        u = await d.create_user("ktl2_user")
+        conv = await d.create_conversation(u.id)
+        kf = await d.create_knowledge_file(u.id, "r.txt", "/tmp/r.txt", "txt", conversation_id=conv.id)
+        await d.create_chunk(kf.id, 0, "x")
+
+        count = [0]
+        fetched = set()
+        tool = make_read_file(d, count, fetched)
+
+        for _ in range(5):
+            # Need different file_ids since read_file deduplicates
+            kf2 = await d.create_knowledge_file(u.id, f"r{_}.txt", f"/tmp/r{_}.txt", "txt", conversation_id=conv.id)
+            await d.create_chunk(kf2.id, 0, f"c{_}")
+            r = await tool.ainvoke({"file_id": kf2.id})
+            assert "已达上限" not in r
+
+        r = await tool.ainvoke({"file_id": 99999})
+        assert "已达上限" in r
+
+
 # Import tool factories at module level for test discovery
 from pptgenius.agent.tools.perception import (
     make_get_conversation_status,

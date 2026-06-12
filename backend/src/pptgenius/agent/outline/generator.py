@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 from langchain.agents import create_agent
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
 from langgraph.config import get_stream_writer
 
@@ -13,6 +13,7 @@ from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_agent
+from ..common.message_utils import strip_dangling_tool_calls
 from ..common.model_builder import build_llm
 from .knowledge_tools import (
     make_fetch_web,
@@ -155,6 +156,8 @@ async def run_outline_generator(
         section_id=section_id,
         query=query,
         knowledge_mode=knowledge_mode,
+        user_id=user_id,
+        conversation_id=conversation_id,
     )
 
     llm, agent_id, mw = build_llm(conversation_id)
@@ -166,26 +169,32 @@ async def run_outline_generator(
     )
 
     writer({"type": "outline_generator_start", "section": section_title})
-    result = await agent.ainvoke(
-        {"messages": [HumanMessage(content=user_prompt)]},
-        config={"recursion_limit": 50},
-    )
+
+    # ── first attempt ──
+    try:
+        result = await agent.ainvoke(
+            {"messages": [HumanMessage(content=user_prompt)]},
+            config={"recursion_limit": 80},
+        )
+    except Exception:
+        _log.warning("generator failed section=%d — retrying with clean state", section_id)
+        result = {"messages": [HumanMessage(content=user_prompt)]}
 
     if not was_called[0]:
-        _log.warning("write_slides not called — retrying")
+        _log.warning("write_slides not called section=%d — retrying", section_id)
         retry_msg = HumanMessage(content="请立即调用 write_slides 工具写入内容。不要再搜索或分析，直接写入。")
-        clean = _strip_dangling_tool_calls(result["messages"])
-        await agent.ainvoke(
-            {"messages": clean + [retry_msg]},
-            config={"recursion_limit": 30},
-        )
+        clean = strip_dangling_tool_calls(result["messages"])
+        try:
+            await agent.ainvoke(
+                {"messages": clean + [retry_msg]},
+                config={"recursion_limit": 30},
+            )
+        except Exception:
+            _log.warning("generator retry failed section=%d — giving up", section_id)
+
+    if not was_called[0]:
+        _log.error("generator could not write slides section=%d", section_id)
+        return f"错误: 章节'{section_title}'填充失败"
 
     writer({"type": "outline_generator_end", "section": section_title})
     return f"章节'{section_title}'填充完成"
-
-
-def _strip_dangling_tool_calls(messages: list) -> list:
-    cleaned = list(messages)
-    while cleaned and isinstance(cleaned[-1], AIMessage) and cleaned[-1].tool_calls:
-        cleaned.pop()
-    return cleaned
