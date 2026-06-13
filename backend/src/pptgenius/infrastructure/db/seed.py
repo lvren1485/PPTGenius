@@ -40,7 +40,7 @@ async def seed(engine: AsyncEngine) -> None:
                             fonts_json=d.get("fonts", {}),
                             style_density=d.get("style_density", "moderate"),
                             decoration_json=d.get("decoration", {}),
-                            background_json=d.get("background"),
+                            background_json=d.get("background_json"),
                         )
                     )
                     count += 1

@@ -32,10 +32,12 @@ _TOOL_CTYPE: dict[str, str] = {
     "_modify_outline_section":   "mod_section",
     "_outline_evaluate":         "evaluate",
     "_explore_knowledge":        "explore",
+    "_ppt_style":                "ppt_style",
+    "_slides_content":           "slides_content",
 }
 
 # Tools that spawn a sub-agent (have their own LLM + TokenCountingMiddleware)
-_SUB_AGENT_TOOLS: set[str] = {"gen_content", "mod_section", "evaluate", "explore"}
+_SUB_AGENT_TOOLS: set[str] = {"gen_content", "mod_section", "evaluate", "explore", "ppt_style", "slides_content"}
 
 from .common.model_builder import build_llm
 from .tools.explore_knowledge import make_explore_knowledge
@@ -50,13 +52,15 @@ from .tools.perception import (
     make_list_styles,
     make_switch_outline,
 )
+from .tools.ppt_style import make_ppt_style
+from .tools.slides_content import make_slides_content
 from .tools.structure import make_modify_outline_structure, make_write_outline_structure
 
 
 def _assemble_tools(db: Database, conversation_id: int) -> list:
     """Assemble all currently-implemented Master tools."""
     return [
-        # Perception (Phase 2)
+        # Perception 
         make_get_conversation_status(db, conversation_id),
         make_switch_outline(db, conversation_id),
         make_get_outline(db, conversation_id),
@@ -64,16 +68,17 @@ def _assemble_tools(db: Database, conversation_id: int) -> list:
         make_get_presentation(db, conversation_id),
         make_get_knowledge_files(db, conversation_id),
         make_list_styles(db, conversation_id),
-        # Structure (Phase 2)
+        # Structure 
         make_write_outline_structure(db, conversation_id),
         make_modify_outline_structure(db, conversation_id),
-        # Outline content (Phase 3 — thin wrappers over outline/)
+        # Outline content 
         make_generate_outline_content(db, conversation_id),
         make_modify_outline_section(db, conversation_id),
         make_outline_evaluate(db, conversation_id),
         make_explore_knowledge(db, conversation_id),
-        # ppt_style (Phase 4) — TODO
-        # slides_content (Phase 4) — TODO
+        # Presentation content
+        make_ppt_style(db, conversation_id),
+        make_slides_content(db, conversation_id),
     ]
 
 

@@ -27,5 +27,9 @@
     "container_border": true,
     "page_number_style": "right_bottom",
     "corner_bracket": false
+  },
+  "background_json": {
+    "type": "solid",
+    "color": "f8f9fa"
   }
 }
