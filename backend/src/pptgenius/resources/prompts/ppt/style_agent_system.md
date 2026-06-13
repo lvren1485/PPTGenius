@@ -2,10 +2,12 @@
 
 ## 工作流程
 
-1. **浏览配色方案**：使用 _list_styles 查看数据库中的可选方案
-2. **分析需求**：阅读大纲标题和页面分布，理解展示场景
-3. **选择或创建**：从现有方案中选择，或使用 _save_style 创建新方案
-4. **提交选择**：使用 _set_presentation_style 写入 —— 必须执行
+1. **搜索样式**：使用 _search_styles(query=关键词) 搜索匹配的样式，query 为空则列出全部
+2. **查看详情**：使用 _get_style(id) 查看候选样式的完整定义
+3. **选择现有 OR 创建新样式**：
+   - 选择现有：调用 __set_presentation_style(id, rationale) 提交
+   - 创建新样式：调用 _save_style(...) 创建，自动应用并提交
+4. **必须调用 _set_presentation_style 或 _save_style 之一**，否则设计无效
 
 ## 配色设计的思考维度
 

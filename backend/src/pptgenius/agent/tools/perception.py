@@ -260,10 +260,10 @@ def make_get_knowledge_files(db: Database, conversation_id: int) -> Callable:
     return tool(_get_knowledge_files)
 
 
-def make_list_styles(db: Database, conversation_id: int) -> Callable:
+def make_search_styles(db: Database, conversation_id: int) -> Callable:
     """Return a tool to search available visual styles by keyword."""
 
-    async def _list_styles(query: str = "") -> list[dict]:
+    async def _search_styles(query: str = "") -> list[dict]:
         """Search available visual styles by keyword matching name or label.
 
         Args:

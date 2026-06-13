@@ -20,11 +20,11 @@ from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_agent
 from ..common.model_builder import build_llm
+from .common.instruction_loader import get_instruction
 
 _log = get_logger("pptgenius.agent.ppt.style_agent")
 
 _PROMPT_PATH = RESOURCES_DIR / "prompts" / "ppt" / "style_agent_system.md"
-_LAYOUTS_DIR = RESOURCES_DIR / "layouts"
 
 
 @lru_cache(maxsize=1)
@@ -69,11 +69,15 @@ async def run_style_agent(
 
     # ── tools ────────────────────────────────────────────────────────
 
-    async def _list_styles(dummy: str = "") -> str:
-        """List all active styles in the database. Pass empty string."""
-        styles = await db.search_styles("")
+    async def _search_styles(query: str = "") -> str:
+        """Search active styles by keyword. Pass empty string to list all.
+
+        Args:
+            query: Search keyword matching name or label.
+        """
+        styles = await db.search_styles(query)
         if not styles:
-            return "数据库中没有可用样式。使用 save_style 创建一个。"
+            return "数据库中没有可用样式。使用 _save_style 创建一个。"
         items = []
         for s in styles:
             items.append(json.dumps({
@@ -113,7 +117,7 @@ async def run_style_agent(
         decoration: dict | None = None,
         background: dict | None = None,
     ) -> str:
-        """Create a new style.
+        """Create a new style and auto-apply it to the presentation.
 
         Args:
             name: Unique identifier, e.g. 'tech_green'.
@@ -140,35 +144,17 @@ async def run_style_agent(
                 decoration_json=decoration or {},
                 background_json=background,
             )
+            # Auto-apply to presentation
+            await db.set_presentation_style(presentation_id, style_id=s.id)
+            _style_id[0] = s.id
+            _rationale[0] = f"创建新样式 '{label}' 并应用"
+            _was_called[0] = True
             return json.dumps({
                 "id": s.id, "name": s.name, "label": s.label,
-                "message": f"样式 '{label}' 创建成功 (id={s.id})。",
+                "message": f"样式 '{label}' 创建成功 (id={s.id})，已自动应用。",
             }, ensure_ascii=False)
         except Exception as exc:
             return f"创建失败: {exc}。name 可能已存在。"
-
-    async def _list_layouts(dummy: str = "") -> str:
-        """List all built-in layout templates. Pass empty string."""
-        items = []
-        for f in sorted(_LAYOUTS_DIR.glob("*.json")):
-            try:
-                d = json.loads(f.read_text(encoding="utf-8"))
-                items.append(f"- **{d['name']}**: {d['label']}")
-            except Exception:
-                items.append(f"- {f.stem}")
-        return "\n".join(items) if items else "没有找到布局模板。"
-
-    async def _get_layout(name: str) -> str:
-        """Get full layout definition by name.
-
-        Args:
-            name: Layout name, e.g. 'title_slide', 'content_two_column'.
-        """
-        path = _LAYOUTS_DIR / f"{name}.json"
-        if not path.exists():
-            available = [f.stem for f in sorted(_LAYOUTS_DIR.glob("*.json"))]
-            return f"布局 '{name}' 不存在。可用: {', '.join(available)}"
-        return path.read_text(encoding="utf-8")
 
     async def _set_presentation_style(
         style_id: int,
@@ -188,11 +174,9 @@ async def run_style_agent(
         return json.dumps({"status": "ok", "style_id": style_id}, ensure_ascii=False)
 
     tools = [
-        tool(_list_styles),
+        tool(_search_styles),
         tool(_get_style),
         tool(_save_style),
-        tool(_list_layouts),
-        tool(_get_layout),
         tool(_set_presentation_style),
     ]
 
@@ -211,6 +195,7 @@ async def run_style_agent(
         f"  {s.slide_index}. [{s.layout_type or 'content'}] {s.title or '(无标题)'}"
         for s in sorted(slides, key=lambda x: x.slide_index)
     )
+    bg_inst = json.dumps(get_instruction("background.json"), ensure_ascii=False, indent=2)
     user_prompt = (
         f"## 大纲信息\n"
         f"标题: {outline.title if outline else '未命名'}\n"
@@ -218,7 +203,10 @@ async def run_style_agent(
         f"页面类型分布: {json.dumps(lt_summary, ensure_ascii=False)}\n\n"
         f"## 页面标题列表\n"
         f"{slide_titles}\n\n"
-        f"请按照工作流程选择配色方案和布局模板。"
+        f"## 背景指令参考\n"
+        f"```json\n{bg_inst}\n```\n\n"
+        f"**注意: 目前系统未接入 image 图片功能，创建样式时 background.type 只能选 solid 或 gradient，不要选 image。**\n\n"
+        f"请按照工作流程搜索样式、选择或创建并提交。"
     )
 
     agent = create_agent(
@@ -235,7 +223,7 @@ async def run_style_agent(
 
     result = await agent.ainvoke(
         {"messages": [HumanMessage(content=user_prompt)]},
-        config={"recursion_limit": 30},
+        config={"recursion_limit": 50},
     )
 
     # Retry if set_presentation_style wasn't called

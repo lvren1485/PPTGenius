@@ -59,6 +59,8 @@ def build_user_prompt(
     style: dict | None,
     template: dict | None,
     query: str | None = None,
+    *,
+    existing_outputs: dict | None = None,
 ) -> str:
     """Build the user prompt for a single slide."""
     content_json = slide.get("content_json", {})
@@ -78,6 +80,7 @@ def build_user_prompt(
     key_data_block = f"关键数据: {key_data}" if key_data else ""
     visual_note_block = f"可视化建议: {visual_note}" if visual_note else ""
 
+    existing_section = _build_existing_section(existing_outputs) if existing_outputs else ""
     color_section = _build_style_section(style) if style else "## 配色方案: 使用默认配色"
     template_section = _build_template_section(template) if template else ""
     query_section = f"## 修改指令\n{query}" if query else ""
@@ -93,6 +96,7 @@ def build_user_prompt(
         detailed_content_block=detailed_block,
         key_data_block=key_data_block,
         visual_note_block=visual_note_block,
+        existing_content_section=existing_section,
         color_scheme_section=color_section,
         template_section=template_section,
         neighbor_section=query_section,
@@ -122,14 +126,25 @@ def _build_style_section(data: dict) -> str:
             f"最小: {fonts.get('min_size','?')}pt"
         )
 
-    # Background constraint
+    # Background (full JSON, not summarized)
     bg = data.get("background_json", {})
     if bg:
-        parts.append(f"背景: type={bg.get('type','solid')}, color={bg.get('color','')}")
-        parts.append("背景可使用 style 中的 background 设置，也可自行重新设计。")
+        parts.append(f"背景预设: {_j(bg)}")
+        parts.append("可沿用此预设，也可自行重新设计背景。")
 
     parts.append(_Z_ORDER_TABLE)
     return "\n".join(parts)
+
+
+def _build_existing_section(outputs: dict) -> str:
+    """Pass existing slide state as raw JSON — do NOT parse or truncate."""
+    return (
+        "## 当前 slide 已有内容（修改模式，完整 JSON）\n"
+        "你可以保留、修改或删除已有元素。删除用 submit_element(element_id=..., delete=true)。\n"
+        "```json\n"
+        + json.dumps(outputs, ensure_ascii=False, indent=2)
+        + "\n```"
+    )
 
 
 def _build_template_section(template: dict) -> str:

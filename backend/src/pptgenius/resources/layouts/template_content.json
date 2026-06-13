@@ -1,0 +1,101 @@
+{
+  "type": "content",
+  "description": "content (bullet / two_column / three_column / grid_2x2) — 正文页完整元素参考",
+  "background": {
+    "type": "solid",
+    "color": "{{bg}}"
+  },
+  "elements": [
+    {
+      "id": "content_title",
+      "type": "textbox",
+      "position": {"left": 0.8, "top": 0.4, "width": 11.7, "height": 0.9},
+      "remark": "页标题 h2",
+      "content": [{"paragraph": {"alignment": "left", "runs": [{"text": "页标题", "font": {"size": 28, "bold": true, "color": "{{text}}"}}]}}]
+    },
+    {
+      "id": "body_text",
+      "type": "textbox",
+      "position": {"left": 1.2, "top": 1.6, "width": 10.9, "height": 5.1},
+      "remark": "正文主体 body — bullet_list 时逐条 bullet，two_column 时分两栏",
+      "content": [
+        {"paragraph": {"alignment": "left", "runs": [{"text": "要点一", "font": {"size": 16, "color": "{{text}}"}}]}},
+        {"paragraph": {"alignment": "left", "runs": [{"text": "要点二", "font": {"size": 16, "color": "{{text}}"}}]}}
+      ]
+    },
+    {
+      "id": "subheading",
+      "type": "textbox",
+      "position": {"left": 1.2, "top": 1.6, "width": 5.0, "height": 0.6},
+      "remark": "小标题 h3 — 用于分组内容",
+      "content": [{"paragraph": {"alignment": "left", "runs": [{"text": "小标题", "font": {"size": 22, "bold": true, "color": "{{primary}}"}}]}}]
+    },
+    {
+      "id": "chart_placeholder",
+      "type": "chart",
+      "position": {"left": 1.2, "top": 2.5, "width": 11.0, "height": 4.0},
+      "remark": "图表 — 需要 plot_data 时使用"
+    },
+    {
+      "id": "table_element",
+      "type": "table",
+      "position": {"left": 1.2, "top": 2.5, "width": 11.0, "height": 3.0},
+      "remark": "表格 — 需要结构化数据时使用"
+    },
+    {
+      "id": "icon_picture",
+      "type": "picture",
+      "position": {"left": 11.0, "top": 0.4, "width": 0.6, "height": 0.6},
+      "remark": "SVG 装饰图标",
+      "name": "star",
+      "color": "{{primary}}",
+      "fit": "aspect"
+    },
+    {
+      "id": "page_number",
+      "type": "textbox",
+      "position": {"left": 11.8, "top": 6.9, "width": 1.0, "height": 0.4},
+      "remark": "页码",
+      "content": [{"paragraph": {"alignment": "right", "runs": [{"text": "01", "font": {"size": 14, "color": "{{text_secondary}}"}}]}}]
+    },
+    {
+      "id": "title_accent_bar",
+      "type": "shape",
+      "shape_type": "rectangle",
+      "position": {"left": 0.8, "top": 0.35, "width": 0.08, "height": 0.55},
+      "remark": "标题左侧装饰条",
+      "fill": {"type": "solid", "color": "{{primary}}"}
+    },
+    {
+      "id": "bottom_line",
+      "type": "shape",
+      "shape_type": "rectangle",
+      "position": {"left": 0.8, "top": 6.95, "width": 11.7, "height": 0.01},
+      "remark": "页脚分隔线",
+      "fill": {"type": "solid", "color": "{{border}}"}
+    },
+    {
+      "id": "accent_box",
+      "type": "shape",
+      "shape_type": "rounded_rectangle",
+      "position": {"left": 0.8, "top": 0.3, "width": 0.04, "height": 6.4},
+      "remark": "左侧装饰线 (minimal)",
+      "fill": {"type": "solid", "color": "{{primary}}"}
+    },
+    {
+      "id": "corner_bracket_lt",
+      "type": "shape",
+      "shape_type": "corner_bracket",
+      "position": {"left": 0.3, "top": 0.3, "width": 0.8, "height": 0.6},
+      "remark": "左上角括号装饰",
+      "fill": {"type": "no_fill"},
+      "line": {"color": "{{primary}}", "width": 0.02}
+    }
+  ],
+  "layout_variants": {
+    "bullet_list": "标题 + 要点列表 (body 占主区域)",
+    "two_column": "标题 + 左右两栏正文 (各 5.5 wide)",
+    "three_column": "标题 + 三栏 (各 3.6 wide)",
+    "grid_2x2": "标题 + 四个卡片区域 (各 5.5×2.5)"
+  }
+}

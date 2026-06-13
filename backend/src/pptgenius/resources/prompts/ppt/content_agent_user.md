@@ -8,6 +8,7 @@ has_image: {has_image}
 ## outline content_json
 核心要点: {main_points}
 {detailed_content_block}{key_data_block}{visual_note_block}
+{existing_content_section}
 {color_scheme_section}
 {template_section}
 {neighbor_section}

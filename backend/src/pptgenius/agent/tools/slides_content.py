@@ -34,15 +34,26 @@ _LAYOUTS_DIR = RESOURCES_DIR / "layouts"
 # ── helpers ──────────────────────────────────────────────────────────────
 
 @lru_cache(maxsize=1)
-def _load_all_layouts() -> dict[str, dict]:
-    layouts = {}
-    for f in sorted(_LAYOUTS_DIR.glob("*.json")):
-        try:
-            d = json.loads(f.read_text(encoding="utf-8"))
-            layouts[d.get("name", f.stem)] = d
-        except Exception:
-            pass
-    return layouts
+def _load_template_catalog() -> dict[str, dict]:
+    """Load the 3 comprehensive template files (title / section / content)."""
+    templates = {}
+    for fname in ("template_title.json", "template_section.json", "template_content.json"):
+        path = _LAYOUTS_DIR / fname
+        if path.exists():
+            try:
+                d = json.loads(path.read_text(encoding="utf-8"))
+                templates[d.get("type", fname)] = d
+            except Exception:
+                pass
+    return templates
+
+
+_LAYOUT_TYPE_MAP: dict[str, str] = {
+    "title": "title", "title_slide": "title",
+    "thanks": "title", "ending": "title",
+    "section": "section",
+    "content": "content",
+}
 
 
 def _resolve_citations(citations, known_files: dict[int, dict]) -> str:
@@ -85,7 +96,7 @@ def _resolve_slide_data(slide) -> dict:
 async def _load_context(
     db: Database, conversation_id: int
 ) -> tuple[dict | None, dict[str, dict], dict[int, dict], object, int, int]:
-    """Return (style_data, all_layouts, known_files, conv, outline_id, pres_id)."""
+    """Return (style_data, templates, known_files, conv, outline_id, pres_id)."""
     conv = await db.get_conversation(conversation_id)
     if conv is None or conv.current_outline_id is None:
         return None, {}, {}, conv, 0, 0
@@ -112,14 +123,14 @@ async def _load_context(
                 "background_json": s.background_json,
             }
 
-    all_layouts = _load_all_layouts()
+    templates = _load_template_catalog()
     kf_list = await db.list_knowledge_files(
         user_id=conv.user_id, conversation_id=conversation_id,
     )
     known_files = {kf.id: {"filename": kf.filename, "web_url": kf.web_url}
                    for kf in kf_list}
 
-    return style_data, all_layouts, known_files, conv, outline_id, pres.id
+    return style_data, templates, known_files, conv, outline_id, pres.id
 
 
 # ── intermediate: generate + write one slide ─────────────────────────────
@@ -129,7 +140,7 @@ async def _write_slide_content(
     conversation_id: int,
     outline_slide,
     style_data: dict | None,
-    all_layouts: dict[str, dict],
+    templates: dict[str, dict],
     known_files: dict[int, dict],
     query: str | None,
     pres_id: int,
@@ -137,15 +148,24 @@ async def _write_slide_content(
     """Generate and persist ONE slide.  Returns the agent result dict."""
 
     sd = _resolve_slide_data(outline_slide)
-    layout = all_layouts.get(sd["layout_type"])
+
+    # Read existing agent outputs (for modify mode awareness)
+    existing = await db.get_slides_by_presentation_id(pres_id)
+    existing_ps = next((ps for ps in existing if ps.slide_index == sd["slide_index"]), None)
+    existing_outputs = existing_ps.agent_outputs if existing_ps and existing_ps.agent_outputs else None
+
+    # Map layout_type to template category, pass all 3 templates as catalog
+    template_type = _LAYOUT_TYPE_MAP.get(sd["layout_type"], "content")
+    matched_template = templates.get(template_type)
 
     # Generate (pure memory)
     result = await run_slide_agent(
         conversation_id=conversation_id,
         slide=sd,
         style=style_data,
-        template=layout,
+        template=matched_template,
         query=query,
+        existing_outputs=existing_outputs,
     )
 
     # Ensure presentation_slide row exists
@@ -201,7 +221,7 @@ def make_slides_content(db: Database, conversation_id: int) -> Callable:
             query: Optional user requirements, e.g. "全部背景改为深色".
             modify_instructions: Per-slide modify instructions by slide ID, e.g. {5: "饼图→柱状图"}.
         """
-        style_data, all_layouts, known_files, conv, outline_id, pres_id = \
+        style_data, templates, known_files, conv, outline_id, pres_id = \
             await _load_context(db, conversation_id)
 
         if pres_id == 0:
@@ -224,7 +244,7 @@ def make_slides_content(db: Database, conversation_id: int) -> Callable:
                 db, conversation_id,
                 outline_slide=sl,
                 style_data=style_data,
-                all_layouts=all_layouts,
+                templates=templates,
                 known_files=known_files,
                 query=(
                     modify_instructions.get(sl.id)
@@ -263,7 +283,7 @@ def make_modify_slides_content(db: Database, conversation_id: int) -> Callable:
             query: Optional overall modification requirements.
             modify_instructions: Per-slide modify instructions by slide ID, e.g. {5: "柱状图→饼图"}.
         """
-        style_data, all_layouts, known_files, conv, outline_id, pres_id = \
+        style_data, templates, known_files, conv, outline_id, pres_id = \
             await _load_context(db, conversation_id)
 
         if pres_id == 0:
@@ -282,7 +302,7 @@ def make_modify_slides_content(db: Database, conversation_id: int) -> Callable:
                 db, conversation_id,
                 outline_slide=sl,
                 style_data=style_data,
-                all_layouts=all_layouts,
+                templates=templates,
                 known_files=known_files,
                 query=(
                     modify_instructions.get(sl.id)

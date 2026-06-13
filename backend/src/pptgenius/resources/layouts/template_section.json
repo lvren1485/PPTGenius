@@ -1,0 +1,57 @@
+{
+  "type": "section",
+  "description": "section — 章节分隔页的完整元素参考",
+  "background": {
+    "type": "solid",
+    "color": "{{bg}}"
+  },
+  "elements": [
+    {
+      "id": "section_number",
+      "type": "textbox",
+      "position": {"left": 0.8, "top": 2.0, "width": 2.0, "height": 1.2},
+      "remark": "章节编号 h1",
+      "content": [{"paragraph": {"alignment": "left", "runs": [{"text": "01", "font": {"size": 36, "bold": true, "color": "ffffff"}}]}}]
+    },
+    {
+      "id": "section_title",
+      "type": "textbox",
+      "position": {"left": 0.8, "top": 3.3, "width": 11.7, "height": 1.0},
+      "remark": "章节标题 h2",
+      "content": [{"paragraph": {"alignment": "left", "runs": [{"text": "章节标题", "font": {"size": 28, "bold": true, "color": "ffffff"}}]}}]
+    },
+    {
+      "id": "section_subtitle",
+      "type": "textbox",
+      "position": {"left": 0.8, "top": 4.5, "width": 11.7, "height": 0.6},
+      "remark": "章节副标题 body",
+      "content": [{"paragraph": {"alignment": "left", "runs": [{"text": "描述说明", "font": {"size": 16, "color": "{{text_secondary}}"}}]}}]
+    },
+    {
+      "id": "section_bg_block",
+      "type": "shape",
+      "shape_type": "rounded_rectangle",
+      "position": {"left": 0.8, "top": 1.8, "width": 2.5, "height": 3.2},
+      "remark": "章节编号背景色块",
+      "fill": {"type": "gradient", "gradient_angle": 135, "gradient_stops": [
+        {"position": 0.0, "color": "{{primary}}"},
+        {"position": 1.0, "color": "{{accent}}"}
+      ]}
+    },
+    {
+      "id": "divider_line",
+      "type": "shape",
+      "shape_type": "rectangle",
+      "position": {"left": 0.8, "top": 5.8, "width": 11.7, "height": 0.015},
+      "remark": "分隔线",
+      "fill": {"type": "solid", "color": "{{border}}"}
+    },
+    {
+      "id": "page_number",
+      "type": "textbox",
+      "position": {"left": 11.8, "top": 6.9, "width": 1.0, "height": 0.4},
+      "remark": "页码",
+      "content": [{"paragraph": {"alignment": "right", "runs": [{"text": "01", "font": {"size": 14, "color": "{{text_secondary}}"}}]}}]
+    }
+  ]
+}

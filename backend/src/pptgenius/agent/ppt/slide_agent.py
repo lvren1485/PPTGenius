@@ -30,10 +30,15 @@ async def run_slide_agent(
     style: dict | None,
     template: dict | None,
     query: str | None = None,
+    *,
+    existing_outputs: dict | None = None,
 ) -> dict:
     """Generate one slide. Returns {slide_index, elements, notes, background}.
 
     Pure memory — no DB access.  Each element gets an auto-generated hex id.
+
+    If existing_outputs is provided (modify mode), the agent can see what
+    elements already exist and decide what to keep/change/delete.
     """
 
     slide_index = slide.get("slide_index", 0)
@@ -133,7 +138,8 @@ async def run_slide_agent(
     push_agent(conversation_id, agent_id)
 
     system_prompt = build_system_prompt()
-    user_prompt = build_user_prompt(slide, style, template, query)
+    user_prompt = build_user_prompt(slide, style, template, query,
+                                    existing_outputs=existing_outputs)
 
     agent = create_agent(
         model=llm, tools=tools,
@@ -149,7 +155,7 @@ async def run_slide_agent(
 
     result = await agent.ainvoke(
         {"messages": [HumanMessage(content=user_prompt)]},
-        config={"recursion_limit": 50},
+        config={"recursion_limit": 100},
     )
 
     # ── retry if no elements submitted ────────────────────────────────
