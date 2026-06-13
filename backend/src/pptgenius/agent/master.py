@@ -32,12 +32,13 @@ _TOOL_CTYPE: dict[str, str] = {
     "_modify_outline_section":   "mod_section",
     "_outline_evaluate":         "evaluate",
     "_explore_knowledge":        "explore",
-    "_ppt_style":                "ppt_style",
-    "_slides_content":           "slides_content",
+    "_ppt_style":                 "ppt_style",
+    "_slides_content":            "slides_content",
+    "_modify_slides_content":     "mod_slides",
 }
 
 # Tools that spawn a sub-agent (have their own LLM + TokenCountingMiddleware)
-_SUB_AGENT_TOOLS: set[str] = {"gen_content", "mod_section", "evaluate", "explore", "ppt_style", "slides_content"}
+_SUB_AGENT_TOOLS: set[str] = {"gen_content", "mod_section", "evaluate", "explore", "ppt_style", "slides_content", "mod_slides"}
 
 from .common.model_builder import build_llm
 from .tools.explore_knowledge import make_explore_knowledge
@@ -53,7 +54,7 @@ from .tools.perception import (
     make_switch_outline,
 )
 from .tools.ppt_style import make_ppt_style
-from .tools.slides_content import make_slides_content
+from .tools.slides_content import make_modify_slides_content, make_slides_content
 from .tools.structure import make_modify_outline_structure, make_write_outline_structure
 
 
@@ -79,6 +80,7 @@ def _assemble_tools(db: Database, conversation_id: int) -> list:
         # Presentation content
         make_ppt_style(db, conversation_id),
         make_slides_content(db, conversation_id),
+        make_modify_slides_content(db, conversation_id),
     ]
 
 
@@ -180,6 +182,30 @@ async def run_master_agent(
                         await db.get_sections_by_outline_id(conv.current_outline_id),
                         await db.get_slides_by_outline_id(conv.current_outline_id),
                     ),
+                )
+
+    if presentation_changed:
+        conv = await db.get_conversation(conversation_id)
+        if conv and conv.current_outline_id:
+            pres_list = await db.list_presentations_by_conversation(conversation_id)
+            pres = next(
+                (p for p in pres_list
+                 if p.outline_id == conv.current_outline_id and p.status != "deleted"),
+                None,
+            )
+            if pres:
+                outline = await db.get_outline(conv.current_outline_id)
+                slides = await db.get_slides_by_presentation_id(pres.id)
+                await db.create_snapshot(
+                    presentation_id=pres.id,
+                    user_id=pres.user_id,
+                    conversation_id=conversation_id,
+                    outline_json=_build_outline_snapshot_json(
+                        outline,
+                        await db.get_sections_by_outline_id(conv.current_outline_id),
+                        await db.get_slides_by_outline_id(conv.current_outline_id),
+                    ) if outline else {},
+                    presentation_json=_build_presentation_snapshot_json(pres, slides),
                 )
 
     # Ensure all DB changes are committed before the session closes
@@ -369,5 +395,23 @@ def _build_outline_snapshot_json(outline, sections, slides) -> dict:
                 ],
             }
             for s in sections
+        ],
+    }
+
+
+def _build_presentation_snapshot_json(pres, slides) -> dict:
+    return {
+        "status": pres.status,
+        "style_id": pres.style_id,
+        "slide_count": pres.slide_count,
+        "file_path": pres.file_path,
+        "slides": [
+            {
+                "slide_index": s.slide_index,
+                "layout_name": s.layout_name,
+                "status": s.status,
+                "agent_outputs": s.agent_outputs,
+            }
+            for s in slides
         ],
     }

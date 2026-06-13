@@ -6,6 +6,7 @@ Based on agent_old/ppt/phase1_style.py, adapted to the new build_llm() framework
 from __future__ import annotations
 
 import json
+from functools import lru_cache
 from pathlib import Path
 
 from langchain.agents import create_agent
@@ -22,10 +23,11 @@ from ..common.model_builder import build_llm
 
 _log = get_logger("pptgenius.agent.ppt.style_agent")
 
-_PROMPT_PATH = RESOURCES_DIR / "prompts" / "ppt" / "style_agent_system.txt"
+_PROMPT_PATH = RESOURCES_DIR / "prompts" / "ppt" / "style_agent_system.md"
 _LAYOUTS_DIR = RESOURCES_DIR / "layouts"
 
 
+@lru_cache(maxsize=1)
 def _load_system_prompt() -> str:
     if _PROMPT_PATH.exists():
         return _PROMPT_PATH.read_text(encoding="utf-8")
@@ -205,11 +207,17 @@ async def run_style_agent(
         lt = s.layout_type or "content"
         lt_summary[lt] = lt_summary.get(lt, 0) + 1
 
+    slide_titles = "\n".join(
+        f"  {s.slide_index}. [{s.layout_type or 'content'}] {s.title or '(无标题)'}"
+        for s in sorted(slides, key=lambda x: x.slide_index)
+    )
     user_prompt = (
         f"## 大纲信息\n"
         f"标题: {outline.title if outline else '未命名'}\n"
         f"页数: {len(slides)}\n"
         f"页面类型分布: {json.dumps(lt_summary, ensure_ascii=False)}\n\n"
+        f"## 页面标题列表\n"
+        f"{slide_titles}\n\n"
         f"请按照工作流程选择配色方案和布局模板。"
     )
 

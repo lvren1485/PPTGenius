@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from functools import lru_cache
 from pathlib import Path
 
 from pptgenius.agent.ppt.common.instruction_loader import (
@@ -23,17 +24,19 @@ z_order 参照 (越小越底层):
 """
 
 
-def _load_txt(filename: str) -> str:
+@lru_cache(maxsize=8)
+def _load_prompt(filename: str) -> str:
     path = _PROMPTS_DIR / filename
     if path.exists():
         return path.read_text(encoding="utf-8")
     raise FileNotFoundError(f"Prompt template not found: {path}")
 
 
+@lru_cache(maxsize=1)
 def build_system_prompt() -> str:
     """Build the slide agent system prompt ~8k tokens."""
     instruction_ctx = get_full_instruction_context()
-    template = _load_txt("super_freedom_system.txt")
+    template = _load_prompt("content_agent_system.md")
 
     return template.format(
         howto=get_how_to_read(),
@@ -71,7 +74,7 @@ def build_user_prompt(
     visual_note = content_json.get("visual_note", "")
     fmt = content_json.get("recommended_ppt_format", "bullet_list")
 
-    detailed_block = f"详细内容: {detailed[:2000]}" if detailed else ""
+    detailed_block = f"详细内容: {detailed}" if detailed else ""
     key_data_block = f"关键数据: {key_data}" if key_data else ""
     visual_note_block = f"可视化建议: {visual_note}" if visual_note else ""
 
@@ -79,7 +82,7 @@ def build_user_prompt(
     template_section = _build_template_section(template) if template else ""
     query_section = f"## 修改指令\n{query}" if query else ""
 
-    template_text = _load_txt("super_freedom_user.txt")
+    template_text = _load_prompt("content_agent_user.md")
     return template_text.format(
         slide_title=slide.get("title", ""),
         slide_layout_type=slide.get("layout_type", "content"),

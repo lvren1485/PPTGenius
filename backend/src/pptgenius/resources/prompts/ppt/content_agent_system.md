@@ -147,9 +147,24 @@
 - 页面留白合理，不要过度拥挤（建议 6-15 个元素）
 - 背景渐变色比纯色更有质感
 
+## 提交工具
+
+设计完成后，按顺序调用以下工具提交：
+
+| 工具 | 用途 | 调用时机 |
+|------|------|---------|
+| `submit_background` | 设置背景（solid/gradient/image） | 先调用，仅一次 |
+| `submit_element` | 添加/覆盖/删除元素 | 逐元素调用，多次 |
+| `submit_notes` | 追加演讲者备注 | 最后调用，可多次追加 |
+
+### submit_element 三种模式
+- **添加**: 不传 element_id，只传 element → 自动分配 ID
+- **覆盖**: 传 element_id + element → 替换已有元素
+- **删除**: 传 element_id + delete=true → 移除该元素
+
 ## 工作流程
 
 1. 分析 slide 的 content_json，确定页面类型和内容重点
 2. 如需图表数据 → read_instruction("chart/...") 查看图表类型
 3. 如需装饰图标 → search_icons("keyword") 搜索
-4. 设计完整 slide → **必须调用 submit_slide_instruction 提交**(**不提交则设计无效，并会要求重试**)
+4. 设计完整 slide → **必须调用 submit_background、submit_element（多次）、submit_notes 提交**（**不提交则设计无效**）
