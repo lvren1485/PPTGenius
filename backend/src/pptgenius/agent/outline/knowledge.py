@@ -14,7 +14,6 @@ from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_agent
-from ..common.message_utils import prepare_retry_messages
 from ..common.model_builder import build_llm
 from .knowledge_tools import make_read_file
 
@@ -123,11 +122,19 @@ async def run_knowledge_agent(
     # ── retry if no useful output ──
     if not final_text and not notes:
         _log.warning("knowledge agent no output conv=%d — retrying", conversation_id)
+        chain = list(result["messages"])
+        for i in range(len(chain) - 1, -1, -1):
+            if isinstance(chain[i], AIMessage):
+                if not chain[i].content or not str(chain[i].content).strip():
+                    chain[i] = AIMessage(
+                        content="（已读取文件，但未输出结构建议）",
+                        tool_calls=chain[i].tool_calls,
+                    )
+                break
         retry_prompt = user_prompt + "\n\n**重要：读完所有文件后必须直接在最后一条消息中输出大纲结构建议，不要再调用工具。**"
-        clean = prepare_retry_messages(result["messages"])
         try:
             result2 = await agent.ainvoke(
-                {"messages": clean + [HumanMessage(content=retry_prompt)]},
+                {"messages": chain + [HumanMessage(content=retry_prompt)]},
                 config={"recursion_limit": 30},
             )
             final_text = ""

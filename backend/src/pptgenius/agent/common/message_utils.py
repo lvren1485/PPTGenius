@@ -37,11 +37,18 @@ def _sanitize_str(text: str) -> str:
 
 
 def _sanitize_message(msg):
-    """Sanitize string content of any message type."""
+    """Sanitize string content of any message type. Preserves tool_calls, id, etc."""
     if hasattr(msg, "content") and isinstance(msg.content, str):
         cleaned = _sanitize_str(msg.content)
         if isinstance(msg, AIMessage):
-            return AIMessage(content=cleaned)
+            extra: dict = {}
+            if msg.tool_calls:
+                extra["tool_calls"] = msg.tool_calls
+            if msg.additional_kwargs:
+                extra["additional_kwargs"] = msg.additional_kwargs
+            if msg.id:
+                extra["id"] = msg.id
+            return AIMessage(content=cleaned, **extra)
         elif isinstance(msg, HumanMessage):
             return HumanMessage(content=cleaned)
         elif isinstance(msg, SystemMessage):

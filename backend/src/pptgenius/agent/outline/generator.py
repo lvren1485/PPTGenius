@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 from langchain.agents import create_agent
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
 from langgraph.config import get_stream_writer
 
@@ -13,7 +13,6 @@ from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_agent
-from ..common.message_utils import prepare_retry_messages
 from ..common.model_builder import build_llm
 from .knowledge_tools import (
     make_fetch_web,
@@ -139,10 +138,10 @@ async def run_outline_generator(
 
     write_tool, was_called = _make_write_slides(db, outline_id, section_id)
     tools = [
+        write_tool,
         make_search_knowledge(db, user_id, conversation_id, rag_mode, kb_count),
         make_search_web(web_count),
         make_fetch_web(db, user_id, conversation_id, fetch_count),
-        write_tool,
     ]
 
     system_prompt = build_generator_system_prompt()
@@ -178,12 +177,36 @@ async def run_outline_generator(
 
     if not was_called[0]:
         _log.warning("write_slides not called section=%d — retrying", section_id)
-        retry_msg = HumanMessage(content="请立即调用 write_slides 工具写入内容。不要再搜索或分析，直接写入。")
-        clean = prepare_retry_messages(result["messages"])
+        # Collect ALL tool results into one string, discard all AIMessages/thinking
+        tool_texts: list[str] = []
+        for m in result.get("messages", []):
+            if isinstance(m, ToolMessage) and m.content:
+                name = getattr(m, "name", "tool")
+                tool_texts.append(f"### [{name}]\n{str(m.content)}")
+        gathered = "\n\n---\n\n".join(tool_texts) if tool_texts else "（无知识搜索结果）"
+
+        # Build fresh user prompt + retry instruction
+        retry_user = await build_generator_user_prompt(
+            db=db, outline_id=outline_id, section_id=section_id,
+            query=query, knowledge_mode=knowledge_mode,
+            user_id=user_id, conversation_id=conversation_id,
+        )
+        retry_content = f"{retry_user}\n\n## 已收集的知识\n{gathered}\n\n---\n⚠️ 以上知识已足够。请**立即**调用 write_slides 写入内容。"
+
+        # New agent with only write_slides — no search tools
+        retry_agent = create_agent(
+            model=llm, tools=[write_tool],
+            system_prompt=system_prompt,
+            middleware=[mw],
+        )
+        retry_messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=retry_content),
+        ]
         try:
-            await agent.ainvoke(
-                {"messages": clean + [retry_msg]},
-                config={"recursion_limit": 50},
+            await retry_agent.ainvoke(
+                {"messages": retry_messages},
+                config={"recursion_limit": 15},
             )
         except Exception:
             _log.warning("generator retry failed section=%d — giving up", section_id)

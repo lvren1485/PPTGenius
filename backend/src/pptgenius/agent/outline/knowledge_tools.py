@@ -16,7 +16,7 @@ _FETCH_LIMIT = 4
 _READ_LIMIT = 3
 
 # Suffix appended to every tool result to nudge the model toward write_slides
-_WRITE_HINT = "\n\n💡 如果已收集到足够信息，请立即调用 write_slides 写入内容。"
+_WRITE_HINT = "\n\n 如果已收集到足够信息，请立即调用 write_slides 工具写入内容。禁止直接输出"
 
 
 async def _build_chunk_map(
@@ -55,7 +55,7 @@ def make_search_knowledge(
         Each result includes a chunk_id for citation.
         """
         if count[0] >= _KB_SEARCH_LIMIT:
-            return f"搜索已达上限 ({_KB_SEARCH_LIMIT}次)。请立即调用 write_slides 写入内容。"
+            return f"搜索已达上限 ({_KB_SEARCH_LIMIT}次)。请立即调用 write_slides 工具写入内容。禁止直接输出。"
         count[0] += 1
 
         await _ensure_map()
@@ -92,7 +92,7 @@ def make_search_web(count: list[int]):
         Max 6 calls per round.
         """
         if count[0] >= _WEB_SEARCH_LIMIT:
-            return f"搜索已达上限 ({_WEB_SEARCH_LIMIT}次)。请立即调用 write_slides 写入内容。"
+            return f"搜索已达上限 ({_WEB_SEARCH_LIMIT}次)。请立即调用 write_slides 工具写入内容。禁止直接输出。"
         count[0] += 1
 
         results = await _web_search.search(query, max_results)
@@ -114,7 +114,7 @@ def make_fetch_web(db: Database, user_id: int, conv_id: int, count: list[int]):
         Use after search_web to read a promising result. Max 4 fetches per round.
         """
         if count[0] >= _FETCH_LIMIT:
-            return f"抓取已达上限 ({_FETCH_LIMIT}次)。请立即调用 write_slides 写入内容。"
+            return f"抓取已达上限 ({_FETCH_LIMIT}次)。请立即调用 write_slides 写入内容。禁止直接输出。"
         count[0] += 1
         result = await _web_search.fetch_and_ingest(db, url, user_id, conv_id)
         if result.get("ingested"):
@@ -129,7 +129,7 @@ def make_read_file(db: Database, count: list[int], fetched_ids: set[int]):
     async def read_file(file_id: int) -> str:
         """Read full content of a knowledge file. Max 3 per round."""
         if count[0] >= _READ_LIMIT:
-            return f"读取已达上限 ({_READ_LIMIT}次)。请立即调用 write_slides 写入内容。"
+            return f"读取已达上限 ({_READ_LIMIT}次)。请立即调用 write_slides 工具写入内容。禁止直接输出。"
         if file_id in fetched_ids:
             return f"already fetched (file_id={file_id})"
         count[0] += 1
