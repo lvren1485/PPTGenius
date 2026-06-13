@@ -124,8 +124,8 @@ async def run_master_agent(
     _log.debug("loaded %d context messages for conv=%d", len(context) - 1, conversation_id)
     try:
         result = await agent.ainvoke(state, config={"recursion_limit": recursion_limit})
-    except Exception as e:
-        _log.warning("master agent crashed conv=%d error=%s", conversation_id, e, exc_info=True)
+    except BaseException as e:
+        _log.warning("master agent crashed conv=%d error=%s type=%s", conversation_id, e, type(e).__name__, exc_info=True)
         result = {"messages": context}
     writer({"type": "master_done"})
     _log.info("master agent done conv=%d agent=%s", conversation_id, agent_id)

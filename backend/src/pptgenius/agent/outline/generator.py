@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 from langchain.agents import create_agent
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
 from langgraph.config import get_stream_writer
 
@@ -33,78 +33,89 @@ def _get_writer():
         return lambda _: None
 
 
-# ── write tool (overwrite only, no create/delete) ─────────────────────────────
+# ── write tools (single-slide) ──────────────────────────────────────────────────
 
 
-def _make_write_slides(db: Database, outline_id: int, section_id: int):
-    _called: list[bool] = [False]
+def _make_write_tools(db: Database, outline_id: int, section_id: int):
+    _written: set[int] = set()
 
     @tool
-    async def write_slides(
-        slides: list[dict],
+    async def write_slide(
+        slide_index: int,
+        title: str,
+        content_json: dict,
+        has_image: bool = False,
+        has_chart: bool = False,
+        notes: str = "",
         citations: list[dict] | None = None,
     ) -> str:
-        """Overwrite content for existing section slides. MUST be called last.
-
-        Only fills content_json / has_image / has_chart / notes on pre-created
-        slides. Does NOT create or delete slides. Target slides by slide_index.
+        """Write content for ONE slide. Call once per slide.
 
         Parameters
         ----------
-        slides : list[dict] — [{slide_index, title, content_json, has_image, has_chart, notes}, ...]. title is REQUIRED.
-        citations : list[dict] | None — [{chunk_id, reason}, ...], cite knowledge sources used.
+        slide_index : int — the slide's index number.
+        title : str — clean, specific title for this slide.
+        content_json : dict — {main_points: [...], detailed_content: "...", key_data: "...", visual_note: "...", recommended_ppt_format: "..."}
+        has_image : bool — whether the slide needs an image.
+        has_chart : bool — whether the slide needs a chart.
+        notes : str — speaker notes (optional).
+        citations : list[dict] | None — [{chunk_id, reason}, ...] for knowledge sources used.
         """
         existing = await db.get_slides_by_outline_id(outline_id)
-        sec_slides = sorted(
-            [s for s in existing if s.section_id == section_id],
-            key=lambda s: s.slide_index,
-        )
-        index_map = {s.slide_index: s for s in sec_slides}
+        sec = sorted([s for s in existing if s.section_id == section_id], key=lambda s: s.slide_index)
+        index_map = {s.slide_index: s for s in sec}
 
-        # Resolve chunk_id → file_id for citations
-        resolved_citations: list[dict] | None = None
+        target = index_map.get(slide_index)
+        if target is None:
+            return f"错误: slide_index={slide_index} 不在当前章节"
+
+        resolved: list[dict] | None = None
         if citations:
-            resolved_citations = []
+            resolved = []
             for c in citations:
                 cid = c.get("chunk_id")
                 if cid is None:
                     continue
                 chunk = await db.get_chunk_by_id(cid)
                 fid = chunk.file_id if chunk else None
-                resolved_citations.append({
-                    "chunk_id": cid,
-                    "knowledge_file_id": fid,
-                    "reason": c.get("reason", ""),
-                })
+                resolved.append({"chunk_id": cid, "knowledge_file_id": fid, "reason": c.get("reason", "")})
 
-        updated = 0
-        for sl in slides:
-            si = sl.get("slide_index")
-            target = index_map.get(si)
-            if target is None:
+        await db.update_outline_slide(target.id,
+            title=title, content_json=content_json,
+            has_image=has_image, has_chart=has_chart, notes=notes,
+            status="completed",
+        )
+        if resolved:
+            await db.update_outline_slide_citations(target.id, resolved)
+
+        _written.add(slide_index)
+        remaining = [s.slide_index for s in sec if s.slide_index not in _written]
+        return json.dumps({"written": slide_index, "ok": True, "remaining": remaining}, ensure_ascii=False)
+
+    @tool
+    async def pending_slides() -> str:
+        """List section slides that still need content. No args. Call to see what's left."""
+        slides = await db.get_slides_by_outline_id(outline_id)
+        sec = sorted([s for s in slides if s.section_id == section_id], key=lambda s: s.slide_index)
+        pending = []
+        for s in sec:
+            if s.slide_index in _written:
                 continue
-            updates: dict = {"status": "completed"}
-            if "title" in sl:
-                updates["title"] = sl["title"]
-            if "content_json" in sl:
-                updates["content_json"] = sl["content_json"]
-            if "has_image" in sl:
-                updates["has_image"] = sl["has_image"]
-            if "has_chart" in sl:
-                updates["has_chart"] = sl["has_chart"]
-            if "notes" in sl:
-                updates["notes"] = sl["notes"]
-            await db.update_outline_slide(target.id, **updates)
-            if resolved_citations:
-                await db.update_outline_slide_citations(target.id, resolved_citations)
-            updated += 1
+            cj = s.content_json
+            if isinstance(cj, dict):
+                has_content = bool(cj.get("main_points")) or bool(cj.get("detailed_content"))
+            else:
+                has_content = False
+            if s.status == "completed" or has_content:
+                _written.add(s.slide_index)
+                continue
+            pending.append({"slide_index": s.slide_index, "title": s.title or "", "layout_type": s.layout_type or "content"})
+        if not pending:
+            return "所有幻灯片已写入。可以结束了。"
+        items = "\n".join(f"  - slide_index={p['slide_index']}: {p['title']} ({p['layout_type']})" for p in pending)
+        return f"待写入 ({len(pending)}页):\n{items}"
 
-        _called[0] = True
-        return json.dumps({"section_id": section_id, "updated": updated,
-                           "citations": len(resolved_citations) if resolved_citations else 0,
-                           "status": "ok"})
-
-    return write_slides, _called
+    return write_slide, pending_slides, _written
 
 
 # ── main entry ────────────────────────────────────────────────────────────────
@@ -136,9 +147,10 @@ async def run_outline_generator(
     web_count = [0]
     fetch_count = [0]
 
-    write_tool, was_called = _make_write_slides(db, outline_id, section_id)
-    tools = [
-        write_tool,
+    write_slide, pending_slides, _written = _make_write_tools(db, outline_id, section_id)
+    full_tools = [
+        write_slide,
+        pending_slides,
         make_search_knowledge(db, user_id, conversation_id, rag_mode, kb_count),
         make_search_web(web_count),
         make_fetch_web(db, user_id, conversation_id, fetch_count),
@@ -146,19 +158,15 @@ async def run_outline_generator(
 
     system_prompt = build_generator_system_prompt()
     user_prompt = await build_generator_user_prompt(
-        db=db,
-        outline_id=outline_id,
-        section_id=section_id,
-        query=query,
-        knowledge_mode=knowledge_mode,
-        user_id=user_id,
-        conversation_id=conversation_id,
+        db=db, outline_id=outline_id, section_id=section_id,
+        query=query, knowledge_mode=knowledge_mode,
+        user_id=user_id, conversation_id=conversation_id,
     )
 
     llm, agent_id, mw = build_llm(conversation_id)
     push_agent(conversation_id, agent_id)
     agent = create_agent(
-        model=llm, tools=tools,
+        model=llm, tools=full_tools,
         system_prompt=system_prompt,
         middleware=[mw],
     )
@@ -172,12 +180,18 @@ async def run_outline_generator(
             config={"recursion_limit": 80},
         )
     except Exception:
-        _log.warning("generator failed section=%d — retrying with clean state", section_id)
+        _log.warning("generator crashed section=%d — retrying", section_id)
         result = {"messages": [HumanMessage(content=user_prompt)]}
 
-    if not was_called[0]:
-        _log.warning("write_slides not called section=%d — retrying", section_id)
-        # Collect ALL tool results into one string, discard all AIMessages/thinking
+    total_slides = len(await db.get_slides_by_outline_id(outline_id))
+    sec_slides = sum(1 for s in (await db.get_slides_by_outline_id(outline_id)) if s.section_id == section_id)
+    _log.info("generator section=%d written=%d/%d kb=%d web=%d fetch=%d",
+              section_id, len(_written), sec_slides, kb_count[0], web_count[0], fetch_count[0])
+
+    if len(_written) < sec_slides:
+        _log.warning("generator retry section=%d (%d/%d written)", section_id, len(_written), sec_slides)
+
+        # Collect all tool results into one string
         tool_texts: list[str] = []
         for m in result.get("messages", []):
             if isinstance(m, ToolMessage) and m.content:
@@ -185,35 +199,38 @@ async def run_outline_generator(
                 tool_texts.append(f"### [{name}]\n{str(m.content)}")
         gathered = "\n\n---\n\n".join(tool_texts) if tool_texts else "（无知识搜索结果）"
 
-        # Build fresh user prompt + retry instruction
         retry_user = await build_generator_user_prompt(
             db=db, outline_id=outline_id, section_id=section_id,
             query=query, knowledge_mode=knowledge_mode,
             user_id=user_id, conversation_id=conversation_id,
         )
-        retry_content = f"{retry_user}\n\n## 已收集的知识\n{gathered}\n\n---\n⚠️ 以上知识已足够。请**立即**调用 write_slides 写入内容。"
+        pending = await pending_slides.ainvoke({})
+        retry_content = (
+            f"{retry_user}\n\n"
+            f"## 已收集的知识\n{gathered}\n\n"
+            f"## 当前进度\n{pending}\n\n"
+            f"---\n"
+            f"⚠️ 请逐个调用 write_slide 完成所有待写入的幻灯片。用 pending_slides 查看进度。"
+        )
 
-        # New agent with only write_slides — no search tools
+        # New agent: only write_slide + pending_slides
         retry_agent = create_agent(
-            model=llm, tools=[write_tool],
+            model=llm, tools=[write_slide, pending_slides],
             system_prompt=system_prompt,
             middleware=[mw],
         )
-        retry_messages = [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=retry_content),
-        ]
         try:
             await retry_agent.ainvoke(
-                {"messages": retry_messages},
-                config={"recursion_limit": 15},
+                {"messages": [SystemMessage(content=system_prompt), HumanMessage(content=retry_content)]},
+                config={"recursion_limit": 30},
             )
-        except Exception:
-            _log.warning("generator retry failed section=%d — giving up", section_id)
+            _log.info("generator retry done section=%d written=%d/%d", section_id, len(_written), sec_slides)
+        except Exception as e:
+            _log.warning("generator retry failed section=%d error=%s", section_id, e)
 
-    if not was_called[0]:
-        _log.error("generator could not write slides section=%d", section_id)
-        return f"错误: 章节'{section_title}'填充失败"
+    if len(_written) < sec_slides:
+        _log.error("generator section=%d only %d/%d written", section_id, len(_written), sec_slides)
+        return f"错误: 章节'{section_title}'仅完成 {len(_written)}/{sec_slides} 页"
 
     writer({"type": "outline_generator_end", "section": section_title})
-    return f"章节'{section_title}'填充完成"
+    return f"章节'{section_title}'填充完成 ({len(_written)}页)"
