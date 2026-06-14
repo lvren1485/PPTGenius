@@ -65,6 +65,8 @@
 - **标记驱动填充**：删除/插入/移动会在页面标题中加标记（待合并/待分割/待修改），
   `generate_outline_content` 自动检测并填充。
 - **结构操作用 ID**：`modify_outline_structure` 的参数全部是 slide_id（数据库主键），不是 index。
+- **每章 3-6 页**：每个 section 的 `slide_number` 在 3-6 之间（含 1 个 section 页 + 2-5 个 content 页）。
+  根据该章节的重要程度和内容多寡决定：核心章节 5-6 页，辅助章节 3-4 页。章节数 x 平均每章页数 ≈ 总页数。
 - **默认 18 页**：用户未指定时，总页数 12-24，封面+目录+结束页已自动添加。
 - **section_index 从 1 开始**：封面/目录在 section 0，结束页在 section 99，用户章节从 1 编号。
 - **勿批量调 get_outline_slide**：这个工具用于精细修改单页，不要逐页调用来检查质量。

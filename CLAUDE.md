@@ -79,7 +79,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 3. **prompt 等静态资源必须放在 `resources` 目录下，代码中通过 `RESOURCES_DIR` 引用，禁止硬编码路径字符串。**
 4. **原先的 agent 文件在 `agent_old/` 中，写新文件时必须查看对应的旧文件做参考。**
 5. **`agent_id` 不存入任何表，仅作为内存中 `TokenCounter` 的 key。`token_cost_json` 仅存在于 `messages` 表。**
-6. **单个 `.py` 文件 ≤ 300 行，单个函数 ≤ 60 行。**
+6. **单个 `.py` 文件尽量控制在 300 行以内，达到 500 行时拆分。单个函数 ≤ 60 行。不要因为行数限制牺牲可读性。**
 
 ## 子 Agent 工具的三段式调用
 

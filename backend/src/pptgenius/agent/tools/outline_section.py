@@ -18,6 +18,84 @@ from ..outline.generator import run_outline_generator
 _log = get_logger("pptgenius.agent.tools.outline_section")
 
 
+async def _finalize_special_slides(db: Database, outline_id: int) -> None:
+    """Write hierarchical markdown to title, TOC, and thanks slides."""
+    sections = await db.get_sections_by_outline_id(outline_id)
+    slides = await db.get_slides_by_outline_id(outline_id)
+    outline = await db.get_outline(outline_id)
+
+    # Build hierarchical markdown
+    md_lines = [f"# {outline.title if outline else ''}", ""]
+    for s in sorted(sections, key=lambda x: x.section_index):
+        sec_slides = sorted(
+            [sl for sl in slides if sl.section_id == s.id],
+            key=lambda x: x.slide_index,
+        )
+        md_lines.append(f"## {s.section_index}. {s.title}")
+        for sl in sec_slides:
+            t = sl.title or "(无标题)"
+            lt = sl.layout_type or "content"
+            md_lines.append(f"  - [{lt}] {t}")
+        md_lines.append("")
+    full_md = "\n".join(md_lines)
+
+    # Generate TOC: just the hierarchical list
+    toc_lines = [f"# 目录", ""]
+    for s in sorted(sections, key=lambda x: x.section_index):
+        sec_slides = sorted(
+            [sl for sl in slides if sl.section_id == s.id],
+            key=lambda x: x.slide_index,
+        )
+        toc_lines.append(f"## {s.section_index}. {s.title}")
+        for sl in sec_slides:
+            t = sl.title or "(无标题)"
+            toc_lines.append(f"  - {t}")
+        toc_lines.append("")
+    toc_md = "\n".join(toc_lines)
+
+    # Write to special slides by layout_type
+    for sl in slides:
+        lt = sl.layout_type or ""
+        if lt == "title":
+            await db.update_outline_slide(sl.id,
+                content_json={
+                    "main_points": [outline.title if outline else ""],
+                    "detailed_content": full_md,
+                    "key_data": "",
+                    "visual_note": "封面页 — 标题大字鲜明，副标题说明演讲主题，可加演讲者信息、时间地点等",
+                    "recommended_ppt_format": "title_slide",
+                },
+                status="completed",
+            )
+        elif lt == "content" and sl.slide_index == 0:
+            # TOC slide: slide_index=0, layout_type=content, title contains "目录"
+            t = sl.title or ""
+            if "目录" in t or "目錄" in t or "TOC" in t.upper():
+                await db.update_outline_slide(sl.id,
+                    content_json={
+                        "main_points": [f"{len(sections)} 个章节, {len(slides)} 页"],
+                        "detailed_content": toc_md,
+                        "key_data": "",
+                        "visual_note": "目录页 — 形状、列表展示章节，各个章节可以添加副标题或关键词说明内容，突出层级关系",
+                        "recommended_ppt_format": "bullet_list",
+                    },
+                    status="completed",
+                )
+        elif lt == "thanks":
+            await db.update_outline_slide(sl.id,
+                content_json={
+                    "main_points": ["感谢观看"],
+                    "detailed_content": full_md,
+                    "key_data": "",
+                    "visual_note": "结尾页 — 简洁致谢，可加联系方式或二维码",
+                    "recommended_ppt_format": "title_slide",
+                },
+                status="completed",
+            )
+
+    _log.debug("special slides finalized for outline=%d", outline_id)
+
+
 def make_generate_outline_content(db: Database, conversation_id: int) -> Callable:
     """Batch tool: generate content for ALL sections concurrently."""
 
@@ -57,6 +135,9 @@ def make_generate_outline_content(db: Database, conversation_id: int) -> Callabl
                 await sm.close(gdb)
 
         await asyncio.gather(*[_run_one(sec) for sec in sections])
+
+        # Write hierarchical markdown to title / TOC / thanks slides
+        await _finalize_special_slides(db, outline_id)
 
         await db.update_outline_status(outline_id, "completed")
         await db.increase_outline_version(conv.current_outline_id, "major")
