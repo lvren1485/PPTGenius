@@ -68,7 +68,8 @@ async def chat_send(
                 "token_usage": token_snapshot,
             })
         except Exception as exc:
-            _log.exception("agent error")
+            _log.warning("agent error conv=%d: %s", req.conversation_id, exc)
+            _log.debug("agent error detail", exc_info=True)
             yield _sse("error", {"code": 40200, "message": str(exc), "retryable": True})
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")

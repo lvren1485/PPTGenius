@@ -341,8 +341,6 @@ async def _persist_tool_messages(
                         token_cost_json=summed,
                         estimated_cost=total_cost,
                     )
-                    _log.debug("persisted tokens for tool=%s agents=%d msg=%d cost=%.4f",
-                               ctype, len(agent_ids), msg.id, total_cost)
 
 
 def _has_outline_changed(state: dict) -> bool:

@@ -181,6 +181,7 @@ async def run_outline_evaluator(
         )
     except Exception:
         _log.warning("evaluator failed outline=%d — retrying", outline_id)
+        _log.debug("evaluator crash detail", exc_info=True)
         result = {"messages": [HumanMessage(content=user_prompt)]}
 
     writer({"type": "outline_evaluator_end"})

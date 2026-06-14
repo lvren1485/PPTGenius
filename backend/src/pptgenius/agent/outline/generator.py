@@ -181,6 +181,7 @@ async def run_outline_generator(
         )
     except Exception:
         _log.warning("generator crashed section=%d — retrying", section_id)
+        _log.debug("generator crash detail", exc_info=True)
         result = {"messages": [HumanMessage(content=user_prompt)]}
 
     total_slides = len(await db.get_slides_by_outline_id(outline_id))
@@ -225,8 +226,9 @@ async def run_outline_generator(
                 config={"recursion_limit": 30},
             )
             _log.info("generator retry done section=%d written=%d/%d", section_id, len(_written), sec_slides)
-        except Exception as e:
-            _log.warning("generator retry failed section=%d error=%s", section_id, e)
+        except Exception:
+            _log.warning("generator retry failed section=%d", section_id)
+            _log.debug("generator retry detail", exc_info=True)
 
     if len(_written) < sec_slides:
         _log.error("generator section=%d only %d/%d written", section_id, len(_written), sec_slides)

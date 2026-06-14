@@ -108,6 +108,7 @@ async def run_knowledge_agent(
         )
     except Exception:
         _log.warning("knowledge agent failed conv=%d — retrying", conversation_id)
+        _log.debug("knowledge agent crash detail", exc_info=True)
         result = {"messages": [HumanMessage(content=user_prompt)]}
 
     writer({"type": "knowledge_agent_end"})
@@ -144,6 +145,7 @@ async def run_knowledge_agent(
                     break
         except Exception:
             _log.warning("knowledge agent retry failed conv=%d", conversation_id)
+            _log.debug("knowledge agent retry detail", exc_info=True)
 
     if not final_text and not notes:
         return {"error": "知识探索未产生有效结果", "status": "error"}

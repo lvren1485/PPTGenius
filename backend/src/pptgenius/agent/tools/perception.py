@@ -278,7 +278,7 @@ def make_search_styles(db: Database, conversation_id: int) -> Callable:
             for s in styles
         ]
 
-    return tool(_list_styles)
+    return tool(_search_styles)
 
 
 def _slide_summary(sl) -> str:
