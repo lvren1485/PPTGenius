@@ -205,7 +205,7 @@ async def run_style_agent(
         f"{slide_titles}\n\n"
         f"## 背景指令参考\n"
         f"```json\n{bg_inst}\n```\n\n"
-        f"**注意: 目前系统未接入 image 图片功能，创建样式时 background.type 只能选 solid 或 gradient，不要选 image。**\n\n"
+        f"**注意: 目前系统未接入 image 图片功能，创建样式时 background.type 只能选 solid 或 gradient。**\n\n"
         f"请按照工作流程搜索样式、选择或创建并提交。"
     )
 
@@ -223,7 +223,7 @@ async def run_style_agent(
 
     result = await agent.ainvoke(
         {"messages": [HumanMessage(content=user_prompt)]},
-        config={"recursion_limit": 50},
+        config={"recursion_limit": 30},
     )
 
     # Retry if set_presentation_style wasn't called
@@ -232,13 +232,13 @@ async def run_style_agent(
         retry_agent = create_agent(
             model=llm,
             tools=[tool(_set_presentation_style)],
-            system_prompt="你必须立即调用 set_presentation_style 提交风格选择。直接选择最合适的样式并提交。",
+            system_prompt="你必须立即调用 _set_presentation_style 提交风格选择。直接选择最合适的样式并提交。",
             middleware=[mw],
         )
         await retry_agent.ainvoke(
             {"messages": [
                 HumanMessage(content=user_prompt),
-                HumanMessage(content="请立即调用 set_presentation_style 提交。不要再浏览或搜索。"),
+                HumanMessage(content="请立即调用 _set_presentation_style 提交。不要再浏览或搜索。"),
             ]},
             config={"recursion_limit": 10},
         )
