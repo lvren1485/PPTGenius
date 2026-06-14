@@ -92,7 +92,7 @@ async def run_style_agent(
         """Get full details of a style by ID.
 
         Args:
-            style_id: The style ID from list_styles.
+            style_id: The style ID from search_styles.
         """
         s = await db.get_style(style_id)
         if s is None:

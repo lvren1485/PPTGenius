@@ -95,7 +95,10 @@ def make_search_web(count: list[int]):
             return f"搜索已达上限 ({_WEB_SEARCH_LIMIT}次)。请立即调用 write_slides 工具写入内容。禁止直接输出。"
         count[0] += 1
 
-        results = await _web_search.search(query, max_results)
+        try:
+            results = await _web_search.search(query, max_results)
+        except Exception as e:
+            return f"网络搜索失败: {e}。可尝试换关键词或直接使用知识库内容。" + _WRITE_HINT
         if not results:
             return "未找到相关网络结果。" + _WRITE_HINT
         items = []
@@ -116,7 +119,10 @@ def make_fetch_web(db: Database, user_id: int, conv_id: int, count: list[int]):
         if count[0] >= _FETCH_LIMIT:
             return f"抓取已达上限 ({_FETCH_LIMIT}次)。请立即调用 write_slides 写入内容。禁止直接输出。"
         count[0] += 1
-        result = await _web_search.fetch_and_ingest(db, url, user_id, conv_id)
+        try:
+            result = await _web_search.fetch_and_ingest(db, url, user_id, conv_id)
+        except Exception as e:
+            return f"网页抓取失败: {e}。请尝试其他搜索结果。" + _WRITE_HINT
         if result.get("ingested"):
             return f"已抓取: {result['title']}\n{result['text'][:1000]}\n详细内容已加入知识库。" + _WRITE_HINT
         return f"抓取失败。{result.get('title', 'N/A')}" + _WRITE_HINT

@@ -28,6 +28,18 @@ TOPICS = {
         "turn1": "帮我创建一个关于远程办公的PPT大纲，标题为'远程办公新范式'，3个章节，共12页。涵盖工具平台、团队协作、未来趋势。",
         "turn2": "确认大纲，请为所有章节填充详细内容。",
     },
+    "blockchain": {
+        "turn1": "帮我创建一个关于区块链技术的PPT大纲，标题为'区块链技术原理与应用'，3个章节，共12页。涵盖分布式账本、共识机制、行业应用案例。",
+        "turn2": "大纲看起来不错，请为所有章节填充详细内容。",
+    },
+    "space_exploration": {
+        "turn1": "帮我创建一个关于太空探索的PPT大纲，标题为'人类太空探索史'，3个章节，共12页。涵盖早期探索、登月计划、火星任务与商业航天。",
+        "turn2": "好的，请为所有章节填充详细内容。",
+    },
+    "digital_economy": {
+        "turn1": "帮我创建一个关于数字经济的PPT大纲，标题为'数字经济发展趋势'，3个章节，共12页。涵盖数据要素、平台经济、数字人民币与监管。",
+        "turn2": "确认大纲，请为所有章节填充详细内容。",
+    },
 }
 
 
@@ -85,19 +97,40 @@ async def chat(topic: str, cfg: dict, turn: int, msg: str):
 
 
 async def main():
-    topic = sys.argv[1] if len(sys.argv) > 1 else "ai_education"
-    msgs = TOPICS.get(topic)
-    if not msgs:
-        print(f"Unknown topic: {topic}")
-        return
+    topics = [sys.argv[1]] if len(sys.argv) > 1 else list(TOPICS.keys())
+    results = {}
+    t0_total = time.time()
 
-    print(f"[{topic}] Setting up conversation...")
-    cfg = await setup(topic)
-    print(f"[{topic}] conv={cfg['conversation_id']} user={cfg['user_id']}")
+    for topic in topics:
+        msgs = TOPICS.get(topic)
+        if not msgs:
+            print(f"Unknown topic: {topic}")
+            continue
 
-    await chat(topic, cfg, 1, msgs["turn1"])
-    await chat(topic, cfg, 2, msgs["turn2"])
-    print(f"\n[{topic}] DONE")
+        print(f"\n{'='*60}")
+        print(f"[{topic}] Setting up...")
+        try:
+            cfg = await setup(topic)
+            print(f"[{topic}] conv={cfg['conversation_id']} user={cfg['user_id']}")
+        except Exception as e:
+            print(f"[{topic}] SETUP FAILED: {e}")
+            results[topic] = "SETUP_FAILED"
+            continue
+
+        try:
+            await chat(topic, cfg, 1, msgs["turn1"])
+            await chat(topic, cfg, 2, msgs["turn2"])
+            results[topic] = "OK"
+        except Exception as e:
+            print(f"[{topic}] FAILED: {e}")
+            results[topic] = f"FAILED: {e}"
+
+    elapsed = round(time.time() - t0_total, 1)
+    print(f"\n{'='*60}")
+    print(f"Stability test completed in {elapsed}s")
+    for t, r in results.items():
+        print(f"  {t}: {r}")
+    print(f"Total: {sum(1 for v in results.values() if v == 'OK')}/{len(results)} passed")
 
 
 if __name__ == "__main__":
