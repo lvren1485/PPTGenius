@@ -6,6 +6,9 @@ from langchain_core.tools import tool
 
 from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.rag import KnowledgeService, WebSearchService
+from pptgenius.infrastructure.utils import get_logger
+
+_log = get_logger(__name__)
 
 _web_search = WebSearchService()
 _knowledge = KnowledgeService()
@@ -98,6 +101,7 @@ def make_search_web(count: list[int]):
         try:
             results = await _web_search.search(query, max_results)
         except Exception as e:
+            _log.warning("web search failed: %s", e)
             return f"网络搜索失败: {e}。可尝试换关键词或直接使用知识库内容。" + _WRITE_HINT
         if not results:
             return "未找到相关网络结果。" + _WRITE_HINT
@@ -122,6 +126,7 @@ def make_fetch_web(db: Database, user_id: int, conv_id: int, count: list[int]):
         try:
             result = await _web_search.fetch_and_ingest(db, url, user_id, conv_id)
         except Exception as e:
+            _log.warning("web fetch failed: %s — %s", url, e)
             return f"网页抓取失败: {e}。请尝试其他搜索结果。" + _WRITE_HINT
         if result.get("ingested"):
             return f"已抓取: {result['title']}\n{result['text'][:1000]}\n详细内容已加入知识库。" + _WRITE_HINT

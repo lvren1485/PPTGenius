@@ -151,6 +151,13 @@ async def run_master_agent(
 
     # --- 7. Persist Master's own token cost ---
     tc = TokenCounter.get_agent(agent_id)
+    # Extract reasoning_content from the last AIMessage in the result chain
+    reasoning = ""
+    for m in reversed(messages):
+        if isinstance(m, AIMessage) and m.additional_kwargs.get("reasoning_content"):
+            reasoning = m.additional_kwargs["reasoning_content"]
+            break
+    meta = {"reasoning_content": reasoning} if reasoning else None
     await db.create_message(
         conversation_id=conversation_id,
         role="assistant",
@@ -158,6 +165,7 @@ async def run_master_agent(
         content_type="text",
         estimated_cost=tc.snapshot()["estimated_cost_cny"] if tc else 0.0,
         token_cost_json=tc.to_json() if tc else None,
+        metadata_json=meta,
     )
 
     # --- 8. Snapshot on exit ---
@@ -170,7 +178,7 @@ async def run_master_agent(
     if outline_changed:
         conv = await db.get_conversation(conversation_id)
         if conv and conv.current_outline_id:
-            await db.increase_outline_version(conv.current_outline_id, "patch")
+            await db.increase_outline_version(conv.current_outline_id)
             outline = await db.get_outline(conv.current_outline_id)
             if outline:
                 await db.create_outline_snapshot(
@@ -251,13 +259,18 @@ async def _load_context_messages(
                 "id": tc_id,
                 "type": "tool_call",
             }
+            reasoning = meta.get("reasoning_content", "")
+            if reasoning:
+                pending[tc_id + "_reasoning"] = reasoning
 
         elif r.role == "tool_result":
             meta = r.metadata_json or {}
             tc_id = meta.get("tool_call_id", "") or ""
             tc = pending.pop(tc_id, None)
+            reasoning = pending.pop(tc_id + "_reasoning", "") or ""
             if tc:
-                msgs.append(AIMessage(content="", tool_calls=[tc]))
+                extra = {"reasoning_content": reasoning} if reasoning else {}
+                msgs.append(AIMessage(content="", tool_calls=[tc], additional_kwargs=extra))
                 msgs.append(ToolMessage(
                     content=r.content,
                     tool_call_id=tc_id,
@@ -266,7 +279,10 @@ async def _load_context_messages(
 
         elif r.role == "assistant" and r.content_type == "text":
             pending.clear()
-            msgs.append(AIMessage(content=r.content))
+            meta = r.metadata_json or {}
+            reasoning = meta.get("reasoning_content", "")
+            extra = {"reasoning_content": reasoning} if reasoning else {}
+            msgs.append(AIMessage(content=r.content, additional_kwargs=extra))
 
     return msgs
 
@@ -297,16 +313,20 @@ async def _persist_tool_messages(
                 if tc_id in seen_ids:
                     continue  # already persisted from a previous turn
                 ctype = _TOOL_CTYPE.get(tc.get("name", ""), "tool_call")
+                meta = {
+                    "tool_name": tc.get("name"),
+                    "args": tc.get("args", {}),
+                    "tool_call_id": tc.get("id", ""),
+                }
+                reasoning = m.additional_kwargs.get("reasoning_content", "")
+                if reasoning:
+                    meta["reasoning_content"] = reasoning
                 await db.create_message(
                     conversation_id=conversation_id,
                     role="tool_call",
                     content=tc.get("args", {}).get("query", "") or "",
                     content_type=ctype,
-                    metadata_json={
-                        "tool_name": tc.get("name"),
-                        "args": tc.get("args", {}),
-                        "tool_call_id": tc.get("id", ""),
-                    },
+                    metadata_json=meta,
                 )
 
         elif isinstance(m, ToolMessage):
@@ -369,7 +389,7 @@ def _build_outline_snapshot_json(outline, sections, slides) -> dict:
     return {
         "title": outline.title,
         "status": outline.status,
-        "version": f"{outline.version_major}.{outline.version_minor}.{outline.version_patch}",
+        "version": str(outline.version),
         "slide_count": outline.slide_count,
         "eval_score": outline.eval_score,
         "sections": [
