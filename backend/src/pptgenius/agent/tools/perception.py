@@ -50,7 +50,7 @@ def make_get_conversation_status(
             outlines.append({
                 "id": o.id,
                 "title": o.title,
-                "version": f"{o.version_major}.{o.version_minor}.{o.version_patch}",
+                "version": str(o.version),
                 "section_count": len(sections),
                 "slide_count": o.slide_count,
                 "status": o.status,
@@ -146,7 +146,7 @@ def make_get_outline(db: Database, conversation_id: int) -> Callable:
 
         return {
             "id": outline.id, "title": outline.title,
-            "version": f"{outline.version_major}.{outline.version_minor}.{outline.version_patch}",
+            "version": str(outline.version),
             "status": outline.status, "slide_count": outline.slide_count,
             "sections": sec_data,
         }

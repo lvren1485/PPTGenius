@@ -11,18 +11,31 @@ async def create_presentation(
     user_id: int,
     conversation_id: int,
     outline_id: int | None = None,
+    outline_version: int = 0,
     style_id: int | None = None,
 ) -> Presentation:
     pres = Presentation(
         user_id=user_id,
         conversation_id=conversation_id,
         outline_id=outline_id,
+        outline_version=outline_version,
         style_id=style_id,
     )
     db.add(pres)
     await db.commit()
     await db.refresh(pres)
     return pres
+
+
+async def increment_presentation_version(
+    db: AsyncSession, pres_id: int
+) -> bool:
+    pres = await db.get(Presentation, pres_id)
+    if pres is None or pres.status == "deleted":
+        return False
+    pres.version += 1
+    await db.commit()
+    return True
 
 
 async def get_presentation(db: AsyncSession, pres_id: int) -> Presentation | None:

@@ -10,7 +10,7 @@ async def create_outline(
     db: AsyncSession,
     user_id: int,
     conversation_id: int,
-    title: str,
+    title: str = "",
     slide_count: int | None = None,
 ) -> Outline:
     outline = Outline(
@@ -23,6 +23,17 @@ async def create_outline(
     await db.commit()
     await db.refresh(outline)
     return outline
+
+
+async def set_outline_title(
+    db: AsyncSession, outline_id: int, title: str
+) -> bool:
+    outline = await db.get(Outline, outline_id)
+    if outline is None or outline.status == "deleted":
+        return False
+    outline.title = title
+    await db.commit()
+    return True
 
 
 async def get_outline(db: AsyncSession, outline_id: int) -> Outline | None:
@@ -85,24 +96,34 @@ async def update_outline_eval(
 
 
 async def increase_outline_version(
-    db: AsyncSession,
-    outline_id: int,
-    type: str, # "major", "minor", or "patch"
+    db: AsyncSession, outline_id: int
 ) -> bool:
     outline = await db.get(Outline, outline_id)
     if outline is None or outline.status == "deleted":
         return False
-    if type == "major":
-        outline.version_major += 1
-        outline.version_minor = 0
-        outline.version_patch = 0
-    elif type == "minor":
-        outline.version_minor += 1
-        outline.version_patch = 0
-    elif type == "patch":
-        outline.version_patch += 1
+    outline.version += 1
     await db.commit()
     return True
+
+
+async def set_outline_explore_result(
+    db: AsyncSession, outline_id: int, explore_result: dict
+) -> bool:
+    outline = await db.get(Outline, outline_id)
+    if outline is None or outline.status == "deleted":
+        return False
+    outline.explore_result_json = explore_result
+    await db.commit()
+    return True
+
+
+async def get_outline_explore_result(
+    db: AsyncSession, outline_id: int
+) -> dict | None:
+    outline = await db.get(Outline, outline_id)
+    if outline is None or outline.status == "deleted":
+        return None
+    return outline.explore_result_json
 
 
 async def soft_delete_outline(db: AsyncSession, outline_id: int) -> bool:

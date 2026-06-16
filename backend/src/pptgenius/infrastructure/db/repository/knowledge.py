@@ -117,6 +117,17 @@ async def update_knowledge_file_summary(
     return True
 
 
+async def set_knowledge_file_web_url(
+    db: AsyncSession, file_id: int, web_url: str
+) -> bool:
+    kf = await db.get(KnowledgeFile, file_id)
+    if kf is None:
+        return False
+    kf.web_url = web_url
+    await db.commit()
+    return True
+
+
 async def delete_knowledge_file(db: AsyncSession, file_id: int) -> bool:
     """删除知识文件及其所有 chunks（级联删除）。"""
     kf = await db.get(KnowledgeFile, file_id)

@@ -66,12 +66,15 @@ class Database:
 
     # ─── outline ───
     async def create_outline(self, *a, **kw): return await self._call(out_repo.create_outline, *a, **kw)
+    async def set_outline_title(self, *a, **kw): return await self._call(out_repo.set_outline_title, *a, **kw)
     async def get_outline(self, *a, **kw): return await self._call(out_repo.get_outline, *a, **kw)
     async def list_outlines_by_conversation(self, *a, **kw): return await self._call(out_repo.list_outlines_by_conversation, *a, **kw)
     async def list_outlines_by_user(self, *a, **kw): return await self._call(out_repo.list_outlines_by_user, *a, **kw)
     async def update_outline_status(self, *a, **kw): return await self._call(out_repo.update_outline_status, *a, **kw)
     async def update_outline_eval(self, *a, **kw): return await self._call(out_repo.update_outline_eval, *a, **kw)
     async def increase_outline_version(self, *a, **kw): return await self._call(out_repo.increase_outline_version, *a, **kw)
+    async def set_outline_explore_result(self, *a, **kw): return await self._call(out_repo.set_outline_explore_result, *a, **kw)
+    async def get_outline_explore_result(self, *a, **kw): return await self._call(out_repo.get_outline_explore_result, *a, **kw)
     async def soft_delete_outline(self, *a, **kw): return await self._call(out_repo.soft_delete_outline, *a, **kw)
     # outline_slide
     async def create_outline_slide(self, *a, **kw): return await self._call(out_repo.create_outline_slide, *a, **kw)
@@ -100,6 +103,7 @@ class Database:
     async def update_presentation_status(self, *a, **kw): return await self._call(ppt_repo.update_presentation_status, *a, **kw)
     async def set_presentation_style(self, *a, **kw): return await self._call(ppt_repo.set_presentation_style, *a, **kw)
     async def set_presentation_output(self, *a, **kw): return await self._call(ppt_repo.set_presentation_output, *a, **kw)
+    async def increment_presentation_version(self, *a, **kw): return await self._call(ppt_repo.increment_presentation_version, *a, **kw)
     async def soft_delete_presentation(self, *a, **kw): return await self._call(ppt_repo.soft_delete_presentation, *a, **kw)
     # presentation_slide
     async def create_presentation_slide(self, *a, **kw): return await self._call(ppt_repo.create_presentation_slide, *a, **kw)
@@ -126,6 +130,7 @@ class Database:
     async def list_knowledge_files(self, *a, **kw): return await self._call(kn_repo.list_knowledge_files, *a, **kw)
     async def update_knowledge_file_status(self, *a, **kw): return await self._call(kn_repo.update_knowledge_file_status, *a, **kw)
     async def update_knowledge_file_summary(self, *a, **kw): return await self._call(kn_repo.update_knowledge_file_summary, *a, **kw)
+    async def set_knowledge_file_web_url(self, *a, **kw): return await self._call(kn_repo.set_knowledge_file_web_url, *a, **kw)
     async def delete_knowledge_file(self, *a, **kw): return await self._call(kn_repo.delete_knowledge_file, *a, **kw)
     # chunks
     async def create_chunk(self, *a, **kw): return await self._call(kn_repo.create_chunk, *a, **kw)
