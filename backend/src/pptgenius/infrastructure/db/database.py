@@ -84,6 +84,7 @@ class Database:
     async def update_outline_slide_index(self, *a, **kw): return await self._call(out_repo.update_outline_slide_index, *a, **kw)
     async def update_outline_slide_citations(self, *a, **kw): return await self._call(out_repo.update_outline_slide_citations, *a, **kw)
     async def update_outline_slide_status(self, *a, **kw): return await self._call(out_repo.update_outline_slide_status, *a, **kw)
+    async def soft_delete_outline_slide(self, *a, **kw): return await self._call(out_repo.soft_delete_outline_slide, *a, **kw)
     async def delete_outline_slide(self, *a, **kw): return await self._call(out_repo.delete_outline_slide, *a, **kw)
     async def insert_outline_slide_after(self, *a, **kw): return await self._call(out_repo.insert_outline_slide_after, *a, **kw)
     async def replace_outline_slides(self, *a, **kw): return await self._call(out_repo.replace_outline_slides, *a, **kw)
@@ -116,6 +117,7 @@ class Database:
     async def set_slide_chart_data(self, *a, **kw): return await self._call(ppt_repo.set_slide_chart_data, *a, **kw)
     async def set_slide_table_data(self, *a, **kw): return await self._call(ppt_repo.set_slide_table_data, *a, **kw)
     async def set_slide_image_paths(self, *a, **kw): return await self._call(ppt_repo.set_slide_image_paths, *a, **kw)
+    async def soft_delete_presentation_slide(self, *a, **kw): return await self._call(ppt_repo.soft_delete_presentation_slide, *a, **kw)
     async def delete_presentation_slide(self, *a, **kw): return await self._call(ppt_repo.delete_presentation_slide, *a, **kw)
     async def replace_presentation_slides(self, *a, **kw): return await self._call(ppt_repo.replace_presentation_slides, *a, **kw)
 

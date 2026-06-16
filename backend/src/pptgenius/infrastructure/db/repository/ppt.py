@@ -169,7 +169,10 @@ async def create_presentation_slides_batch(
 
 
 async def get_presentation_slide(db: AsyncSession, slide_id: int) -> PresentationSlide | None:
-    return await db.get(PresentationSlide, slide_id)
+    slide = await db.get(PresentationSlide, slide_id)
+    if slide is None or slide.status == "deleted":
+        return None
+    return slide
 
 
 async def get_slides_by_presentation_id(
@@ -178,10 +181,20 @@ async def get_slides_by_presentation_id(
     stmt = (
         select(PresentationSlide)
         .where(PresentationSlide.presentation_id == presentation_id)
+        .where(PresentationSlide.status != "deleted")
         .order_by(PresentationSlide.slide_index.asc())
     )
     result = await db.execute(stmt)
     return list(result.scalars().all())
+
+
+async def soft_delete_presentation_slide(db: AsyncSession, slide_id: int) -> bool:
+    slide = await db.get(PresentationSlide, slide_id)
+    if slide is None:
+        return False
+    slide.status = "deleted"
+    await db.commit()
+    return True
 
 
 async def _get_slide(db: AsyncSession, presentation_id: int, slide_index: int):

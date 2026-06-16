@@ -27,6 +27,7 @@ _TOOL_CTYPE: dict[str, str] = {
     "_search_styles":            "search_styles",
     "_write_outline_structure":  "write_outline",
     "_modify_outline_structure": "mod_outline",
+    "_rearrange_presentation_slides": "rearr_pres",
     "_generate_outline_content": "gen_content",
     "_modify_outline_section":   "mod_section",
     "_outline_evaluate":         "evaluate",
@@ -54,7 +55,7 @@ from .tools.perception import (
 )
 from .tools.ppt_style import make_ppt_style
 from .tools.slides_content import make_modify_slides_content, make_slides_content
-from .tools.structure import make_modify_outline_structure, make_write_outline_structure
+from .tools.structure import make_modify_outline_structure, make_rearrange_presentation_slides, make_write_outline_structure
 
 
 def _assemble_tools(db: Database, conversation_id: int) -> list:
@@ -71,6 +72,7 @@ def _assemble_tools(db: Database, conversation_id: int) -> list:
         # Structure 
         make_write_outline_structure(db, conversation_id),
         make_modify_outline_structure(db, conversation_id),
+        make_rearrange_presentation_slides(db, conversation_id),
         # Outline content 
         make_generate_outline_content(db, conversation_id),
         make_modify_outline_section(db, conversation_id),
@@ -304,7 +306,7 @@ def _has_presentation_changed(state: dict) -> bool:
     msgs = state.get("messages", [])
     for m in msgs:
         name = getattr(m, "name", "")
-        if name in ("_slides_content", "_ppt_style"):
+        if name in ("_slides_content", "_ppt_style", "_rearrange_presentation_slides"):
             return True
     return False
 

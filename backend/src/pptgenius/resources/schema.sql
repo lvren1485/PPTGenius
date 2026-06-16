@@ -154,7 +154,7 @@ CREATE TABLE IF NOT EXISTS presentation_slides (
     chart_data JSON COMMENT '纯图表数据',
     table_data JSON COMMENT '纯表格数据',
     image_paths JSON COMMENT '图片路径列表',
-    status VARCHAR(20) DEFAULT 'pending',
+    status VARCHAR(20) DEFAULT 'new',
     error_message TEXT,
     retry_count INT DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

@@ -61,6 +61,7 @@ def build_user_prompt(
     query: str | None = None,
     *,
     existing_outputs: dict | None = None,
+    pres_status: str | None = None,
 ) -> str:
     """Build the user prompt for a single slide."""
     content_json = slide.get("content_json", {})
@@ -84,6 +85,7 @@ def build_user_prompt(
     color_section = _build_style_section(style) if style else "## 配色方案: 使用默认配色"
     template_section = _build_template_section(template) if template else ""
     query_section = f"## 修改指令\n{query}" if query else ""
+    status_section = f"## 页面状态\n当前 presentation slide 状态: {pres_status}\n(若非 null/new，说明本页需要重生成或修改)" if pres_status and pres_status != "new" else ""
 
     template_text = _load_prompt("content_agent_user.md")
     return template_text.format(
@@ -100,6 +102,7 @@ def build_user_prompt(
         color_scheme_section=color_section,
         template_section=template_section,
         neighbor_section=query_section,
+        status_section=status_section,
     )
 
 

@@ -204,7 +204,7 @@ class PresentationSlide(Base):
     chart_data: Mapped[dict | None] = mapped_column(JSON)
     table_data: Mapped[dict | None] = mapped_column(JSON)
     image_paths: Mapped[dict | None] = mapped_column(JSON)
-    status: Mapped[str | None] = mapped_column(String(20), default="pending")
+    status: Mapped[str | None] = mapped_column(String(20), default="new")
     error_message: Mapped[str | None] = mapped_column(Text)
     retry_count: Mapped[int | None] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

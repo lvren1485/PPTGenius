@@ -233,7 +233,10 @@ async def create_outline_slide(
 
 
 async def get_outline_slide(db: AsyncSession, slide_id: int) -> OutlineSlide | None:
-    return await db.get(OutlineSlide, slide_id)
+    slide = await db.get(OutlineSlide, slide_id)
+    if slide is None or slide.status == "deleted":
+        return None
+    return slide
 
 
 async def get_slides_by_outline_id(
@@ -242,10 +245,20 @@ async def get_slides_by_outline_id(
     stmt = (
         select(OutlineSlide)
         .where(OutlineSlide.outline_id == outline_id)
+        .where(OutlineSlide.status != "deleted")
         .order_by(OutlineSlide.slide_index.asc())
     )
     result = await db.execute(stmt)
     return list(result.scalars().all())
+
+
+async def soft_delete_outline_slide(db: AsyncSession, slide_id: int) -> bool:
+    slide = await db.get(OutlineSlide, slide_id)
+    if slide is None:
+        return False
+    slide.status = "deleted"
+    await db.commit()
+    return True
 
 
 async def update_outline_slide(

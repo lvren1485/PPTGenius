@@ -152,6 +152,7 @@ async def _write_slide_content(
     existing = await db.get_slides_by_presentation_id(pres_id)
     existing_ps = next((ps for ps in existing if ps.slide_index == sd["slide_index"]), None)
     existing_outputs = existing_ps.agent_outputs if existing_ps and existing_ps.agent_outputs else None
+    pres_status = existing_ps.status if existing_ps else None
 
     # Map layout_type to template category, pass all 3 templates as catalog
     template_type = _LAYOUT_TYPE_MAP.get(sd["layout_type"], "content")
@@ -164,6 +165,7 @@ async def _write_slide_content(
         style=style_data,
         template=matched_template,
         query=query,
+        pres_status=pres_status,
         existing_outputs=existing_outputs,
     )
 

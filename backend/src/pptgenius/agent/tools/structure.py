@@ -20,6 +20,8 @@ _STATUS_SPLIT = "split"
 _STATUS_NEW = "new"
 _STATUS_MODIFY = "modify"
 
+_PRES_MODIFIED_PREFIX = "o_modified_"
+
 # keys that reference slide IDs in each operation type
 _ID_KEYS = {
     "rename": ["slide_id"],
@@ -193,6 +195,7 @@ def make_modify_outline_structure(db: Database, conversation_id: int) -> Callabl
                     rename_count += 1
                     if modify_content:
                         placeholder_ids.append(sid)
+                        await _cascade_pres_status(db, sid, _PRES_MODIFIED_PREFIX + _STATUS_MODIFY)
                 else:
                     notes.append(f"rename 失败: slide {sid} 不存在")
 
@@ -210,7 +213,9 @@ def make_modify_outline_structure(db: Database, conversation_id: int) -> Callabl
                     _merge_into(target, merge)
                     await db.update_outline_slide(merge_id, status=_STATUS_MERGE)
                     placeholder_ids.append(merge_id)
-                await db.delete_outline_slide(target_id)
+                    await _cascade_pres_status(db, merge_id, _PRES_MODIFIED_PREFIX + _STATUS_MERGE)
+                await db.update_outline_slide_status(target_id, "deleted")
+                await _cascade_pres_status(db, target_id, _PRES_MODIFIED_PREFIX + "deleted")
 
             elif op_type == "insert":
                 after_id, is_copy = op["after_id"], op.get("is_copy", False)
@@ -220,18 +225,21 @@ def make_modify_outline_structure(db: Database, conversation_id: int) -> Callabl
                     continue
                 new_title = after.title or "新页"
                 content = None
+                new_status = _STATUS_NEW
                 if is_copy:
                     await db.update_outline_slide(after_id, status=_STATUS_SPLIT)
                     new_title = after.title or "新页"
                     content = dict(after.content_json) if after.content_json else None
                     placeholder_ids.append(after_id)
+                    await _cascade_pres_status(db, after_id, _PRES_MODIFIED_PREFIX + _STATUS_SPLIT)
+                    new_status = _STATUS_SPLIT
                 new_slide = await db.insert_outline_slide_after(
                     outline_id=outline_id, after_slide_id=after_id,
                     title=new_title, section_id=after.section_id,
                     content_json=content,
                     notes=None,
                 )
-                await db.update_outline_slide_status(new_slide.id, _STATUS_NEW if not is_copy else _STATUS_SPLIT)
+                await db.update_outline_slide_status(new_slide.id, new_status)
                 placeholder_ids.append(new_slide.id)
 
             elif op_type == "move":
@@ -285,6 +293,86 @@ def make_modify_outline_structure(db: Database, conversation_id: int) -> Callabl
         return {"summary": summary, "placeholder_slide_ids": placeholder_ids}
 
     return tool(_modify_outline_structure)
+
+
+def make_rearrange_presentation_slides(db: Database, conversation_id: int) -> Callable:
+
+    async def _rearrange_presentation_slides() -> str:
+        """Sync presentation_slides with outline_slides based on o_modified_* status.
+
+        Reads presentation_slides whose status starts with 'o_modified_', then:
+        - o_modified_deleted → soft-delete the pres slide
+        - o_modified_new / o_modified_split → reset to new (new placeholder)
+        - o_modified_merge / o_modified_modify → reset to new (regenerate)
+        Then re-indexes all remaining pres slides to match outline slide_index order.
+
+        No args needed — reads current_outline_id from conversation.
+        """
+        conv = await db.get_conversation(conversation_id)
+        if conv is None or conv.current_outline_id is None:
+            return "错误：没有选中大纲"
+
+        outline_id = conv.current_outline_id
+        pres_list = await db.list_presentations_by_conversation(conversation_id)
+        pres = next((p for p in pres_list
+                     if p.outline_id == outline_id and p.status != "deleted"), None)
+        if pres is None:
+            return "错误：当前大纲没有关联的 presentation"
+
+        from sqlalchemy import select as _sel
+        from pptgenius.infrastructure.db.models import PresentationSlide
+
+        # Find all pres slides marked with o_modified_*
+        result = await db.db.execute(
+            _sel(PresentationSlide)
+            .where(PresentationSlide.presentation_id == pres.id)
+            .where(PresentationSlide.status.like(_PRES_MODIFIED_PREFIX + "%"))
+        )
+        modified = list(result.scalars().all())
+
+        deleted, pending = 0, 0
+        for ps in modified:
+            st = ps.status or ""
+            if st.endswith("_deleted"):
+                await db.soft_delete_presentation_slide(ps.id)
+                deleted += 1
+            else:
+                # Reset to pending — outline_section generator will re-fill
+                ps.status = "new"
+                pending += 1
+        if modified:
+            await db.db.commit()
+
+        # Re-index: all remaining pres slides match outline slide_index order
+        outline_slides = await db.get_slides_by_outline_id(outline_id)
+        all_pres = await db.get_slides_by_presentation_id(pres.id)
+        pres_by_outline = {s.outline_slide_id: s for s in all_pres if s.outline_slide_id}
+
+        moved = 0
+        for idx, oslide in enumerate(outline_slides, start=1):
+            ps = pres_by_outline.get(oslide.id)
+            if ps is not None and ps.slide_index != idx:
+                ps.slide_index = idx
+                moved += 1
+        if moved:
+            await db.db.commit()
+
+        return f"重排完成: 删除 {deleted}, 重置 {pending}, 移动 {moved}"
+
+    return tool(_rearrange_presentation_slides)
+
+
+async def _cascade_pres_status(
+    db: Database, outline_slide_id: int, status: str,
+) -> None:
+    """Set *status* on all presentation_slides that reference *outline_slide_id*."""
+    from sqlalchemy import update as _up
+    from pptgenius.infrastructure.db.models import PresentationSlide
+    await db.db.execute(
+        _up(PresentationSlide)
+        .where(PresentationSlide.outline_slide_id == outline_slide_id)
+        .values(status=status[:20])
+    )
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────

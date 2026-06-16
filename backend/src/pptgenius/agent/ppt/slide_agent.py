@@ -33,6 +33,7 @@ async def run_slide_agent(
     query: str | None = None,
     *,
     existing_outputs: dict | None = None,
+    pres_status: str | None = None,
 ) -> dict:
     """Generate one slide. Returns {slide_index, elements, notes, background}.
 
@@ -140,7 +141,8 @@ async def run_slide_agent(
 
     system_prompt = build_system_prompt()
     user_prompt = build_user_prompt(slide, style, template, query,
-                                    existing_outputs=existing_outputs)
+                                    existing_outputs=existing_outputs,
+                                    pres_status=pres_status)
 
     agent = create_agent(
         model=llm, tools=tools,
