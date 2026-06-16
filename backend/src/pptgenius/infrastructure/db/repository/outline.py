@@ -254,9 +254,21 @@ async def get_slides_by_outline_id(
 
 async def soft_delete_outline_slide(db: AsyncSession, slide_id: int) -> bool:
     slide = await db.get(OutlineSlide, slide_id)
-    if slide is None:
+    if slide is None or slide.status == "deleted":
         return False
+    outline_id = slide.outline_id
+    deleted_index = slide.slide_index
     slide.status = "deleted"
+    await db.flush()
+    # Shift all non-deleted slides with higher index down by 1
+    from sqlalchemy import update as _up
+    await db.execute(
+        _up(OutlineSlide)
+        .where(OutlineSlide.outline_id == outline_id)
+        .where(OutlineSlide.slide_index > deleted_index)
+        .where(OutlineSlide.status != "deleted")
+        .values(slide_index=OutlineSlide.slide_index - 1)
+    )
     await db.commit()
     return True
 

@@ -214,7 +214,7 @@ def make_modify_outline_structure(db: Database, conversation_id: int) -> Callabl
                     await db.update_outline_slide(merge_id, status=_STATUS_MERGE)
                     placeholder_ids.append(merge_id)
                     await _cascade_pres_status(db, merge_id, _PRES_MODIFIED_PREFIX + _STATUS_MERGE)
-                await db.update_outline_slide_status(target_id, "deleted")
+                await db.soft_delete_outline_slide(target_id)
                 await _cascade_pres_status(db, target_id, _PRES_MODIFIED_PREFIX + "deleted")
 
             elif op_type == "insert":
@@ -298,13 +298,12 @@ def make_modify_outline_structure(db: Database, conversation_id: int) -> Callabl
 def make_rearrange_presentation_slides(db: Database, conversation_id: int) -> Callable:
 
     async def _rearrange_presentation_slides() -> str:
-        """Sync presentation_slides with outline_slides based on o_modified_* status.
+        """Sync presentation_slides with outline_slides.
 
-        Reads presentation_slides whose status starts with 'o_modified_', then:
         - o_modified_deleted → soft-delete the pres slide
-        - o_modified_new / o_modified_split → reset to new (new placeholder)
-        - o_modified_merge / o_modified_modify → reset to new (regenerate)
-        Then re-indexes all remaining pres slides to match outline slide_index order.
+        - Other o_modified_* → keep status (content agent reads it via prompt)
+        - Creates missing pres slides for new outline slides
+        - Overwrites all pres slide_index from outline slides
 
         No args needed — reads current_outline_id from conversation.
         """
@@ -330,34 +329,40 @@ def make_rearrange_presentation_slides(db: Database, conversation_id: int) -> Ca
         )
         modified = list(result.scalars().all())
 
-        deleted, pending = 0, 0
+        deleted = 0
         for ps in modified:
             st = ps.status or ""
             if st.endswith("_deleted"):
                 await db.soft_delete_presentation_slide(ps.id)
                 deleted += 1
-            else:
-                # Reset to pending — outline_section generator will re-fill
-                ps.status = "new"
-                pending += 1
-        if modified:
+            # Other o_modified_* statuses kept — content agent reads them via prompt
+        if deleted:
             await db.db.commit()
 
-        # Re-index: all remaining pres slides match outline slide_index order
+        # Overwrite all pres slide indexes from outline slides.
+        # Create missing pres slides, delete orphans already handled above.
         outline_slides = await db.get_slides_by_outline_id(outline_id)
         all_pres = await db.get_slides_by_presentation_id(pres.id)
         pres_by_outline = {s.outline_slide_id: s for s in all_pres if s.outline_slide_id}
 
-        moved = 0
+        created = 0
         for idx, oslide in enumerate(outline_slides, start=1):
             ps = pres_by_outline.get(oslide.id)
-            if ps is not None and ps.slide_index != idx:
+            if ps is None:
+                await db.create_presentation_slide(
+                    presentation_id=pres.id,
+                    slide_index=idx,
+                    layout_name=oslide.layout_type or "content",
+                    outline_slide_id=oslide.id,
+                    style_id=pres.style_id,
+                )
+                created += 1
+            else:
                 ps.slide_index = idx
-                moved += 1
-        if moved:
+        if created:
             await db.db.commit()
 
-        return f"重排完成: 删除 {deleted}, 重置 {pending}, 移动 {moved}"
+        return f"重排完成: 删除 {deleted}, 新建 {created}"
 
     return tool(_rearrange_presentation_slides)
 

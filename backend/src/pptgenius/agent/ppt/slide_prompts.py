@@ -85,7 +85,15 @@ def build_user_prompt(
     color_section = _build_style_section(style) if style else "## 配色方案: 使用默认配色"
     template_section = _build_template_section(template) if template else ""
     query_section = f"## 修改指令\n{query}" if query else ""
-    status_section = f"## 页面状态\n当前 presentation slide 状态: {pres_status}\n(若非 null/new，说明本页需要重生成或修改)" if pres_status and pres_status != "new" else ""
+    status_hints = {
+        "o_modified_modify": "用户要求修改本页内容",
+        "o_modified_merge":  "本页内容来自被删除页面合并，需要重新组织",
+        "o_modified_split":  "本页从其他页面复制/拆分，需要调整为独立内容",
+        "o_modified_new":    "本页是新插入的页面，需要从零填充内容",
+    }
+    status_section = ""
+    if pres_status and pres_status in status_hints:
+        status_section = f"## 页面状态\n{status_hints[pres_status]} (status={pres_status})"
 
     template_text = _load_prompt("content_agent_user.md")
     return template_text.format(
