@@ -17,6 +17,7 @@ from pptgenius.infrastructure.ppt_engine.validator import validate_elements
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_agent
+from ..common.middleware import SSEToolMiddleware
 from ..common.model_builder import build_llm
 from .common.tools import make_read_chart_instruction, make_read_instruction, make_search_icons
 from .slide_prompts import build_system_prompt, build_user_prompt
@@ -144,7 +145,7 @@ async def run_slide_agent(
     agent = create_agent(
         model=llm, tools=tools,
         system_prompt=system_prompt,
-        middleware=[mw],
+        middleware=[SSEToolMiddleware(), mw],
     )
 
     try:
@@ -166,7 +167,7 @@ async def run_slide_agent(
         retry_agent = create_agent(
             model=llm, tools=submit_tools,
             system_prompt="你必须立即提交 slide 的完整设计。直接调用 submit_background、submit_element 和 submit_notes。不要再搜索或查阅任何资料。",
-            middleware=[mw],
+            middleware=[SSEToolMiddleware(), mw],
         )
         await retry_agent.ainvoke(
             {"messages": [

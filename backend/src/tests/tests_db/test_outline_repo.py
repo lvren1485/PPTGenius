@@ -131,33 +131,21 @@ class TestOutlineVersion:
         o = await Database(db).create_outline(u.id, conv.id, "Ver Test")
         return Database(db), o
 
-    async def test_increase_major_resets_minor_patch(self, d):
+    async def test_increase_version(self, d):
         db_obj, outline = d
-        await db_obj.increase_outline_version(outline.id, type="major")
+        await db_obj.increase_outline_version(outline.id)
+        await db_obj.increase_outline_version(outline.id)
+        await db_obj.increase_outline_version(outline.id)
         fetched = await db_obj.get_outline(outline.id)
-        assert fetched.version_major == 2
-        assert fetched.version_minor == 0
-        assert fetched.version_patch == 0
-
-    async def test_increase_minor_resets_patch(self, d):
-        db_obj, outline = d
-        await db_obj.increase_outline_version(outline.id, type="minor")
-        fetched = await db_obj.get_outline(outline.id)
-        assert fetched.version_minor == 1
-        assert fetched.version_patch == 0
-
-    async def test_increase_patch(self, d):
-        db_obj, outline = d
-        await db_obj.increase_outline_version(outline.id, type="patch")
-        await db_obj.increase_outline_version(outline.id, type="patch")
-        fetched = await db_obj.get_outline(outline.id)
-        assert fetched.version_patch == 2
+        assert fetched.version == 4
 
     async def test_version_defaults(self, d):
         db_obj, outline = d
-        assert outline.version_major == 1
-        assert outline.version_minor == 0
-        assert outline.version_patch == 0
+        assert outline.version == 1
+
+    async def test_version_is_int(self, d):
+        db_obj, outline = d
+        assert isinstance(outline.version, int)
 
 
 class TestOutlineSlideCitations:

@@ -14,6 +14,7 @@ from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_agent
+from ..common.middleware import SSEToolMiddleware
 from ..common.model_builder import build_llm
 from .knowledge_tools import make_read_file
 
@@ -95,7 +96,7 @@ async def run_knowledge_agent(
     agent = create_agent(
         model=llm, tools=tools,
         system_prompt=_load_system_prompt(),
-        middleware=[mw],
+        middleware=[SSEToolMiddleware(), mw],
     )
 
     writer({"type": "knowledge_agent_start"})

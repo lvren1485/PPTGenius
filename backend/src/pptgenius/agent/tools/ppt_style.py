@@ -9,7 +9,6 @@ from langchain_core.tools import tool
 from pptgenius.infrastructure.db.database import Database
 
 from ..common.agent_registry import push_sentinel
-from ..common.tool_sse_wrapper import wrap_tool_with_sse
 from ..ppt.style_agent import run_style_agent
 
 
@@ -32,4 +31,4 @@ def make_ppt_style(db: Database, conversation_id: int) -> Callable:
             f"已选择样式:'{result.get('style_label','')}'(id={result.get('style_id')})。"
         )
 
-    return tool(wrap_tool_with_sse(_ppt_style))
+    return tool(_ppt_style)

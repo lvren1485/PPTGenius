@@ -12,7 +12,6 @@ from langchain_core.tools import tool
 from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import get_logger
 
-from ..common.tool_sse_wrapper import wrap_tool_with_sse
 
 _log = get_logger("pptgenius.agent.tools.structure")
 
@@ -134,7 +133,7 @@ def make_write_outline_structure(db: Database, conversation_id: int) -> Callable
             f"{n_sections} sections, 共 {total} 页"
         )
 
-    return tool(wrap_tool_with_sse(_write_outline_structure))
+    return tool(_write_outline_structure))
 
 
 def make_modify_outline_structure(db: Database, conversation_id: int) -> Callable:
@@ -278,7 +277,7 @@ def make_modify_outline_structure(db: Database, conversation_id: int) -> Callabl
         _log.info("modify outline=%d: %s", outline_id, summary)
         return {"summary": summary, "placeholder_slide_ids": placeholder_ids}
 
-    return tool(wrap_tool_with_sse(_modify_outline_structure))
+    return tool(_modify_outline_structure))
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────

@@ -23,7 +23,6 @@ from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_sentinel
-from ..common.tool_sse_wrapper import wrap_tool_with_sse
 from ..ppt.slide_agent import run_slide_agent
 
 _log = get_logger("pptgenius.agent.tools.slides_content")
@@ -264,7 +263,7 @@ def make_slides_content(db: Database, conversation_id: int) -> Callable:
         failed = sum(1 for r in results if not r.get("elements") and not r.get("background"))
         return f"{len(results) - failed}/{len(results)} 完成" + (f", {failed} 失败" if failed else "")
 
-    return tool(wrap_tool_with_sse(_slides_content))
+    return tool(_slides_content))
 
 
 # ── tool: modify specific slides ─────────────────────────────────────────
@@ -317,4 +316,4 @@ def make_modify_slides_content(db: Database, conversation_id: int) -> Callable:
         failed = sum(1 for r in results if not r.get("elements") and not r.get("background"))
         return f"已修改 {len(results) - failed}/{len(results)} 页" + (f", {failed} 失败" if failed else "")
 
-    return tool(wrap_tool_with_sse(_modify_slides_content))
+    return tool(_modify_slides_content))

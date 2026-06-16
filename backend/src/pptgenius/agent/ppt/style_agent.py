@@ -19,6 +19,7 @@ from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_agent
+from ..common.middleware import SSEToolMiddleware
 from ..common.model_builder import build_llm
 from .common.instruction_loader import get_instruction
 
@@ -212,7 +213,7 @@ async def run_style_agent(
     agent = create_agent(
         model=llm, tools=tools,
         system_prompt=_load_system_prompt(),
-        middleware=[mw],
+        middleware=[SSEToolMiddleware(), mw],
     )
 
     try:
@@ -233,7 +234,7 @@ async def run_style_agent(
             model=llm,
             tools=[tool(_set_presentation_style)],
             system_prompt="你必须立即调用 _set_presentation_style 提交风格选择。直接选择最合适的样式并提交。",
-            middleware=[mw],
+            middleware=[SSEToolMiddleware(), mw],
         )
         await retry_agent.ainvoke(
             {"messages": [

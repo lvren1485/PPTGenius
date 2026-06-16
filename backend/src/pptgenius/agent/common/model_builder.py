@@ -10,7 +10,7 @@ from pptgenius.agent.common.langchain_adapter import apply_deepseek_patch
 from pptgenius.infrastructure.config.settings import get_settings
 from pptgenius.infrastructure.utils import get_logger
 
-from .token_middleware import TokenCountingMiddleware
+from .middleware.token_tool import TokenCountingMiddleware
 
 _log = get_logger("pptgenius.agent.common.model_builder")
 apply_deepseek_patch()

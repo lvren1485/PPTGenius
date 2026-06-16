@@ -12,7 +12,6 @@ from pptgenius.infrastructure.db.engine import get_session_manager
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_sentinel
-from ..common.tool_sse_wrapper import wrap_tool_with_sse
 from ..outline.generator import run_outline_generator
 
 _log = get_logger("pptgenius.agent.tools.outline_section")
@@ -143,7 +142,7 @@ def make_generate_outline_content(db: Database, conversation_id: int) -> Callabl
         await db.increase_outline_version(conv.current_outline_id)
         return f"全部生成完成: {len(sections)} 章节"
 
-    return tool(wrap_tool_with_sse(_generate_outline_content))
+    return tool(_generate_outline_content))
 
 
 def make_modify_outline_section(db: Database, conversation_id: int) -> Callable:
@@ -168,7 +167,7 @@ def make_modify_outline_section(db: Database, conversation_id: int) -> Callable:
         if conv is None or conv.current_outline_id is None:
             return "错误：没有选中大纲"
 
-        await db.increase_outline_version(conv.current_outline_id, "minor")
+        await db.increase_outline_version(conv.current_outline_id)
         push_sentinel(conversation_id)
         return await run_outline_generator(
             db, conversation_id,
@@ -176,4 +175,4 @@ def make_modify_outline_section(db: Database, conversation_id: int) -> Callable:
             query=query,
         )
 
-    return tool(wrap_tool_with_sse(_modify_outline_section))
+    return tool(_modify_outline_section))

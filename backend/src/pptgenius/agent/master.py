@@ -12,12 +12,11 @@ from pptgenius.infrastructure.config.settings import RESOURCES_DIR
 from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import TokenCounter, get_logger
 
-from .common.agent_registry import pop_until_sentinel
+from .common.middleware import PersistToolMiddleware, SSEToolMiddleware
 
 _log = get_logger("pptgenius.agent.master")
 
 # tool_name → content_type (≤32 chars, VARCHAR limit)
-# Tool names come from inner function __name__ (wrap_tool_with_sse preserves it)
 _TOOL_CTYPE: dict[str, str] = {
     "_get_conversation_status":  "conv_status",
     "_switch_outline":           "switch_outline",
@@ -114,13 +113,14 @@ async def run_master_agent(
     _log.debug("assembled %d tools for conv=%d", len(tools), conversation_id)
 
     # --- 3. Build agent ---
+    persist_mw = PersistToolMiddleware(conversation_id, _TOOL_CTYPE, _SUB_AGENT_TOOLS)
     prompt_path = RESOURCES_DIR / "prompts" / "master.md"
     system_prompt = prompt_path.read_text(encoding="utf-8")
     agent = create_agent(
         model=llm,
         tools=tools,
         system_prompt=system_prompt,
-        middleware=[mw],
+        middleware=[persist_mw, SSEToolMiddleware(), mw],
     )
 
     # --- 4. Load context + run ---
@@ -137,8 +137,8 @@ async def run_master_agent(
     writer({"type": "master_done"})
     _log.info("master agent done conv=%d agent=%s", conversation_id, agent_id)
 
-    # --- 5. Persist tool messages + sub-agent tokens (deduplicated by tool_call_id) ---
-    await _persist_tool_messages(db, conversation_id, result["messages"])
+    # --- 5. Persist tool messages + sub-agent tokens ---
+    await persist_mw.flush(db)
 
     # --- 6. Extract reply ---
     reply = ""
@@ -285,82 +285,6 @@ async def _load_context_messages(
             msgs.append(AIMessage(content=r.content, additional_kwargs=extra))
 
     return msgs
-
-
-async def _persist_tool_messages(
-    db: Database, conversation_id: int, messages: list,
-) -> None:
-    """Persist tool_call / tool_result message pairs with token costs.
-
-    Stores LangChain's tool_call_id so _load_context_messages can
-    reconstruct AIMessage(tool_calls) + ToolMessage pairs correctly.
-    Deduplicates by tool_call_id — messages already persisted from
-    earlier turns are skipped.
-    """
-    # Collect already-persisted tool_call_ids for this conversation
-    existing = await db.get_messages_by_conversation(conversation_id)
-    seen_ids: set[str] = set()
-    for r in existing:
-        meta = r.metadata_json or {}
-        tc_id = meta.get("tool_call_id", "")
-        if tc_id:
-            seen_ids.add(tc_id)
-
-    for m in messages:
-        if isinstance(m, AIMessage) and m.tool_calls:
-            for tc in m.tool_calls:
-                tc_id = tc.get("id", "")
-                if tc_id in seen_ids:
-                    continue  # already persisted from a previous turn
-                ctype = _TOOL_CTYPE.get(tc.get("name", ""), "tool_call")
-                meta = {
-                    "tool_name": tc.get("name"),
-                    "args": tc.get("args", {}),
-                    "tool_call_id": tc.get("id", ""),
-                }
-                reasoning = m.additional_kwargs.get("reasoning_content", "")
-                if reasoning:
-                    meta["reasoning_content"] = reasoning
-                await db.create_message(
-                    conversation_id=conversation_id,
-                    role="tool_call",
-                    content=tc.get("args", {}).get("query", "") or "",
-                    content_type=ctype,
-                    metadata_json=meta,
-                )
-
-        elif isinstance(m, ToolMessage):
-            tc_id = getattr(m, "tool_call_id", "") or ""
-            if tc_id in seen_ids:
-                continue  # already persisted from a previous turn
-            name = getattr(m, "name", "") or ""
-            ctype = _TOOL_CTYPE.get(name, "tool_result")
-            tool_content = str(m.content) if hasattr(m, "content") else ""
-
-            msg = await db.create_message(
-                conversation_id=conversation_id,
-                role="tool_result",
-                content=tool_content,
-                content_type=ctype,
-                metadata_json={"tool_name": name, "tool_call_id": tc_id},
-            )
-
-            # For sub-agent tools, flush all concurrent agent token counters
-            if ctype in _SUB_AGENT_TOOLS:
-                agent_ids = pop_until_sentinel(conversation_id)
-                if agent_ids:
-                    summed: dict = {}
-                    total_cost = 0.0
-                    for aid in agent_ids:
-                        tc = TokenCounter.get_agent(aid)
-                        if tc:
-                            for k, v in tc.to_json().items():
-                                summed[k] = summed.get(k, 0) + v
-                            total_cost += tc.snapshot()["estimated_cost_cny"]
-                    await db.set_message_cost(msg.id,
-                        token_cost_json=summed,
-                        estimated_cost=total_cost,
-                    )
 
 
 def _has_outline_changed(state: dict) -> bool:

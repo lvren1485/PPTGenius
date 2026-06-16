@@ -13,6 +13,7 @@ from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_agent
+from ..common.middleware import SSEToolMiddleware
 from ..common.model_builder import build_llm
 from .knowledge_tools import (
     make_fetch_web,
@@ -168,7 +169,7 @@ async def run_outline_generator(
     agent = create_agent(
         model=llm, tools=full_tools,
         system_prompt=system_prompt,
-        middleware=[mw],
+        middleware=[SSEToolMiddleware(), mw],
     )
 
     writer({"type": "outline_generator_start", "section": section_title})
@@ -218,7 +219,7 @@ async def run_outline_generator(
         retry_agent = create_agent(
             model=llm, tools=[write_slide, pending_slides],
             system_prompt=system_prompt,
-            middleware=[mw],
+            middleware=[SSEToolMiddleware(), mw],
         )
         try:
             await retry_agent.ainvoke(
