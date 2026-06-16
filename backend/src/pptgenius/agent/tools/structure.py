@@ -15,8 +15,10 @@ from pptgenius.infrastructure.utils import get_logger
 
 _log = get_logger("pptgenius.agent.tools.structure")
 
-_TAG_MERGE = "（待合并）"
-_TAG_SPLIT = "（待分割）"
+_STATUS_MERGE = "merge"
+_STATUS_SPLIT = "split"
+_STATUS_NEW = "new"
+_STATUS_MODIFY = "modify"
 
 # keys that reference slide IDs in each operation type
 _ID_KEYS = {
@@ -65,7 +67,7 @@ def make_write_outline_structure(db: Database, conversation_id: int) -> Callable
         Title/TOC/ending are auto-added. Each section's slide_number field
         determines how many slides to pre-create for that section.
         First slide per section = layout_type="section", remaining = "content".
-        All section slides are created with content_json=null, status="pending".
+        All section slides are created with content_json=null, status="new".
 
         Args:
             title: The presentation title.
@@ -133,7 +135,7 @@ def make_write_outline_structure(db: Database, conversation_id: int) -> Callable
             f"{n_sections} sections, 共 {total} 页"
         )
 
-    return tool(_write_outline_structure))
+    return tool(_write_outline_structure)
 
 
 def make_modify_outline_structure(db: Database, conversation_id: int) -> Callable:
@@ -146,11 +148,12 @@ def make_modify_outline_structure(db: Database, conversation_id: int) -> Callabl
         is_copy and is_change_section are bool flags, default False. 
 
         Operations:
-          rename: {op, slide_id, new_title}
+          rename: {op, slide_id, new_title, modify_content?} — rename slide.
+                   If modify_content=true, also sets status="modify" for regeneration.
           delete: {op, target_id, merge_id?} — delete target_id. merge_id appends target's
-                   content to merge, tags merge title "待合并".
+                   content to merge, sets merge status="merge".
           insert: {op, after_id, is_copy?} — insert after after_id. is_copy=true copies
-                   content from after_id (split), tags both "待分割". New slide inherits
+                   content from after_id, sets both status="split". New slide inherits
                    after_id's section_id.
           move:   {op, target_id, after_id, is_change_section?} — move target_id after
                    after_id. Inherits section_id. If section changes, is_change_section
@@ -181,9 +184,15 @@ def make_modify_outline_structure(db: Database, conversation_id: int) -> Callabl
 
             if op_type == "rename":
                 sid, new_title = op["slide_id"], op["new_title"]
-                ok = await db.update_outline_slide(sid, title=new_title)
+                modify_content = op.get("modify_content", False)
+                ok = await db.update_outline_slide(
+                    sid, title=new_title,
+                    status=_STATUS_MODIFY if modify_content else None,
+                )
                 if ok:
                     rename_count += 1
+                    if modify_content:
+                        placeholder_ids.append(sid)
                 else:
                     notes.append(f"rename 失败: slide {sid} 不存在")
 
@@ -199,9 +208,7 @@ def make_modify_outline_structure(db: Database, conversation_id: int) -> Callabl
                         notes.append(f"delete 失败: merge_id={merge_id} 不存在")
                         continue
                     _merge_into(target, merge)
-                    old_title = merge.title or ""
-                    if _TAG_MERGE not in old_title:
-                        await db.update_outline_slide(merge_id, title=old_title + _TAG_MERGE)
+                    await db.update_outline_slide(merge_id, status=_STATUS_MERGE)
                     placeholder_ids.append(merge_id)
                 await db.delete_outline_slide(target_id)
 
@@ -211,20 +218,20 @@ def make_modify_outline_structure(db: Database, conversation_id: int) -> Callabl
                 if after is None:
                     notes.append(f"insert 失败: after_id={after_id} 不存在")
                     continue
-                new_title = "新页"
+                new_title = after.title or "新页"
                 content = None
                 if is_copy:
-                    old_title = after.title or ""
-                    if _TAG_SPLIT not in old_title:
-                        await db.update_outline_slide(after_id, title=old_title + _TAG_SPLIT)
-                    new_title = (after.title or "新页").rstrip(_TAG_SPLIT) + _TAG_SPLIT
+                    await db.update_outline_slide(after_id, status=_STATUS_SPLIT)
+                    new_title = after.title or "新页"
                     content = dict(after.content_json) if after.content_json else None
                     placeholder_ids.append(after_id)
                 new_slide = await db.insert_outline_slide_after(
                     outline_id=outline_id, after_slide_id=after_id,
                     title=new_title, section_id=after.section_id,
                     content_json=content,
+                    notes=None,
                 )
+                await db.update_outline_slide_status(new_slide.id, _STATUS_NEW if not is_copy else _STATUS_SPLIT)
                 placeholder_ids.append(new_slide.id)
 
             elif op_type == "move":
@@ -277,7 +284,7 @@ def make_modify_outline_structure(db: Database, conversation_id: int) -> Callabl
         _log.info("modify outline=%d: %s", outline_id, summary)
         return {"summary": summary, "placeholder_slide_ids": placeholder_ids}
 
-    return tool(_modify_outline_structure))
+    return tool(_modify_outline_structure)
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────

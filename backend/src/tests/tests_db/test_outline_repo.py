@@ -77,7 +77,7 @@ class TestOutlineSlideWithSection:
         )
         assert slide.section_id == section.id
         assert slide.title == "Page 1"
-        assert slide.status == "pending"
+        assert slide.status == "new"
 
     async def test_slides_belong_to_section(self, d):
         db_obj, outline, section = d

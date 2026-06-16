@@ -62,7 +62,7 @@ class TestTokenCountingMiddleware:
     """Validate middleware structure."""
 
     def test_middleware_creation(self):
-        from pptgenius.agent.common.token_middleware import TokenCountingMiddleware
+        from pptgenius.agent.common.middleware.token_tool import TokenCountingMiddleware
         mw = TokenCountingMiddleware(conversation_id=1, agent_id="test_agent")
         assert mw.conversation_id == 1
         assert mw.agent_id == "test_agent"

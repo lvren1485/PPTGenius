@@ -121,7 +121,7 @@ class OutlineSlide(Base):
     has_chart: Mapped[bool | None] = mapped_column(Boolean, default=False)
     notes: Mapped[str | None] = mapped_column(Text)
     citations: Mapped[list | None] = mapped_column(JSON)
-    status: Mapped[str | None] = mapped_column(String(32), default="pending")
+    status: Mapped[str | None] = mapped_column(String(32), default="new")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     outline: Mapped["Outline"] = relationship(back_populates="slides")

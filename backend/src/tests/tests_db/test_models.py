@@ -49,27 +49,25 @@ class TestConversationModel:
 
 
 class TestOutlineModel:
-    """Outlines: version → version_major/minor/patch + new columns."""
+    """Outlines: single version column + explore_result_json + eval_detail."""
 
-    def test_semantic_version_columns(self):
+    def test_version_column(self):
         cols = {c.key for c in Outline.__table__.columns}
-        assert "version_major" in cols
-        assert "version_minor" in cols
-        assert "version_patch" in cols
+        assert "version" in cols
 
-    def test_version_defaults(self):
-        for name in ("version_major", "version_minor", "version_patch"):
-            col = Outline.__table__.columns[name]
-            assert col.default is not None
+    def test_version_default(self):
+        col = Outline.__table__.columns["version"]
+        assert col.default is not None
 
     def test_new_columns(self):
         cols = {c.key for c in Outline.__table__.columns}
-        for name in ("eval_detail",):
+        for name in ("eval_detail", "explore_result_json"):
             assert name in cols, f"missing column: {name}"
 
-    def test_old_version_column_removed(self):
+    def test_old_version_columns_removed(self):
         cols = {c.key for c in Outline.__table__.columns}
-        assert "version" not in cols
+        for name in ("version_major", "version_minor", "version_patch"):
+            assert name not in cols
 
     def test_has_sections_relationship(self):
         assert hasattr(Outline, "sections")

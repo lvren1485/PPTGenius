@@ -21,10 +21,9 @@ from .knowledge_tools import (
     make_search_web,
 )
 from .prompts import build_generator_system_prompt, build_generator_user_prompt
+from .prompts import _STATUS_HINTS
 
 _log = get_logger("pptgenius.agent.outline.generator")
-
-_FLAGS = ("待合并", "待分割", "待填充", "新页", "待修改")
 
 
 def _get_writer():
@@ -110,10 +109,20 @@ def _make_write_tools(db: Database, outline_id: int, section_id: int):
             if s.status == "completed" or has_content:
                 _written.add(s.slide_index)
                 continue
-            pending.append({"slide_index": s.slide_index, "title": s.title or "", "layout_type": s.layout_type or "content"})
+            st = s.status or "new"
+            hint = _STATUS_HINTS.get(st, "需要填充内容")
+            pending.append({
+                "slide_index": s.slide_index, "title": s.title or "",
+                "layout_type": s.layout_type or "content",
+                "status": st, "hint": hint,
+            })
         if not pending:
             return "所有幻灯片已写入。可以结束了。"
-        items = "\n".join(f"  - slide_index={p['slide_index']}: {p['title']} ({p['layout_type']})" for p in pending)
+        items = "\n".join(
+            f"  - slide_index={p['slide_index']}: {p['title']} ({p['layout_type']}) "
+            f"[{p['status']}] — {p['hint']}"
+            for p in pending
+        )
         return f"待写入 ({len(pending)}页):\n{items}"
 
     return write_slide, pending_slides, _written

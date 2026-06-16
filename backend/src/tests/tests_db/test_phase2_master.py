@@ -83,7 +83,7 @@ class TestPerceptionTools:
         conv = await d.create_conversation(u.id)
         await d.create_style(name="test_blue", label="Test Blue",
                              colors_json={}, chart_colors_json=[], fonts_json={})
-        tool = make_list_styles(d, conv.id)
+        tool = make_search_styles(d, conv.id)
         result = await tool.ainvoke({"query": "blue"})
         assert len(result) >= 1
         assert any(s["name"] == "test_blue" for s in result)
@@ -163,7 +163,7 @@ class TestStructureTools:
         assert "占位" in r["summary"]
         s1f = await d.get_outline_slide(s1.id)
         assert "B1" in str(s1f.content_json)
-        assert "待合并" in (s1f.title or "")
+        assert s1f.status == "merge"
 
     @pytest.mark.asyncio
     async def test_modify_insert_simple(self, db):
@@ -188,7 +188,7 @@ class TestStructureTools:
         r = await make_modify_outline_structure(d, conv.id).ainvoke(
             {"operations": [{"op": "insert", "after_id": s1.id, "is_copy": True}]})
         s1f = await d.get_outline_slide(s1.id)
-        assert "待分割" in (s1f.title or "")
+        assert s1f.status == "split"
         slides = await d.get_slides_by_outline_id(o.id)
         assert len(slides) == 2
 
@@ -336,7 +336,7 @@ class TestConvStatusAfterWrite:
         # increase_outline_version (simulating snapshot step)
         conv2 = await d.get_conversation(conv.id)
         if conv2 and conv2.current_outline_id:
-            await d.increase_outline_version(conv2.current_outline_id, "patch")
+            await d.increase_outline_version(conv2.current_outline_id)
 
         # Turn 2: conv_status should see the outline
         cs = make_get_conversation_status(d, conv.id)
@@ -757,7 +757,7 @@ from pptgenius.agent.tools.perception import (
     make_get_outline,
     make_get_outline_slide,
     make_get_presentation,
-    make_list_styles,
+    make_search_styles,
     make_switch_outline,
 )
 from pptgenius.agent.tools.structure import make_modify_outline_structure, make_write_outline_structure

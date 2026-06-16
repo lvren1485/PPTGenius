@@ -142,7 +142,7 @@ def make_generate_outline_content(db: Database, conversation_id: int) -> Callabl
         await db.increase_outline_version(conv.current_outline_id)
         return f"全部生成完成: {len(sections)} 章节"
 
-    return tool(_generate_outline_content))
+    return tool(_generate_outline_content)
 
 
 def make_modify_outline_section(db: Database, conversation_id: int) -> Callable:
@@ -152,11 +152,10 @@ def make_modify_outline_section(db: Database, conversation_id: int) -> Callable:
         section_id: int,
         query: str | None = None,
     ) -> str:
-        """Regenerate content for flagged slides in a section.
+        """Regenerate content for non-completed slides in a section.
 
-        Use ONLY for modifying existing content. Before calling, mark slides
-        needing changes via modify_outline_structure (rename with flag suffixes
-        like "待修改").
+        Use ONLY for modifying existing content. Before calling, use
+        modify_outline_structure to set slide status (merge/split/new/modify).
 
         Args:
             section_id: The section to regenerate.
@@ -175,4 +174,4 @@ def make_modify_outline_section(db: Database, conversation_id: int) -> Callable:
             query=query,
         )
 
-    return tool(_modify_outline_section))
+    return tool(_modify_outline_section)

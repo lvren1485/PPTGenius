@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS outline_slides (
     has_chart TINYINT(1) DEFAULT 0,
     notes TEXT,
     citations JSON,
-    status VARCHAR(32) DEFAULT 'pending',
+    status VARCHAR(32) DEFAULT 'new',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (outline_id) REFERENCES outlines(id),
     FOREIGN KEY (section_id) REFERENCES outline_sections(id) ON DELETE SET NULL,

@@ -163,9 +163,9 @@ class TestOutlineSlideStatusExtended:
         slide = await Database(db).create_outline_slide(o.id, 1, "Slide 1")
         return Database(db), slide
 
-    async def test_status_default_pending(self, d):
+    async def test_status_default_new(self, d):
         db_obj, slide = d
-        assert slide.status == "pending"
+        assert slide.status == "new"
 
     async def test_status_to_merge(self, d):
         db_obj, slide = d

@@ -43,7 +43,7 @@
 ### 场景 D：修改单节内容（不改结构）
 ```
 1. get_outline_slide(slide_id)  → 查看目标页
-2. modify_outline_structure(rename: 标题加"待修改")  → 打标记
+2. modify_outline_structure(rename: modify_content=true)  → 标记 slide status="modify"
 3. modify_outline_section(section_id, query)  → 仅处理标记页
 ```
 
@@ -62,8 +62,8 @@
 - **创建前先探索**：有上传文件时，`explore_knowledge` 先于 `write_outline_structure`。
 - **修改后必重读**：`modify_outline_structure` 后必须 `get_outline`。
 - **仅改名不需重新生成**：`rename` 操作不产生标记，无需后续 `generate_outline_content`。
-- **标记驱动填充**：删除/插入/移动会在页面标题中加标记（待合并/待分割/待修改），
-  `generate_outline_content` 自动检测并填充。
+- **标记驱动填充**：删除/插入/移动会设置 slide status（merge/split/new），
+  `generate_outline_content` 自动检测非 completed 状态并填充。
 - **结构操作用 ID**：`modify_outline_structure` 的参数全部是 slide_id（数据库主键），不是 index。
 - **每章 3-6 页**：每个 section 的 `slide_number` 在 3-6 之间（含 1 个 section 页 + 2-5 个 content 页）。
   根据该章节的重要程度和内容多寡决定：核心章节 5-6 页，辅助章节 3-4 页。请在一个大纲内分清主次，合理分配页数，避免每章都平均分配。

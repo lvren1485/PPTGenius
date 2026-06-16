@@ -24,9 +24,6 @@ def build_generator_system_prompt() -> str:
     return _load_generator_system()
 
 
-_FLAGS = ("待合并", "待分割", "待填充", "新页", "待修改")
-
-
 async def build_generator_user_prompt(
     *,
     db: Database,
@@ -83,37 +80,50 @@ async def build_generator_user_prompt(
             key=lambda x: x.slide_index,
         )
         for sl in sec_slides:
-            flag = _detect_flag(sl)
-            parts.append(_format_slide(sl, flag))
+            parts.append(_format_slide(sl))
 
     # 3. Query
     if query:
         parts.append(f"## 用户说明\n{query}\n")
 
-    # 4. Flagged slides notice
+    # 4. Flagged slides notice — show specific action per status
     flagged = [sl for sl in all_slides
-               if sl.section_id == section_id and _detect_flag(sl)]
+               if sl.section_id == section_id and _needs_fill(sl)]
     if flagged:
-        ids = [str(sl.slide_index) for sl in flagged]
-        parts.append(f"**待处理**: slide {', '.join(ids)} 标记为空白或待修改，优先填充。\n")
-    parts.append("幻灯片已预先创建且不可增删。使用 write_slides 按 slide_index 写入 content_json。")
-    parts.append("**每页 slide 的 title 字段必须填写**——覆盖原有标题（含标记），提供干净、具体的标题。")
+        items = []
+        for sl in flagged:
+            hint = _status_hint(sl.status)
+            items.append(f"  - slide_index={sl.slide_index}: {sl.title} [{sl.status}] — {hint}")
+        parts.append("**待处理**:")
+        parts.extend(items)
+        parts.append("")
+    parts.append("幻灯片已预先创建且不可增删。使用 write_slide 按 slide_index 写入 content_json。")
+    parts.append("**每页 slide 的 title 字段必须填写**——提供干净、具体的标题。")
 
     return "\n".join(parts)
 
 
-def _detect_flag(slide) -> str | None:
-    if not slide.content_json or not slide.content_json.get("main_points"):
-        return "空白"
-    title = slide.title or ""
-    for flag in _FLAGS:
-        if flag in title:
-            return flag
-    return None
+_STATUS_HINTS = {
+    "new":    "新创建的空白页面，需要从零填充完整内容",
+    "merge":  "内容来自被删除页面合并，需要重新组织融合后的内容",
+    "split":  "内容从原页面复制，需要调整为独立页面",
+    "modify": "用户要求修改的页面，按要求调整内容",
+}
 
 
-def _format_slide(sl, flag: str | None) -> str:
-    tag = f" [{flag}]" if flag else ""
+def _needs_fill(slide) -> bool:
+    """Check if slide needs content generation — status is not 'completed'."""
+    return slide.status != "completed"
+
+
+def _status_hint(status: str | None) -> str:
+    if not status:
+        return "空白页，需要填充完整内容"
+    return _STATUS_HINTS.get(status, f"状态异常 ({status})，需要填充内容")
+
+
+def _format_slide(sl) -> str:
+    tag = f" [{sl.status}]" if sl.status and sl.status != "completed" else ""
     content = sl.content_json or {}
     mp = content.get("main_points", [])
     dc = content.get("detailed_content", "")
