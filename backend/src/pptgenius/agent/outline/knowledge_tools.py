@@ -129,6 +129,9 @@ def make_fetch_web(db: Database, user_id: int, conv_id: int, count: list[int]):
             _log.warning("web fetch failed: %s — %s", url, e)
             return f"网页抓取失败: {e}。请尝试其他搜索结果。" + _WRITE_HINT
         if result.get("ingested"):
+            file_id = result.get("knowledge_file_id")
+            if file_id:
+                await db.set_knowledge_file_web_url(file_id, url)
             return f"已抓取: {result['title']}\n{result['text'][:1000]}\n详细内容已加入知识库。" + _WRITE_HINT
         return f"抓取失败。{result.get('title', 'N/A')}" + _WRITE_HINT
 

@@ -61,13 +61,7 @@ def _make_submit_evaluation(db: Database, outline_id: int):
              + visual_diversity + content_richness) / 5,
             2,
         )
-        overall = (
-            f"总分 {total}/10 | 结构{structure_clarity} 逻辑{logic_coherence} "
-            f"全面{comprehensiveness} 视觉{visual_diversity} 内容{content_richness}"
-        )
-        await db.update_outline_eval(outline_id, total)
-        _log.info("evaluation submitted for outline %d: %.2f", outline_id, total)
-        return json.dumps({
+        detail = {
             "structure_clarity": structure_clarity,
             "logic_coherence": logic_coherence,
             "comprehensiveness": comprehensiveness,
@@ -75,7 +69,10 @@ def _make_submit_evaluation(db: Database, outline_id: int):
             "content_richness": content_richness,
             "total": total,
             "suggestions": suggestions,
-        })
+        }
+        await db.update_outline_eval(outline_id, total, detail)
+        _log.info("evaluation submitted for outline %d: %.2f", outline_id, total)
+        return json.dumps(detail)
 
     return submit_evaluation
 
