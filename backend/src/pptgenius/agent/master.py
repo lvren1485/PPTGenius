@@ -213,11 +213,7 @@ async def run_master_agent(
                     presentation_id=pres.id,
                     user_id=pres.user_id,
                     conversation_id=conversation_id,
-                    outline_json=_build_outline_snapshot_json(
-                        outline,
-                        await db.get_sections_by_outline_id(conv.current_outline_id),
-                        await db.get_slides_by_outline_id(conv.current_outline_id),
-                    ) if outline else {},
+                    outline_version=pres.outline_version,
                     presentation_json=_build_presentation_snapshot_json(pres, slides),
                     pres_version=pres.version,
                 )
@@ -352,7 +348,8 @@ def _build_presentation_snapshot_json(pres, slides) -> dict:
         "status": pres.status,
         "style_id": pres.style_id,
         "slide_count": pres.slide_count,
-        "file_path": pres.file_path,
+        "version": pres.version,
+        "outline_version": pres.outline_version,
         "slides": [
             {
                 "slide_index": s.slide_index,

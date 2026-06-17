@@ -50,17 +50,6 @@ class TestPresentationWithStyleId:
         fetched = await db_obj.get_presentation(pres.id)
         assert fetched is not None
 
-    async def test_set_presentation_output(self, d):
-        db_obj, user, conv = d
-        pres = await db_obj.create_presentation(user.id, conv.id)
-        await db_obj.set_presentation_output(pres.id, "/tmp/test.pptx", 2048, 10)
-        fetched = await db_obj.get_presentation(pres.id)
-        assert fetched.file_path == "/tmp/test.pptx"
-        assert fetched.file_size == 2048
-        assert fetched.slide_count == 10
-        assert fetched.status == "completed"
-
-
 class TestPresentationSlideWithStyleId:
     @pytest_asyncio.fixture
     async def d(self, db):
@@ -115,10 +104,9 @@ class TestPresentationSlideWithStyleId:
     async def test_slide_status_with_error(self, d):
         db_obj, pres = d
         await db_obj.create_presentation_slide(pres.id, 0, "content")
-        await db_obj.update_slide_status(pres.id, 0, "failed", "Element validation error")
+        await db_obj.update_slide_status(pres.id, 0, "failed")
         fetched = (await db_obj.get_slides_by_presentation_id(pres.id))[0]
         assert fetched.status == "failed"
-        assert fetched.error_message == "Element validation error"
 
     async def test_no_retry_methods(self, d):
         """increment_slide_retry* should not exist."""

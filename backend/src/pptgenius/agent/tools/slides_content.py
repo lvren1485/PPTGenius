@@ -258,9 +258,6 @@ def make_slides_content(db: Database, conversation_id: int) -> Callable:
         ])
 
         await db.update_presentation_status(pres_id, "completed")
-        await db.set_presentation_output(
-            pres_id, file_path="", file_size=0, slide_count=len(results),
-        )
 
         failed = sum(1 for r in results if not r.get("elements") and not r.get("background"))
         return f"{len(results) - failed}/{len(results)} 完成" + (f", {failed} 失败" if failed else "")

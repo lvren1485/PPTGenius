@@ -74,14 +74,12 @@ async def list_presentations_by_user(
 
 
 async def update_presentation_status(
-    db: AsyncSession, pres_id: int, status: str, error_msg: str | None = None
+    db: AsyncSession, pres_id: int, status: str
 ) -> bool:
     pres = await db.get(Presentation, pres_id)
     if pres is None or pres.status == "deleted":
         return False
     pres.status = status
-    if error_msg is not None:
-        pres.error_msg = error_msg
     await db.commit()
     return True
 
@@ -93,24 +91,6 @@ async def set_presentation_style(
     if pres is None or pres.status == "deleted":
         return False
     pres.style_id = style_id
-    await db.commit()
-    return True
-
-
-async def set_presentation_output(
-    db: AsyncSession,
-    pres_id: int,
-    file_path: str,
-    file_size: int,
-    slide_count: int,
-) -> bool:
-    pres = await db.get(Presentation, pres_id)
-    if pres is None or pres.status == "deleted":
-        return False
-    pres.file_path = file_path
-    pres.file_size = file_size
-    pres.slide_count = slide_count
-    pres.status = "completed"
     await db.commit()
     return True
 
@@ -235,51 +215,12 @@ async def update_slides_style(
 
 
 async def update_slide_status(
-    db: AsyncSession,
-    presentation_id: int,
-    slide_index: int,
-    status: str,
-    error_message: str | None = None,
+    db: AsyncSession, presentation_id: int, slide_index: int, status: str,
 ) -> bool:
     s = await _get_slide(db, presentation_id, slide_index)
     if s is None:
         return False
     s.status = status
-    if error_message is not None:
-        s.error_message = error_message
-    await db.commit()
-    return True
-
-
-async def set_slide_chart_data(
-    db: AsyncSession, presentation_id: int, slide_index: int, chart_data: dict,
-) -> bool:
-    s = await _get_slide(db, presentation_id, slide_index)
-    if s is None:
-        return False
-    s.chart_data = chart_data
-    await db.commit()
-    return True
-
-
-async def set_slide_table_data(
-    db: AsyncSession, presentation_id: int, slide_index: int, table_data: dict,
-) -> bool:
-    s = await _get_slide(db, presentation_id, slide_index)
-    if s is None:
-        return False
-    s.table_data = table_data
-    await db.commit()
-    return True
-
-
-async def set_slide_image_paths(
-    db: AsyncSession, presentation_id: int, slide_index: int, image_paths: dict,
-) -> bool:
-    s = await _get_slide(db, presentation_id, slide_index)
-    if s is None:
-        return False
-    s.image_paths = image_paths
     await db.commit()
     return True
 

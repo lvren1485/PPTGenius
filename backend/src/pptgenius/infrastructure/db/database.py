@@ -103,7 +103,6 @@ class Database:
     async def list_presentations_by_user(self, *a, **kw): return await self._call(ppt_repo.list_presentations_by_user, *a, **kw)
     async def update_presentation_status(self, *a, **kw): return await self._call(ppt_repo.update_presentation_status, *a, **kw)
     async def set_presentation_style(self, *a, **kw): return await self._call(ppt_repo.set_presentation_style, *a, **kw)
-    async def set_presentation_output(self, *a, **kw): return await self._call(ppt_repo.set_presentation_output, *a, **kw)
     async def increment_presentation_version(self, *a, **kw): return await self._call(ppt_repo.increment_presentation_version, *a, **kw)
     async def soft_delete_presentation(self, *a, **kw): return await self._call(ppt_repo.soft_delete_presentation, *a, **kw)
     # presentation_slide
@@ -114,9 +113,6 @@ class Database:
     async def set_slide_agent_output(self, *a, **kw): return await self._call(ppt_repo.set_slide_agent_output, *a, **kw)
     async def update_slide_status(self, *a, **kw): return await self._call(ppt_repo.update_slide_status, *a, **kw)
     async def update_slides_style(self, *a, **kw): return await self._call(ppt_repo.update_slides_style, *a, **kw)
-    async def set_slide_chart_data(self, *a, **kw): return await self._call(ppt_repo.set_slide_chart_data, *a, **kw)
-    async def set_slide_table_data(self, *a, **kw): return await self._call(ppt_repo.set_slide_table_data, *a, **kw)
-    async def set_slide_image_paths(self, *a, **kw): return await self._call(ppt_repo.set_slide_image_paths, *a, **kw)
     async def soft_delete_presentation_slide(self, *a, **kw): return await self._call(ppt_repo.soft_delete_presentation_slide, *a, **kw)
     async def delete_presentation_slide(self, *a, **kw): return await self._call(ppt_repo.delete_presentation_slide, *a, **kw)
     async def replace_presentation_slides(self, *a, **kw): return await self._call(ppt_repo.replace_presentation_slides, *a, **kw)

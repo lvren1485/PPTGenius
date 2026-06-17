@@ -9,7 +9,7 @@ async def create_snapshot(
     presentation_id: int,
     user_id: int,
     conversation_id: int,
-    outline_json: dict,
+    outline_version: int,
     presentation_json: dict,
     pres_version: int,
 ) -> PresentationSnapshot:
@@ -17,7 +17,7 @@ async def create_snapshot(
         presentation_id=presentation_id,
         user_id=user_id,
         conversation_id=conversation_id,
-        outline_json=outline_json,
+        outline_version=outline_version,
         presentation_json=presentation_json,
         version=pres_version,
     )

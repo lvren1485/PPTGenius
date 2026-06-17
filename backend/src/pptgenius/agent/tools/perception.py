@@ -45,7 +45,7 @@ def make_get_conversation_status(
                     "status": pres_for_outline.status,
                     "slide_count": pres_for_outline.slide_count,
                     "style_id": pres_for_outline.style_id,
-                    "file_path": pres_for_outline.file_path,
+                    "version": pres_for_outline.version,
                 }
             outlines.append({
                 "id": o.id,
@@ -224,7 +224,7 @@ def make_get_presentation(db: Database, conversation_id: int) -> Callable:
             "id": pres.id, "outline_id": pres.outline_id,
             "style_id": pres.style_id, "status": pres.status,
             "slide_count": pres.slide_count,
-            "file_path": pres.file_path,
+            "version": pres.version,
             "slides": slides_data,
         }
 

@@ -97,23 +97,11 @@ async def download_presentation(
     pres = await db.get_presentation(pres_id)
     if pres is None:
         raise HTTPException(404, {"code": 40001, "message": "presentation not found"})
-    if pres.status != "completed" or not pres.file_path:
-        raise HTTPException(400, {"code": 40401, "message": "presentation not ready for download"})
-
-    # Resolve file path — try stored path first, then output dir by naming convention
-    file_path = pres.file_path
-    if not os.path.isabs(file_path):
-        file_path = os.path.join(str(wm.get_path(pres.conversation_id)), file_path)
-
-    # Fallback: look for {pres_id}.pptx in output dir
+    # Look for {pres_id}.pptx in output dir
+    output_dir = wm.get_output_dir(pres.conversation_id)
+    file_path = os.path.join(str(output_dir), f"{pres_id}.pptx")
     if not os.path.isfile(file_path):
-        output_dir = wm.get_output_dir(pres.conversation_id)
-        fallback = os.path.join(str(output_dir), f"{pres_id}.pptx")
-        if os.path.isfile(fallback):
-            file_path = fallback
-
-    if not os.path.isfile(file_path):
-        raise HTTPException(404, {"code": 40402, "message": f"file not found: {os.path.basename(file_path)}"})
+        raise HTTPException(404, {"code": 40402, "message": f"file not found: {pres_id}.pptx"})
 
     filename = os.path.basename(file_path)
     return FileResponse(

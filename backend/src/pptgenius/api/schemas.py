@@ -131,8 +131,8 @@ class PresentationBrief(BaseModel):
     outline_id: int | None = None
     status: str
     slide_count: int | None = None
-    file_path: str
-    file_size: int | None = None
+    version: int = 0
+    outline_version: int = 0
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
@@ -140,11 +140,7 @@ class PresentationBrief(BaseModel):
 
 
 class PresentationDetail(PresentationBrief):
-    template_id: int | None = None
-    template_name: str | None = None
-    color_scheme_id: int | None = None
-    color_scheme_name: str | None = None
-    error_msg: str | None = None
+    style_id: int | None = None
 
 
 class PresentationSlideDetail(BaseModel):
@@ -152,15 +148,9 @@ class PresentationSlideDetail(BaseModel):
     slide_index: int
     layout_name: str
     outline_slide_id: int | None = None
-    template_id: int | None = None
-    color_scheme_id: int | None = None
+    style_id: int | None = None
     status: str | None = None
-    retry_count: int | None = None
     agent_outputs: dict | None = None
-    chart_data: dict | None = None
-    table_data: dict | None = None
-    image_paths: dict | None = None
-    error_message: str | None = None
 
     model_config = {"from_attributes": True}
 
