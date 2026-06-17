@@ -155,6 +155,13 @@ def _validate_single_element(el_data: dict, path: str) -> list[dict]:
 
 def _check_semantic(el, path: str, errors: list[dict]) -> None:
     """Cross-element semantic validation."""
+    # z_order must be non-negative
+    if el.position.z_order is not None and el.position.z_order < 0:
+        errors.append({
+            "path": f"{path}.position.z_order",
+            "error": f"z_order must be >= 0, got {el.position.z_order}"
+        })
+
     if el.type == "chart":
         _check_chart(el, path, errors)
     elif el.type == "table":

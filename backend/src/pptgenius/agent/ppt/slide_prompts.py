@@ -17,13 +17,6 @@ from pptgenius.infrastructure.config import RESOURCES_DIR
 _PROMPTS_DIR = RESOURCES_DIR / "prompts" / "ppt"
 _MAX_ICON_INCH = 0.79
 
-_Z_ORDER_TABLE = """
-z_order 参照 (越小越底层):
-  0=背景 10=背景图 20=大装饰 30=图片 40=图表 50=表格
-  60=小装饰 70=正文 80=标题 90=页码
-"""
-
-
 @lru_cache(maxsize=8)
 def _load_prompt(filename: str) -> str:
     path = _PROMPTS_DIR / filename
@@ -143,7 +136,6 @@ def _build_style_section(data: dict) -> str:
         parts.append(f"背景预设: {_j(bg)}")
         parts.append("可沿用此预设，也可自行重新设计背景。")
 
-    parts.append(_Z_ORDER_TABLE)
     return "\n".join(parts)
 
 

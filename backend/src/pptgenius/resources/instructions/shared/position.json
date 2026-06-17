@@ -7,19 +7,22 @@
       "top": "上边距。float, 英寸, 必须>=0。元素上边缘到幻灯片(或父容器)上边缘的距离",
       "width": "宽度。float, 英寸, 必须>0。元素的宽度",
       "height": "高度。float, 英寸。null=自动(仅 picture 支持)。其他元素必须填具体值",
-      "parent": "父容器标识。string|null。'slide'(整个幻灯片)|'left_col'(左栏)|'right_col'(右栏)。null=绝对坐标。当设置parent时,left/top是相对于父容器左上角的偏移"
+      "parent": "父容器标识。string|null。'slide'(整个幻灯片)|'left_col'(左栏)|'right_col'(右栏)。null=绝对坐标。当设置parent时,left/top是相对于父容器左上角的偏移",
+      "z_order": "图层顺序。int, 0-100, 越小越底层。>=0, 不允负数。null=按元素类型自动分配(textbox=70,chart=40,table=50,picture=30,shape=60)。参考: 0=背景 10=背景图 20=大装饰 30=图片 40=图表 50=表格 60=小装饰 70=正文 80=标题 90=页码"
     },
     "note": [
       "幻灯片尺寸 16:9 = 13.333×7.5 英寸。4:3 = 10×7.5 英寸。",
       "父容器边界由 generator 自动扫描: 检测 slide 上半部分的无parent形状,自动识别为 left_col/right_col。",
-      "示例: parent='left_col', left=0.2, top=0.3 → 实际绝对位置 = left_col的left+0.2, left_col的top+0.3"
+      "z_order 控制层次: 低值先渲染=被压在下面,高值后渲染=浮在上面。相同类型的元素如需精确控制层次,使用不同 z_order 值。"
     ]
   },
   "examples": {
     "absolute": { "left": 1.5, "top": 1.5, "width": 8.0, "height": 5.0 },
     "relative_left_col": { "left": 0.2, "top": 0.3, "width": 5.0, "height": 4.5, "parent": "left_col" },
     "relative_right_col": { "left": 0.2, "top": 0.3, "width": 5.0, "height": 4.5, "parent": "right_col" },
-    "picture_auto_height": { "left": 1.0, "top": 2.0, "width": 5.5, "height": null }
+    "picture_auto_height": { "left": 1.0, "top": 2.0, "width": 5.5, "height": null },
+    "title_on_top": { "left": 0.8, "top": 0.4, "width": 11.5, "height": 1.0, "z_order": 80 },
+    "background_shape": { "left": 0, "top": 0, "width": 13.333, "height": 7.5, "z_order": 0 }
   },
   "parent_bounds_reference": {
     "slide": { "left": 0, "top": 0, "width": 13.333, "height": 7.5 },

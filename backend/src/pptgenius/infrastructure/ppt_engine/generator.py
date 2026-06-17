@@ -22,6 +22,24 @@ logger = logging.getLogger("ppt_engine.generator")
 # Built-in parent bounds (slide, common columns)
 SLIDE_BOUNDS = ("slide", 0, 0, 13.333, 7.5)
 
+# element_type → default z_order when not explicitly set
+# Reference: 0=bg 10=bg_image 20=big_decor 30=picture
+#            40=chart 50=table 60=small_decor 70=body 80=title 90=page_num
+_DEFAULT_Z_ORDER = {
+    "picture": 30,
+    "chart":   40,
+    "table":   50,
+    "shape":   60,
+    "textbox": 70,
+}
+
+
+def _sort_key(element):
+    z = element.position.z_order
+    if z is not None:
+        return z
+    return _DEFAULT_Z_ORDER.get(element.type, 50)
+
 
 async def generate_ppt(
     data: dict[str, Any],
@@ -73,7 +91,9 @@ async def generate_ppt(
         # Resolve relative positions: scan for container shapes, build parent_bounds
         parent_bounds = _build_parent_bounds(slide_spec, meta)
 
-        for ei, element in enumerate(slide_spec.elements):
+        # Sort elements by z_order (ascending: low z rendered first = bottom layer)
+        sorted_elements = sorted(slide_spec.elements, key=_sort_key)
+        for ei, element in enumerate(sorted_elements):
             # Apply relative position resolution
             if element.position.parent:
                 element.position = resolve_position(element.position, parent_bounds)

@@ -91,6 +91,7 @@ class Position(BaseModel):
     width: float = Field(gt=0)
     height: float | None = None
     parent: str | None = None  # 'slide' | 'left_col' | 'right_col' | layout_placeholder_id
+    z_order: int | None = Field(default=None, ge=0, le=100)
 
 
 def resolve_position(pos: Position, parent_bounds: dict[str, tuple[float, float, float, float]] | None = None) -> Position:
@@ -118,6 +119,7 @@ def resolve_position(pos: Position, parent_bounds: dict[str, tuple[float, float,
         width=pos.width,
         height=pos.height,
         parent=None,
+        z_order=pos.z_order,
     )
 
 
