@@ -43,6 +43,32 @@ def _hex_to_rgb(hex_color: str) -> RGBColor:
 
 
 # ═══════════════════════════════════════════════════════════════════
+# FONT TYPEFACE (Latin / East Asian / Complex Script)
+# ═══════════════════════════════════════════════════════════════════
+
+def set_run_fonts(run, font_name: str) -> None:
+    """Set latin, ea, and cs typefaces on a Run.
+
+    python-pptx's ``run.font.name`` only writes ``<a:latin typeface=...>``.
+    Chinese text in PowerPoint is rendered via ``<a:ea>`` (East Asian), so
+    without this the text falls back to the default CJK font regardless of
+    what ``font.name`` says.  This helper writes all three typeface elements.
+
+    Args:
+        run: python-pptx _Run object.
+        font_name: font family name, e.g. '微软雅黑'.
+    """
+    rPr = run._r.get_or_add_rPr()
+
+    for tag in ("a:latin", "a:ea", "a:cs"):
+        existing = rPr.find(qn(tag))
+        if existing is not None:
+            rPr.remove(existing)
+        elm = etree.SubElement(rPr, qn(tag))
+        elm.set("typeface", font_name)
+
+
+# ═══════════════════════════════════════════════════════════════════
 # TEXT EFFECTS
 # ═══════════════════════════════════════════════════════════════════
 

@@ -10,6 +10,7 @@ from .styles import (
     apply_shape_line,
     set_shape_picture_fill,
     add_gradient_stop,
+    set_run_fonts,
 )
 
 
@@ -78,7 +79,7 @@ def _apply_paragraph(p, para_spec) -> None:
             from pptx.dml.color import RGBColor
             f = run.font
             s = run_spec.font
-            if s.name: f.name = s.name
+            if s.name: f.name = s.name; set_run_fonts(run, s.name)
             if s.size: f.size = Pt(s.size)
             if s.bold is not None: f.bold = s.bold
             if s.color: f.color.rgb = RGBColor.from_string(s.color)

@@ -6,6 +6,7 @@ from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 
 from .base import TextboxElement
 from .styles import (
+    set_run_fonts,
     set_text_strikethrough,
     set_text_small_caps,
     set_text_all_caps,
@@ -76,6 +77,7 @@ def _apply_font(run, font_spec) -> None:
     f = run.font
     if font_spec.name:
         f.name = font_spec.name
+        set_run_fonts(run, font_spec.name)
     if font_spec.size:
         f.size = Pt(font_spec.size)
     if font_spec.bold is not None:
