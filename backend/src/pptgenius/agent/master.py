@@ -187,6 +187,7 @@ async def run_master_agent(
                     outline_id=conv.current_outline_id,
                     user_id=outline.user_id,
                     conversation_id=conversation_id,
+                    outline_version=outline.version,
                     outline_json=_build_outline_snapshot_json(
                         outline,
                         await db.get_sections_by_outline_id(conv.current_outline_id),
@@ -204,6 +205,8 @@ async def run_master_agent(
                 None,
             )
             if pres:
+                await db.increment_presentation_version(pres.id)
+                pres = await db.get_presentation(pres.id)  # refresh to get new version
                 outline = await db.get_outline(conv.current_outline_id)
                 slides = await db.get_slides_by_presentation_id(pres.id)
                 await db.create_snapshot(
@@ -216,6 +219,7 @@ async def run_master_agent(
                         await db.get_slides_by_outline_id(conv.current_outline_id),
                     ) if outline else {},
                     presentation_json=_build_presentation_snapshot_json(pres, slides),
+                    pres_version=pres.version,
                 )
 
     # Ensure all DB changes are committed before the session closes

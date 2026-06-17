@@ -11,29 +11,20 @@ async def create_snapshot(
     conversation_id: int,
     outline_json: dict,
     presentation_json: dict,
+    pres_version: int,
 ) -> PresentationSnapshot:
-    next_version = await _get_next_version(db, presentation_id)
     snap = PresentationSnapshot(
         presentation_id=presentation_id,
         user_id=user_id,
         conversation_id=conversation_id,
         outline_json=outline_json,
         presentation_json=presentation_json,
-        version=next_version,
+        version=pres_version,
     )
     db.add(snap)
     await db.commit()
     await db.refresh(snap)
     return snap
-
-
-async def _get_next_version(db: AsyncSession, presentation_id: int) -> int:
-    stmt = (
-        select(func.coalesce(func.max(PresentationSnapshot.version), 0))
-        .where(PresentationSnapshot.presentation_id == presentation_id)
-    )
-    result = await db.execute(stmt)
-    return result.scalar_one() + 1
 
 
 async def get_snapshot(db: AsyncSession, snap_id: int) -> PresentationSnapshot | None:
@@ -76,29 +67,20 @@ async def delete_snapshot(db: AsyncSession, snap_id: int) -> bool:
 
 # ──────────────────── OutlineSnapshot ────────────────────
 
-async def _get_next_outline_version(db: AsyncSession, outline_id: int) -> int:
-    stmt = (
-        select(func.coalesce(func.max(OutlineSnapshot.version), 0))
-        .where(OutlineSnapshot.outline_id == outline_id)
-    )
-    result = await db.execute(stmt)
-    return result.scalar_one() + 1
-
-
 async def create_outline_snapshot(
     db: AsyncSession,
     outline_id: int,
     user_id: int,
     conversation_id: int,
     outline_json: dict,
+    outline_version: int,
 ) -> OutlineSnapshot:
-    next_version = await _get_next_outline_version(db, outline_id)
     snap = OutlineSnapshot(
         outline_id=outline_id,
         user_id=user_id,
         conversation_id=conversation_id,
         outline_json=outline_json,
-        version=next_version,
+        version=outline_version,
     )
     db.add(snap)
     await db.commit()

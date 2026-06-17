@@ -137,11 +137,11 @@ class TestOutlineVersion:
         await db_obj.increase_outline_version(outline.id)
         await db_obj.increase_outline_version(outline.id)
         fetched = await db_obj.get_outline(outline.id)
-        assert fetched.version == 4
+        assert fetched.version == 3
 
     async def test_version_defaults(self, d):
         db_obj, outline = d
-        assert outline.version == 1
+        assert outline.version == 0
 
     async def test_version_is_int(self, d):
         db_obj, outline = d

@@ -139,7 +139,6 @@ def make_generate_outline_content(db: Database, conversation_id: int) -> Callabl
         await _finalize_special_slides(db, outline_id)
 
         await db.update_outline_status(outline_id, "completed")
-        await db.increase_outline_version(conv.current_outline_id)
         return f"全部生成完成: {len(sections)} 章节"
 
     return tool(_generate_outline_content)
@@ -166,7 +165,6 @@ def make_modify_outline_section(db: Database, conversation_id: int) -> Callable:
         if conv is None or conv.current_outline_id is None:
             return "错误：没有选中大纲"
 
-        await db.increase_outline_version(conv.current_outline_id)
         push_sentinel(conversation_id)
         return await run_outline_generator(
             db, conversation_id,

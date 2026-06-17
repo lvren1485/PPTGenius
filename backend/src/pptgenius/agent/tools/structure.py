@@ -362,6 +362,9 @@ def make_rearrange_presentation_slides(db: Database, conversation_id: int) -> Ca
         if created:
             await db.db.commit()
 
+        # Reset presentation version — structure changed, new baseline
+        pres.version = 0
+
         return f"重排完成: 删除 {deleted}, 新建 {created}"
 
     return tool(_rearrange_presentation_slides)

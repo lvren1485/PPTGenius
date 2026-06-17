@@ -16,12 +16,13 @@ class TestOutlineSingleVersion:
         o = await Database(db).create_outline(u.id, conv.id, title="V1 Test")
         return Database(db), o
 
-    async def test_version_defaults_to_1(self, d):
+    async def test_version_defaults_to_0(self, d):
         db_obj, o = d
-        assert o.version == 1
+        assert o.version == 0
 
     async def test_increase_version(self, d):
         db_obj, o = d
+        await db_obj.increase_outline_version(o.id)
         await db_obj.increase_outline_version(o.id)
         await db_obj.increase_outline_version(o.id)
         fetched = await db_obj.get_outline(o.id)
@@ -32,7 +33,7 @@ class TestOutlineSingleVersion:
         # Should work without the legacy 'type' argument
         assert await db_obj.increase_outline_version(o.id)
         fetched = await db_obj.get_outline(o.id)
-        assert fetched.version == 2
+        assert fetched.version == 1
 
     async def test_no_version_major_fields(self, d):
         db_obj, o = d
@@ -107,12 +108,12 @@ class TestPresentationVersion:
 
     async def test_create_presentation_with_outline_version(self, d):
         db_obj, u, conv, o = d
-        outline = await db_obj.get_outline(o.id)  # version = 1
+        outline = await db_obj.get_outline(o.id)  # version = 0
         pres = await db_obj.create_presentation(
             u.id, conv.id, outline_id=o.id, outline_version=outline.version,
         )
-        assert pres.version == 1
-        assert pres.outline_version == 1
+        assert pres.version == 0
+        assert pres.outline_version == 0
 
     async def test_default_outline_version_zero(self, d):
         db_obj, u, conv, o = d
@@ -127,7 +128,7 @@ class TestPresentationVersion:
         assert await db_obj.increment_presentation_version(pres.id)
         assert await db_obj.increment_presentation_version(pres.id)
         fetched = await db_obj.get_presentation(pres.id)
-        assert fetched.version == 3
+        assert fetched.version == 2
 
     async def test_increment_on_deleted_presentation(self, d):
         db_obj, u, conv, o = d
