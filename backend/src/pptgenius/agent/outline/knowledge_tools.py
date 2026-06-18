@@ -17,6 +17,9 @@ _KB_SEARCH_LIMIT = 9
 _WEB_SEARCH_LIMIT = 6
 _FETCH_LIMIT = 4
 _READ_LIMIT = 3
+_EXPLORE_KB_LIMIT = 12
+_EXPLORE_WEB_LIMIT = 8
+_EXPLORE_FETCH_LIMIT = 6
 
 # Suffix appended to every tool result to nudge the model toward write_slides
 _WRITE_HINT = "\n\n 如果已收集到足够信息，请立即调用 write_slides 工具写入内容。禁止直接输出"
@@ -50,6 +53,7 @@ def make_search_knowledge(
     rag_mode: str,
     count: list[int],
     filter_web: bool = False,
+    limit: int = _KB_SEARCH_LIMIT,
 ):
     _chunk_map: dict[str, tuple[int, int]] | None = None
 
@@ -66,8 +70,8 @@ def make_search_knowledge(
         Use this first before searching the open web. Max 9 calls per round.
         Each result includes a chunk_id for citation.
         """
-        if count[0] >= _KB_SEARCH_LIMIT:
-            return f"搜索已达上限 ({_KB_SEARCH_LIMIT}次)。请立即调用 write_slides 工具写入内容。禁止直接输出。"
+        if count[0] >= limit:
+            return f"搜索已达上限 ({limit}次)。请立即调用 write_slides 工具写入内容。禁止直接输出。"
         count[0] += 1
 
         await _ensure_map()
@@ -97,18 +101,18 @@ def make_search_knowledge(
     return search_knowledge
 
 
-def make_search_web(count: list[int], enabled: bool = True):
+def make_search_web(count: list[int], enabled: bool = True,
+                    limit: int = _WEB_SEARCH_LIMIT):
     @tool
     async def search_web(query: str, max_results: int = 5) -> str:
         """Search the web for information. Returns title, URL, and snippet.
 
         Use this when the knowledge base doesn't have enough information.
-        Max 6 calls per round.
         """
         if not enabled:
             return "网络搜索已关闭。请使用知识库内容。" + _WRITE_HINT
-        if count[0] >= _WEB_SEARCH_LIMIT:
-            return f"搜索已达上限 ({_WEB_SEARCH_LIMIT}次)。请立即调用 write_slides 工具写入内容。禁止直接输出。"
+        if count[0] >= limit:
+            return f"搜索已达上限 ({limit}次)。" + _WRITE_HINT
         count[0] += 1
 
         try:
@@ -127,17 +131,18 @@ def make_search_web(count: list[int], enabled: bool = True):
 
 
 def make_fetch_web(db: Database, user_id: int, conv_id: int,
-                   count: list[int], agent_id: str = "", enabled: bool = True):
+                   count: list[int], agent_id: str = "", enabled: bool = True,
+                   limit: int = _FETCH_LIMIT):
     @tool
     async def fetch_web(url: str) -> str:
         """Fetch and index a web page. The content is added to the knowledge base.
 
-        Use after search_web to read a promising result. Max 4 fetches per round.
+        Use after search_web to read a promising result.
         """
         if not enabled:
             return "网络抓取已关闭。" + _WRITE_HINT
-        if count[0] >= _FETCH_LIMIT:
-            return f"抓取已达上限 ({_FETCH_LIMIT}次)。请立即调用 write_slides 写入内容。禁止直接输出。"
+        if count[0] >= limit:
+            return f"抓取已达上限 ({limit}次)。" + _WRITE_HINT
         count[0] += 1
         try:
             result = await _web_search.fetch_and_ingest(
@@ -147,7 +152,17 @@ def make_fetch_web(db: Database, user_id: int, conv_id: int,
             _log.warning("web fetch failed: %s — %s", url, e)
             return f"网页抓取失败: {e}。请尝试其他搜索结果。" + _WRITE_HINT
         if result.get("ingested"):
-            return f"已抓取: {result['title']}\n{result['text'][:1000]}\n详细内容已加入知识库。" + _WRITE_HINT
+            file_id = result.get("knowledge_file_id")
+            title = result.get("title", url)
+            summary = ""
+            if file_id:
+                kf = await db.get_knowledge_file(file_id)
+                if kf and kf.summary_json:
+                    summary = kf.summary_json
+            info = f"file_id={file_id}, title={title}"
+            if summary:
+                info += f"\n摘要: {summary}"
+            return f"已抓取并入库。{info}" + _WRITE_HINT
         return f"抓取失败。{result.get('title', 'N/A')}" + _WRITE_HINT
 
     return fetch_web

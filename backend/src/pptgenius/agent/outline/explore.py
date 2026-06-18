@@ -103,6 +103,9 @@ async def run_explore_agent(
             "每个 section 选择最相关的 2-5 个 file_id 和 chunk_id 填入输出。"
         )
 
+    # ── Build LLM first (agent_id needed for fetch_web token tracking) ──
+    llm, agent_id = create_llm(conversation_id)
+
     # ── Tools ──
     kb_count = [0]
     web_count = [0]
@@ -119,9 +122,7 @@ async def run_explore_agent(
     if web_enabled:
         tools.append(make_search_web(web_count, limit=_EXPLORE_WEB_LIMIT))
         tools.append(make_fetch_web(db, user_id, conversation_id, fetch_count,
-                                    agent_id="", limit=_EXPLORE_FETCH_LIMIT))
-
-    llm, agent_id = create_llm(conversation_id)
+                                    agent_id=agent_id, limit=_EXPLORE_FETCH_LIMIT))
     mws, _ = build_middlewares(conversation_id, agent_id)
     push_agent(conversation_id, agent_id)
 
