@@ -1,4 +1,4 @@
-"""Explore knowledge tool — thin wrapper delegating to agent/outline/knowledge.py."""
+"""Explore knowledge tool — thin wrapper delegating to agent/outline/explore.py."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from langchain_core.tools import tool
 from pptgenius.infrastructure.db.database import Database
 
 from ..common.agent_registry import push_sentinel
-from ..outline.knowledge import run_knowledge_agent
+from ..outline.explore import run_explore_agent
 
 
 def make_explore_knowledge(db: Database, conversation_id: int) -> Callable:
@@ -20,14 +20,17 @@ def make_explore_knowledge(db: Database, conversation_id: int) -> Callable:
     ) -> dict:
         """Explore knowledge files and suggest PPT outline structure.
 
-        Call BEFORE write_outline_structure. Reads files, understands content,
-        and returns a natural-language exploration result with outline suggestions.
+        Call BEFORE write_outline_structure. Reads file summaries, searches
+        knowledge base and web, returns outline structure suggestions.
 
         Args:
             query: Optional user requirements.
             file_ids: Optional specific file ids to explore. Omit to explore all.
         """
         push_sentinel(conversation_id)
-        return await run_knowledge_agent(db, conversation_id, query=query, file_ids=file_ids)
+        result = await run_explore_agent(db, conversation_id, query=query, file_ids=file_ids)
+        if "error" in result:
+            return {"result": result["error"], "status": "error"}
+        return result
 
     return tool(_explore_knowledge)
