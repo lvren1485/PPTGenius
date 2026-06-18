@@ -379,12 +379,7 @@ class SlideSpec(BaseModel):
     notes: str | None = None  # outline slide 备注, 写入 PPT 演讲者备注
     elements: list[Element] = []
 
-    @field_validator("layout")
-    @classmethod
-    def _check_layout(cls, v: str) -> str:
-        if v not in LAYOUT_NAMES:
-            raise ValueError(f"unknown layout '{v}'. valid: {sorted(LAYOUT_NAMES)}")
-        return v
+    # layout validation removed — superfreedom treats layout as a reference label only
 
 
 class MetaSpec(BaseModel):
