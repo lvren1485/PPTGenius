@@ -6,7 +6,7 @@ from pptgenius.infrastructure.utils.token_counter import TokenCounter
 
 
 class TestTokenCounterDualLayer:
-    """New: _agent_counters + for_agent + get_cost dual interface."""
+    """Agent-level token counters with cleanup."""
 
     def test_for_agent_creates_counter(self):
         tc = TokenCounter.for_agent("agent_abc")
@@ -32,18 +32,6 @@ class TestTokenCounterDualLayer:
         TokenCounter.for_agent("temp_agent").add({"input_tokens": 10, "output_tokens": 5, "total_tokens": 15})
         TokenCounter.remove_agent("temp_agent")
         assert TokenCounter.get_agent("temp_agent") is None
-
-    def test_get_cost_dual_interface(self):
-        # int → conversation
-        tc_conv = TokenCounter.for_conversation(9999)
-        assert TokenCounter.get_cost(9999) is tc_conv
-        # str → agent
-        tc_agent = TokenCounter.for_agent("dual_test")
-        assert TokenCounter.get_cost("dual_test") is tc_agent
-
-    def test_get_cost_returns_none(self):
-        assert TokenCounter.get_cost(88888) is None
-        assert TokenCounter.get_cost("no_such_agent") is None
 
     def test_snapshot_after_add(self):
         tc = TokenCounter.for_agent("snap_agent")

@@ -1,31 +1,20 @@
-"""LLM token usage accumulator — per-conversation, with DeepSeek cache pricing.
+"""LLM token usage accumulator — per-agent registry with DeepSeek cache pricing.
 
-Compatible with:
-- raw DeepSeek API ``usage`` dict
-- LangChain ``AIMessage.usage_metadata``
-- LangChain ``UsageMetadataCallbackHandler`` output
+Conversation-level cost is tracked in the DB (conversations.estimated_cost),
+not here.  This module only tracks per-agent token usage during a single
+agent invocation — counters are removed after their results are persisted.
 """
 
 from __future__ import annotations
 
 from .logger import get_logger
 
-# DeepSeek official pricing (CNY per 1M tokens) — 2025-06
 _PRICING: dict[str, dict[str, float]] = {
-    "deepseek-v4-flash": {
-        "cache_hit":  0.02,
-        "cache_miss": 1.00,
-        "output":     2.00,
-    },
-    "deepseek-v4-pro": {
-        "cache_hit":  0.025,
-        "cache_miss": 3.00,
-        "output":     6.00,
-    },
+    "deepseek-v4-flash": {"cache_hit": 0.02, "cache_miss": 1.00, "output": 2.00},
+    "deepseek-v4-pro":  {"cache_hit": 0.025, "cache_miss": 3.00, "output": 6.00},
 }
 _FALLBACK_MODEL = "deepseek-v4-flash"
 
-# Usage field aliases (raw DeepSeek → LangChain UsageMetadata)
 _PROMPT_KEYS = ("prompt_tokens", "input_tokens")
 _COMPLETION_KEYS = ("completion_tokens", "output_tokens")
 _TOTAL_KEYS = ("total_tokens",)
@@ -39,27 +28,22 @@ def _first_of(d: dict, *keys: str, default: int = 0) -> int:
     return default
 
 
-# -- per-conversation registry -----------------------------------------------
-
-_counters: dict[int, "TokenCounter"] = {}
-
-# -- per-agent registry (memory-only, agent_id not persisted) -----------------
-
 _agent_counters: dict[str, "TokenCounter"] = {}
 
 
 class TokenCounter:
-    """Accumulate token usage for one conversation.
+    """Accumulate token usage for one agent invocation.
 
-    Usage with LangGraph / LangChain::
+    Usage::
 
-        # In a model node:
-        response = await llm.ainvoke(messages)
-        tc = TokenCounter.for_conversation(conversation_id)
-        tc.add(response.usage_metadata)
+        # In middleware:
+        TokenCounter.for_agent(agent_id).add(usage)
 
-        # Later:
-        print(tc.snapshot())
+        # After agent completes (in persist middleware):
+        tc = TokenCounter.get_agent(agent_id)
+        token_cost_json = tc.to_json()
+        cost = tc.snapshot()["estimated_cost_cny"]
+        TokenCounter.remove_agent(agent_id)   # prevent memory leak
     """
 
     def __init__(self, model_name: str = "deepseek-v4-flash") -> None:
@@ -76,28 +60,7 @@ class TokenCounter:
     # -- registry ------------------------------------------------------------
 
     @classmethod
-    def for_conversation(cls, conversation_id: int, model_name: str = "deepseek-v4-flash") -> "TokenCounter":
-        """Get or create the TokenCounter for *conversation_id*."""
-        tc = _counters.get(conversation_id)
-        if tc is None:
-            tc = _counters[conversation_id] = cls(model_name)
-        return tc
-
-    @classmethod
-    def get(cls, conversation_id: int) -> "TokenCounter | None":
-        """Return the TokenCounter for *conversation_id* or None."""
-        return _counters.get(conversation_id)
-
-    @classmethod
-    def remove(cls, conversation_id: int) -> None:
-        """Discard the counter for *conversation_id*."""
-        _counters.pop(conversation_id, None)
-
-    # -- per-agent registry ---------------------------------------------------
-
-    @classmethod
     def for_agent(cls, agent_id: str, model_name: str = "deepseek-v4-flash") -> "TokenCounter":
-        """Get or create the TokenCounter for *agent_id* (memory-only)."""
         tc = _agent_counters.get(agent_id)
         if tc is None:
             tc = _agent_counters[agent_id] = cls(model_name)
@@ -105,25 +68,15 @@ class TokenCounter:
 
     @classmethod
     def get_agent(cls, agent_id: str) -> "TokenCounter | None":
-        """Return the TokenCounter for *agent_id* or None."""
         return _agent_counters.get(agent_id)
 
     @classmethod
     def remove_agent(cls, agent_id: str) -> None:
-        """Discard the counter for *agent_id*."""
         _agent_counters.pop(agent_id, None)
-
-    @classmethod
-    def get_cost(cls, key: int | str) -> "TokenCounter | None":
-        """Dual interface: ``int`` → conversation_id, ``str`` → agent_id."""
-        if isinstance(key, int):
-            return _counters.get(key)
-        return _agent_counters.get(key)
 
     # -- public API ----------------------------------------------------------
 
     def add(self, usage: dict | None) -> "TokenCounter":
-        """Accumulate *usage* dict from LLM response. Returns self for chaining."""
         if not usage:
             return self
 
@@ -134,10 +87,8 @@ class TokenCounter:
         input_details = usage.get("input_token_details") or usage.get("prompt_tokens_details") or {}
         output_details = usage.get("output_token_details") or usage.get("completion_tokens_details") or {}
 
-        # DeepSeek top-level cache fields (prompt_cache_hit + prompt_cache_miss = prompt_tokens)
         cache_hit = usage.get("prompt_cache_hit_tokens", 0)
         cache_miss = usage.get("prompt_cache_miss_tokens", 0)
-        # Fallback: nested cached_tokens / cache_read
         if cache_hit == 0 and cache_miss == 0:
             nested_cached = input_details.get("cached_tokens", 0) or input_details.get("cache_read", 0)
             if nested_cached:
@@ -163,7 +114,6 @@ class TokenCounter:
         return self
 
     def estimate_cost(self) -> float:
-        """Estimated cost in CNY using cache-aware DeepSeek pricing."""
         p = _PRICING.get(self.model_name, _PRICING[_FALLBACK_MODEL])
         return (
             self._cache_hit_tokens * p["cache_hit"]
@@ -172,7 +122,6 @@ class TokenCounter:
         ) / 1_000_000
 
     def to_json(self) -> dict:
-        """Billing-relevant token breakdown for message persistence."""
         return {
             "input_tokens": self._prompt_tokens,
             "output_tokens": self._completion_tokens,
@@ -181,31 +130,6 @@ class TokenCounter:
             "cache_miss_tokens": self._cache_miss_tokens,
             "reasoning_tokens": self._reasoning_tokens,
         }
-
-    def snapshot(self) -> dict:
-        """Return a summary dict of accumulated usage."""
-        return {
-            "model": self.model_name,
-            "prompt_tokens": self._prompt_tokens,
-            "completion_tokens": self._completion_tokens,
-            "total_tokens": self._total_tokens,
-            "cache_hit_tokens": self._cache_hit_tokens,
-            "cache_miss_tokens": self._cache_miss_tokens,
-            "reasoning_tokens": self._reasoning_tokens,
-            "call_count": self._call_count,
-            "estimated_cost_cny": round(self.estimate_cost(), 6),
-        }
-
-    def reset(self) -> None:
-        self._prompt_tokens = 0
-        self._completion_tokens = 0
-        self._total_tokens = 0
-        self._cache_hit_tokens = 0
-        self._cache_miss_tokens = 0
-        self._reasoning_tokens = 0
-        self._call_count = 0
-
-    # -- properties ----------------------------------------------------------
 
     @property
     def prompt_tokens(self) -> int:
@@ -234,3 +158,16 @@ class TokenCounter:
     @property
     def call_count(self) -> int:
         return self._call_count
+
+    def snapshot(self) -> dict:
+        return {
+            "model": self.model_name,
+            "prompt_tokens": self._prompt_tokens,
+            "completion_tokens": self._completion_tokens,
+            "total_tokens": self._total_tokens,
+            "cache_hit_tokens": self._cache_hit_tokens,
+            "cache_miss_tokens": self._cache_miss_tokens,
+            "reasoning_tokens": self._reasoning_tokens,
+            "call_count": self._call_count,
+            "estimated_cost_cny": round(self.estimate_cost(), 6),
+        }

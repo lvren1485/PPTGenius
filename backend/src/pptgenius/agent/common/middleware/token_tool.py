@@ -29,7 +29,6 @@ class TokenCountingMiddleware(AgentMiddleware):
             usage = last_msg.usage_metadata
 
         if usage:
-            TokenCounter.for_conversation(self.conversation_id).add(usage)
             TokenCounter.for_agent(self.agent_id).add(usage)
 
         return None

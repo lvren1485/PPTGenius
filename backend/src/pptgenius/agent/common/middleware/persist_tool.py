@@ -155,6 +155,7 @@ class PersistToolMiddleware(AgentMiddleware):
                                 for k, v in tc.to_json().items():
                                     summed[k] = summed.get(k, 0) + v
                                 total_cost += tc.snapshot()["estimated_cost_cny"]
+                                TokenCounter.remove_agent(aid)
                         await db.set_message_cost(msg.id,
                             token_cost_json=summed,
                             estimated_cost=total_cost,

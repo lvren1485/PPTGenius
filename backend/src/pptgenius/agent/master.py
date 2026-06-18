@@ -174,6 +174,7 @@ async def run_master_agent(
 
     # --- 7. Persist Master's own token cost ---
     tc = TokenCounter.get_agent(agent_id)
+    TokenCounter.remove_agent(agent_id)  # prevent memory leak
     # Extract reasoning_content from the last AIMessage in the result chain
     reasoning = ""
     for m in reversed(messages):
