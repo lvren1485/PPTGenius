@@ -18,7 +18,7 @@ import pandas as pd
 from .base import ParsedDocument
 
 _SMALL_THRESHOLD = 30  # row_count × col_count
-_PREVIEW_ROWS = 50
+_PREVIEW_ROWS = 30
 
 
 # -- markdown table (small sheets) --------------------------------------------

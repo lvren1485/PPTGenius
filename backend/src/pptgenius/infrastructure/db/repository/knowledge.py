@@ -198,3 +198,35 @@ async def get_all_chunks_for_conversation(
     )
     result = await db.execute(stmt)
     return list(result.scalars().all())
+
+
+async def get_chunks_for_user_filter_web(db: AsyncSession, user_id: int) -> list[KnowledgeChunk]:
+    """User-level chunks excluding web-sourced files."""
+    stmt = (
+        select(KnowledgeChunk)
+        .join(KnowledgeFile)
+        .where(
+            KnowledgeFile.user_id == user_id,
+            KnowledgeFile.source_type != "web",
+        )
+        .order_by(KnowledgeChunk.id.asc())
+    )
+    result = await db.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def get_chunks_for_conversation_filter_web(
+    db: AsyncSession, conversation_id: int,
+) -> list[KnowledgeChunk]:
+    """Conversation-level chunks excluding web-sourced files."""
+    stmt = (
+        select(KnowledgeChunk)
+        .join(KnowledgeFile)
+        .where(
+            KnowledgeFile.conversation_id == conversation_id,
+            KnowledgeFile.source_type != "web",
+        )
+        .order_by(KnowledgeChunk.id.asc())
+    )
+    result = await db.execute(stmt)
+    return list(result.scalars().all())

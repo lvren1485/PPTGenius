@@ -153,7 +153,8 @@ class WebSearchService:
         res_path = kdir / f"web_{int(time.time())}_{safe_title}.txt"
         res_path.write_text(text, encoding="utf-8")
         ks = KnowledgeService()
-        file_id = await ks.ingest(db, str(res_path), user_id)
+        file_id = await ks.ingest(db, str(res_path), user_id,
+                                  conversation_id=conv_id, source_type="web")
         if file_id:
             _log.debug("indexed %s → file_id=%d", result["url"], file_id)
         return file_id

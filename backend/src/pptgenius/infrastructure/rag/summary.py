@@ -104,6 +104,7 @@ class SummaryService:
         )
 
         await db.update_knowledge_file_summary(file_id, result["summary"])
+        await db.update_knowledge_file_status(file_id, "summarised")
         _log.info("summarised file_id=%d (%d chars → %d chars summary, ¥%.4f)",
                    file_id, len(full_text), len(result["summary"]), result["estimated_cost_cny"])
         return result
@@ -129,6 +130,7 @@ class SummaryService:
         )
 
         await db.update_knowledge_file_summary(file_id, result["summary"])
+        await db.update_knowledge_file_status(file_id, "summarised")
         await db.set_knowledge_file_web_url(file_id, url)
         _log.info("summarised web file_id=%d url=%s (→ %d chars, ¥%.4f)",
                    file_id, url[:60], len(result["summary"]), result["estimated_cost_cny"])

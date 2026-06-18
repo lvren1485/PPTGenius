@@ -43,6 +43,11 @@ class Database:
     async def update_user_other(self, *a, **kw): return await self._call(user_repo.update_user_other, *a, **kw)
     async def get_rag_mode(self, *a, **kw): return await self._call(user_repo.get_rag_mode, *a, **kw)
     async def set_rag_mode(self, *a, **kw): return await self._call(user_repo.set_rag_mode, *a, **kw)
+    async def get_web_search_enabled(self, *a, **kw): return await self._call(user_repo.get_web_search_enabled, *a, **kw)
+    async def set_web_search_enabled(self, *a, **kw): return await self._call(user_repo.set_web_search_enabled, *a, **kw)
+    async def set_rag_index_changed(self, *a, **kw): return await self._call(user_repo.set_rag_index_changed, *a, **kw)
+    async def clear_rag_index_changed(self, *a, **kw): return await self._call(user_repo.clear_rag_index_changed, *a, **kw)
+    async def is_rag_index_changed(self, *a, **kw): return await self._call(user_repo.is_rag_index_changed, *a, **kw)
 
     # ─── conversation ───
     async def create_conversation(self, *a, **kw): return await self._call(conv_repo.create_conversation, *a, **kw)
@@ -136,6 +141,8 @@ class Database:
     async def list_chunks_by_file(self, *a, **kw): return await self._call(kn_repo.list_chunks_by_file, *a, **kw)
     async def get_all_chunks_for_user(self, *a, **kw): return await self._call(kn_repo.get_all_chunks_for_user, *a, **kw)
     async def get_all_chunks_for_conversation(self, *a, **kw): return await self._call(kn_repo.get_all_chunks_for_conversation, *a, **kw)
+    async def get_chunks_for_user_filter_web(self, *a, **kw): return await self._call(kn_repo.get_chunks_for_user_filter_web, *a, **kw)
+    async def get_chunks_for_conversation_filter_web(self, *a, **kw): return await self._call(kn_repo.get_chunks_for_conversation_filter_web, *a, **kw)
 
     # ─── snapshot ───
     async def create_snapshot(self, *a, **kw): return await self._call(snap_repo.create_snapshot, *a, **kw)

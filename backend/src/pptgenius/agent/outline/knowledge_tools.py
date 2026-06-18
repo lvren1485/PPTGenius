@@ -27,12 +27,19 @@ async def _build_chunk_map(
     user_id: int,
     conversation_id: int,
     rag_mode: str,
+    filter_web: bool = False,
 ) -> dict[str, tuple[int, int]]:
     """Return {chunk_text[:20]: (chunk_id, file_id)} for the active scope."""
     if rag_mode == "conversation":
-        chunks = await db.get_all_chunks_for_conversation(conversation_id)
+        if filter_web:
+            chunks = await db.get_chunks_for_conversation_filter_web(conversation_id)
+        else:
+            chunks = await db.get_all_chunks_for_conversation(conversation_id)
     else:
-        chunks = await db.get_all_chunks_for_user(user_id)
+        if filter_web:
+            chunks = await db.get_chunks_for_user_filter_web(user_id)
+        else:
+            chunks = await db.get_all_chunks_for_user(user_id)
     return {c.chunk_text[:20]: (c.id, c.file_id) for c in chunks}
 
 
@@ -42,13 +49,15 @@ def make_search_knowledge(
     conversation_id: int,
     rag_mode: str,
     count: list[int],
+    filter_web: bool = False,
 ):
     _chunk_map: dict[str, tuple[int, int]] | None = None
 
     async def _ensure_map():
         nonlocal _chunk_map
         if _chunk_map is None:
-            _chunk_map = await _build_chunk_map(db, user_id, conversation_id, rag_mode)
+            _chunk_map = await _build_chunk_map(db, user_id, conversation_id,
+                                                 rag_mode, filter_web=filter_web)
 
     @tool
     async def search_knowledge(query: str, top_k: int = 5) -> str:
@@ -65,10 +74,12 @@ def make_search_knowledge(
 
         if rag_mode == "conversation":
             results = await _knowledge.search_by_conversation(
-                db, conversation_id, query, top_k,
+                db, conversation_id, query, top_k, filter_web=filter_web,
             )
         else:
-            results = await _knowledge.search(user_id, query, top_k)
+            results = await _knowledge.search(
+                db, user_id, query, top_k, filter_web=filter_web,
+            )
 
         if not results:
             return "知识库中未找到相关文档。" + _WRITE_HINT
@@ -86,7 +97,7 @@ def make_search_knowledge(
     return search_knowledge
 
 
-def make_search_web(count: list[int]):
+def make_search_web(count: list[int], enabled: bool = True):
     @tool
     async def search_web(query: str, max_results: int = 5) -> str:
         """Search the web for information. Returns title, URL, and snippet.
@@ -94,6 +105,8 @@ def make_search_web(count: list[int]):
         Use this when the knowledge base doesn't have enough information.
         Max 6 calls per round.
         """
+        if not enabled:
+            return "网络搜索已关闭。请使用知识库内容。" + _WRITE_HINT
         if count[0] >= _WEB_SEARCH_LIMIT:
             return f"搜索已达上限 ({_WEB_SEARCH_LIMIT}次)。请立即调用 write_slides 工具写入内容。禁止直接输出。"
         count[0] += 1
@@ -114,13 +127,15 @@ def make_search_web(count: list[int]):
 
 
 def make_fetch_web(db: Database, user_id: int, conv_id: int,
-                   count: list[int], agent_id: str = ""):
+                   count: list[int], agent_id: str = "", enabled: bool = True):
     @tool
     async def fetch_web(url: str) -> str:
         """Fetch and index a web page. The content is added to the knowledge base.
 
         Use after search_web to read a promising result. Max 4 fetches per round.
         """
+        if not enabled:
+            return "网络抓取已关闭。" + _WRITE_HINT
         if count[0] >= _FETCH_LIMIT:
             return f"抓取已达上限 ({_FETCH_LIMIT}次)。请立即调用 write_slides 写入内容。禁止直接输出。"
         count[0] += 1
@@ -136,6 +151,31 @@ def make_fetch_web(db: Database, user_id: int, conv_id: int,
         return f"抓取失败。{result.get('title', 'N/A')}" + _WRITE_HINT
 
     return fetch_web
+
+
+def make_rebuild_rag_index(
+    db: Database,
+    user_id: int,
+    rag_mode: str,
+    conversation_id: int,
+    filter_web: bool = False,
+):
+    @tool
+    async def rebuild_rag_index() -> str:
+        """Rebuild the RAG knowledge base index.
+
+        Call this after uploading files or fetching web pages to make new
+        content searchable. Only needed when new documents were added during
+        this conversation.
+        """
+        from pptgenius.infrastructure.rag.knowledge import knowledge_service
+        await knowledge_service.ensure_index(
+            db, user_id=user_id, rag_mode=rag_mode,
+            filter_web=filter_web, conversation_id=conversation_id,
+        )
+        return "RAG 索引已重建。"
+
+    return rebuild_rag_index
 
 
 def make_read_file(db: Database, count: list[int], fetched_ids: set[int]):

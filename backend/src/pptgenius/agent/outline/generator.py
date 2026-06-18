@@ -152,6 +152,7 @@ async def run_outline_generator(
     conv = await db.get_conversation(conversation_id)
     user_id = conv.user_id if conv else 0
     rag_mode = await db.get_rag_mode(user_id) if user_id else "user"
+    web_enabled = await db.get_web_search_enabled(user_id) if user_id else True
 
     kb_count = [0]
     web_count = [0]
@@ -161,9 +162,11 @@ async def run_outline_generator(
     full_tools = [
         write_slide,
         pending_slides,
-        make_search_knowledge(db, user_id, conversation_id, rag_mode, kb_count),
-        make_search_web(web_count),
-        make_fetch_web(db, user_id, conversation_id, fetch_count, agent_id=agent_id),
+        make_search_knowledge(db, user_id, conversation_id, rag_mode, kb_count,
+                              filter_web=not web_enabled),
+        make_search_web(web_count, enabled=web_enabled),
+        make_fetch_web(db, user_id, conversation_id, fetch_count,
+                       agent_id=agent_id, enabled=web_enabled),
     ]
 
     system_prompt = build_generator_system_prompt()
