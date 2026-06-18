@@ -107,7 +107,7 @@ async def update_knowledge_file_status(
 
 
 async def update_knowledge_file_summary(
-    db: AsyncSession, file_id: int, summary_json: dict
+    db: AsyncSession, file_id: int, summary_json: str
 ) -> bool:
     kf = await db.get(KnowledgeFile, file_id)
     if kf is None:

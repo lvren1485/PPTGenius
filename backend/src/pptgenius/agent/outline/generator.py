@@ -163,7 +163,7 @@ async def run_outline_generator(
         pending_slides,
         make_search_knowledge(db, user_id, conversation_id, rag_mode, kb_count),
         make_search_web(web_count),
-        make_fetch_web(db, user_id, conversation_id, fetch_count),
+        make_fetch_web(db, user_id, conversation_id, fetch_count, agent_id=agent_id),
     ]
 
     system_prompt = build_generator_system_prompt()

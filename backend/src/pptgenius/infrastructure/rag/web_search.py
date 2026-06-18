@@ -104,7 +104,8 @@ class WebSearchService:
         return await self._do_search(query, max_n, cfg)
 
     async def fetch_and_ingest(
-        self, db: Database, url: str, user_id: int, conv_id: int
+        self, db: Database, url: str, user_id: int, conv_id: int,
+        agent_id: str = "",
     ) -> dict:
         """Fetch a single *url*, scrape its content, and index via KnowledgeService.
 
@@ -116,6 +117,17 @@ class WebSearchService:
         if sc["text"] and len(sc["text"]) > 100:
             sc["ingested"] = True
             sc["knowledge_file_id"] = await self._ingest_result(db, sc, user_id, conv_id)
+            # Generate summary after ingest
+            if sc["knowledge_file_id"]:
+                from .summary import summary_service
+                try:
+                    await summary_service.summarize_web(
+                        db, sc["knowledge_file_id"],
+                        title=sc.get("title", ""), url=sc.get("url", url), text=sc["text"],
+                        agent_id=agent_id,
+                    )
+                except Exception:
+                    _log.exception("web summary failed for url=%s", url)
         else:
             sc["ingested"] = False
             sc["knowledge_file_id"] = None

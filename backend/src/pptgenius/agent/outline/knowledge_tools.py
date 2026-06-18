@@ -113,7 +113,8 @@ def make_search_web(count: list[int]):
     return search_web
 
 
-def make_fetch_web(db: Database, user_id: int, conv_id: int, count: list[int]):
+def make_fetch_web(db: Database, user_id: int, conv_id: int,
+                   count: list[int], agent_id: str = ""):
     @tool
     async def fetch_web(url: str) -> str:
         """Fetch and index a web page. The content is added to the knowledge base.
@@ -124,14 +125,13 @@ def make_fetch_web(db: Database, user_id: int, conv_id: int, count: list[int]):
             return f"抓取已达上限 ({_FETCH_LIMIT}次)。请立即调用 write_slides 写入内容。禁止直接输出。"
         count[0] += 1
         try:
-            result = await _web_search.fetch_and_ingest(db, url, user_id, conv_id)
+            result = await _web_search.fetch_and_ingest(
+                db, url, user_id, conv_id, agent_id=agent_id,
+            )
         except Exception as e:
             _log.warning("web fetch failed: %s — %s", url, e)
             return f"网页抓取失败: {e}。请尝试其他搜索结果。" + _WRITE_HINT
         if result.get("ingested"):
-            file_id = result.get("knowledge_file_id")
-            if file_id:
-                await db.set_knowledge_file_web_url(file_id, url)
             return f"已抓取: {result['title']}\n{result['text'][:1000]}\n详细内容已加入知识库。" + _WRITE_HINT
         return f"抓取失败。{result.get('title', 'N/A')}" + _WRITE_HINT
 

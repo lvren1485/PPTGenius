@@ -110,6 +110,18 @@ async def upload_files(
                 result.failed.append({"filename": f.filename, "reason": "parse failed"})
                 continue
 
+            # Generate summary first so we have token cost for the file message
+            from pptgenius.infrastructure.rag.summary import summary_service
+            summary_cost = None
+            summary_tokens = None
+            try:
+                sr = await summary_service.summarize_file(db, file_id)
+                if sr.get("estimated_cost_cny", 0) > 0:
+                    summary_cost = sr["estimated_cost_cny"]
+                    summary_tokens = sr["token_cost_json"]
+            except Exception:
+                _log.exception("summary failed for file_id=%d", file_id)
+
             try:
                 doc = parse_file(str(dest))
                 preview = doc.text[:200].strip()
@@ -124,6 +136,8 @@ async def upload_files(
                             f"{preview}"
                         ),
                         content_type="file",
+                        token_cost_json=summary_tokens,
+                        estimated_cost=summary_cost,
                     )
             except Exception:
                 _log.exception("Failed to create file message for %s", f.filename)
