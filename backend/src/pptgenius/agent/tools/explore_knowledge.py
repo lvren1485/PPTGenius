@@ -1,4 +1,4 @@
-"""Explore knowledge tool — thin wrapper delegating to agent/outline/explore.py."""
+"""Explore knowledge tool — wraps explore agent, stores result in DB."""
 
 from __future__ import annotations
 
@@ -17,20 +17,27 @@ def make_explore_knowledge(db: Database, conversation_id: int) -> Callable:
     async def _explore_knowledge(
         query: str | None = None,
         file_ids: list[int] | None = None,
-    ) -> dict:
-        """Explore knowledge files and suggest PPT outline structure.
+    ) -> str:
+        """Explore knowledge files + web and suggest PPT outline structure in JSON.
 
-        Call BEFORE write_outline_structure. Reads file summaries, searches
-        knowledge base and web, returns outline structure suggestions.
+        Call AFTER create_empty_outline.  Searches file summaries, knowledge base,
+        and web for information.  Returns structured JSON with sections, each
+        containing file_ids and chunk_ids citations.
 
         Args:
-            query: Optional user requirements.
-            file_ids: Optional specific file ids to explore. Omit to explore all.
+            query: User requirements or specific sections to focus on.
+            file_ids: Optional specific file ids. Omit to explore all.
         """
         push_sentinel(conversation_id)
         result = await run_explore_agent(db, conversation_id, query=query, file_ids=file_ids)
         if "error" in result:
-            return {"result": result["error"], "status": "error"}
-        return result
+            return f"探索失败: {result['error']}"
+
+        # Store explore result in DB
+        conv = await db.get_conversation(conversation_id)
+        if conv and conv.current_outline_id:
+            await db.set_outline_explore_result(conv.current_outline_id, result["result"])
+
+        return result["result"]
 
     return tool(_explore_knowledge)

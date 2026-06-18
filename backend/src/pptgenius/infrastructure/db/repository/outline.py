@@ -143,12 +143,14 @@ async def create_outline_section(
     section_index: int,
     title: str,
     description: str | None = None,
+    citations: dict | None = None,
 ) -> OutlineSection:
     section = OutlineSection(
         outline_id=outline_id,
         section_index=section_index,
         title=title,
         description=description,
+        citations=citations,
     )
     db.add(section)
     await db.commit()
@@ -178,6 +180,7 @@ async def update_outline_section(
     title: str | None = None,
     description: str | None = None,
     slide_count: int | None = None,
+    citations: dict | None = None,
 ) -> bool:
     section = await db.get(OutlineSection, section_id)
     if section is None:
@@ -188,6 +191,27 @@ async def update_outline_section(
         section.description = description
     if slide_count is not None:
         section.slide_count = slide_count
+    if citations is not None:
+        section.citations = citations
+    await db.commit()
+    return True
+
+
+async def soft_delete_outline_section(db: AsyncSession, section_id: int) -> bool:
+    """Mark section as deleted."""
+    section = await db.get(OutlineSection, section_id)
+    if section is None:
+        return False
+    await db.delete(section)  # sections are hard-deleted (slides use CASCADE NULL)
+    await db.commit()
+    return True
+
+
+async def set_outline_slide_count(db: AsyncSession, outline_id: int, count: int) -> bool:
+    outline = await db.get(Outline, outline_id)
+    if outline is None or outline.status == "deleted":
+        return False
+    outline.slide_count = count
     await db.commit()
     return True
 

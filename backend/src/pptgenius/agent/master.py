@@ -25,6 +25,7 @@ _TOOL_CTYPE: dict[str, str] = {
     "_get_presentation":         "get_pres",
     "_get_knowledge_files":      "get_kfiles",
     "_search_styles":            "search_styles",
+    "_create_empty_outline":      "create_outline",
     "_write_outline_structure":  "write_outline",
     "_modify_outline_structure": "mod_outline",
     "_rearrange_presentation_slides": "rearr_pres",
@@ -55,7 +56,12 @@ from .tools.perception import (
 )
 from .tools.ppt_style import make_ppt_style
 from .tools.slides_content import make_modify_slides_content, make_slides_content
-from .tools.structure import make_modify_outline_structure, make_rearrange_presentation_slides, make_write_outline_structure
+from .tools.structure import (
+    make_create_empty_outline,
+    make_modify_outline_structure,
+    make_rearrange_presentation_slides,
+    make_write_outline_structure,
+)
 
 
 def _assemble_tools(db: Database, conversation_id: int) -> list:
@@ -69,7 +75,8 @@ def _assemble_tools(db: Database, conversation_id: int) -> list:
         make_get_presentation(db, conversation_id),
         make_get_knowledge_files(db, conversation_id),
         make_search_styles(db, conversation_id),
-        # Structure 
+        # Structure
+        make_create_empty_outline(db, conversation_id),
         make_write_outline_structure(db, conversation_id),
         make_modify_outline_structure(db, conversation_id),
         make_rearrange_presentation_slides(db, conversation_id),

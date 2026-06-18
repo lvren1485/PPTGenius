@@ -14,30 +14,33 @@
 
 ### 场景 A：新建 PPT（有知识文件）
 ```
-1. explore_knowledge(query, file_ids?)  → 阅读文件，获取结构建议
-2. write_outline_structure(title, sections)  → 参考 suggested_structure 创建
-3. generate_outline_content(query?)  → 一键填充全部章节
-4. get_outline()  → 查看结果摘要
-5. outline_evaluate()  → 质量评测
-6. 展示结果给用户确认
+1. create_empty_outline(title?)  → 创建空白大纲并设为当前
+2. explore_knowledge(query, file_ids?)  → 探索文件+网络，返回 JSON（含 citations）
+3. write_outline_structure(title, sections)  → 用 explore 返回的 JSON 写入大纲
+4. generate_outline_content()  → 一键填充全部章节
+5. get_outline()  → 查看结果摘要
+6. outline_evaluate()  → 质量评测
+7. 展示结果给用户确认
 ```
 
 ### 场景 B：新建 PPT（无知识文件）
 ```
-1. 根据用户主题自行规划结构
-2. write_outline_structure(title, sections)
-3. get_outline()  → 展示结构，等待用户确认(因为没有文件支撑，用户确认后才填充内容)
-4. generate_outline_content()
-5. outline_evaluate()  → 展示评测
+1. create_empty_outline(title?)  → 创建空白大纲
+2. explore_knowledge(query)  → 基于用户 query 搜索网络
+3. write_outline_structure(title, sections)  → 用 explore 的 JSON 写入
+4. get_outline()  → 展示结构，等待用户确认
+5. generate_outline_content()
+6. outline_evaluate()  → 展示评测
 ```
 
 ### 场景 C：修改大纲结构
 ```
 1. get_outline()  → 查看当前结构
-2a. modify_outline_structure(operations)  → 执行结构变更，修改要求涉及某些页面调用
-2b. write_outline_structure(title, sections)  → 直接重写结构，修改要求涉及章节或整个ppt时调用
-3. get_outline()  → **必须重读**确认变更
-4. generate_outline_content()  → 重新填充被标记的页面
+2. 如果需要新信息 → explore_knowledge(query: 指定需要探索的 section)
+3a. modify_outline_structure(operations)  → 小范围结构变更（rename/delete/insert/move）
+3b. write_outline_structure(title, sections)  → 大规模重写（新增/删除 section 时更快）
+4. get_outline()  → **必须重读**确认变更
+5. 如有占位 slide → generate_outline_content()
 ```
 
 ### 场景 D：修改单节内容（不改结构）
@@ -59,17 +62,17 @@
 
 ## 关键规则
 
-- **创建前先探索**：有上传文件时，`explore_knowledge` 先于 `write_outline_structure`。
-- **修改后必重读**：`modify_outline_structure` 后必须 `get_outline`。
+- **先创再探**：`create_empty_outline` 先于 `explore_knowledge`。explore 返回的 JSON 直接传给 write_outline_structure。
+- **citations 必传**：explore 返回的 sections 中包含 file_ids 和 chunk_ids，write_outline_structure 会存入 DB 供 generator 使用。不要丢弃这些字段。
+- **修改后必重读**：结构变更后必须 `get_outline`。
 - **仅改名不需重新生成**：`rename` 操作不产生标记，无需后续 `generate_outline_content`。
-- **标记驱动填充**：删除/插入/移动会设置 slide status（merge/split/new），
-  `generate_outline_content` 自动检测非 completed 状态并填充。
+- **标记驱动填充**：删除/插入/移动会设置 slide status（merge/split/new），`generate_outline_content` 自动检测非 completed 状态并填充。
 - **结构操作用 ID**：`modify_outline_structure` 的参数全部是 slide_id（数据库主键），不是 index。
 - **每章 3-6 页**：每个 section 的 `slide_number` 在 3-6 之间（含 1 个 section 页 + 2-5 个 content 页）。
   根据该章节的重要程度和内容多寡决定：核心章节 5-6 页，辅助章节 3-4 页。请在一个大纲内分清主次，合理分配页数，避免每章都平均分配。
 - **默认 18 页**：用户未指定时，总页数 12-24，封面+目录+结束页已自动添加。
 - **section_index 从 1 开始**：封面/目录在 section 0，结束页在 section 99，用户章节从 1 编号。
+- **write_outline_structure 会替换旧结构**：调用前确保已确认新结构，旧 sections 和 slides 将被软删除。
 - **勿批量调 get_outline_slide**：这个工具用于精细修改单页，不要逐页调用来检查质量。
   质量评估请信任 `outline_evaluate` 的结果。如需复查，随机抽 1-2 页即可。
-- **generate_outline_content 是全量工具**：除非有重大结构变更，或者evaluate给出评分很差，否则请勿在填充整个outline内容以外的场景调用它。
-  
+- **generate_outline_content 是全量工具**：除非有重大结构变更，或者 evaluate 给出评分很差，否则勿在填充整个 outline 内容以外的场景调用它。

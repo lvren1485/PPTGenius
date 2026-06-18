@@ -95,6 +95,9 @@ class TestStructureTools:
         d = Database(db)
         u = await d.create_user("ws_user")
         conv = await d.create_conversation(u.id)
+        # Create empty outline first
+        ct = make_create_empty_outline(d, conv.id)
+        await ct.ainvoke({"title": "AI报告"})
         tool = make_write_outline_structure(d, conv.id)
         result = await tool.ainvoke({
             "title": "AI报告",
@@ -103,7 +106,7 @@ class TestStructureTools:
                 {"section_index": 2, "title": "方法", "description": "技术", "slide_number": 4},
             ],
         })
-        assert "已创建大纲" in result
+        assert "已写入大纲" in result
         conv2 = await d.get_conversation(conv.id)
         assert conv2.current_outline_id is not None
         outline = await d.get_outline(conv2.current_outline_id)
@@ -255,6 +258,8 @@ class TestWriteThenReadOutline:
         u = await d.create_user("wtro_user")
         conv = await d.create_conversation(u.id)
 
+        await make_create_empty_outline(d, conv.id).ainvoke({"title": "Test"})
+        await make_create_empty_outline(d, conv.id).ainvoke({"title": ""})
         write_tool = make_write_outline_structure(d, conv.id)
         await write_tool.ainvoke({
             "title": "Test",
@@ -275,6 +280,7 @@ class TestWriteThenReadOutline:
         u = await d.create_user("wtro2_user")
         conv = await d.create_conversation(u.id)
 
+        await make_create_empty_outline(d, conv.id).ainvoke({"title": ""})
         write_tool = make_write_outline_structure(d, conv.id)
         await write_tool.ainvoke({
             "title": "Test2",
@@ -293,6 +299,7 @@ class TestWriteThenReadOutline:
         u = await d.create_user("wtro3_user")
         conv = await d.create_conversation(u.id)
 
+        await make_create_empty_outline(d, conv.id).ainvoke({"title": ""})
         write_tool = make_write_outline_structure(d, conv.id)
         await write_tool.ainvoke({
             "title": "RT",
@@ -323,12 +330,13 @@ class TestConvStatusAfterWrite:
         conv = await d.create_conversation(u.id)
 
         # Turn 1: create outline (like Master calling write_outline_structure)
+        await make_create_empty_outline(d, conv.id).ainvoke({"title": ""})
         w = make_write_outline_structure(d, conv.id)
         r = await w.ainvoke({
             "title": "Cross-Turn Test",
             "sections": [{"section_index": 1, "title": "S1", "description": "", "slide_number": 2}],
         })
-        assert "已创建大纲" in r
+        assert "已写入大纲" in r
 
         # Simulate what the API does after tool returns: persist messages, snapshot, etc.
         # create_message (simulating _persist_tool_messages)
@@ -353,6 +361,7 @@ class TestConvStatusAfterWrite:
         u = await d.create_user("csaw2_user")
         conv = await d.create_conversation(u.id)
 
+        await make_create_empty_outline(d, conv.id).ainvoke({"title": ""})
         w = make_write_outline_structure(d, conv.id)
         await w.ainvoke({
             "title": "Minimal",
@@ -381,6 +390,7 @@ class TestIdentityMapCache:
         assert conv1.current_outline_id is None
 
         # Step 2: write_outline_structure runs, sets current_outline_id
+        await make_create_empty_outline(d, conv.id).ainvoke({"title": ""})
         write_tool = make_write_outline_structure(d, conv.id)
         await write_tool.ainvoke({
             "title": "IMC Test",
@@ -530,104 +540,6 @@ class TestDatabaseConcurrency:
         await test_engine.dispose()
 
 
-class TestKnowledgeTools:
-    """Test the knowledge agent notebook tools (submit_note + read_file)."""
-
-    @pytest.mark.asyncio
-    async def test_submit_note_appends(self):
-        """submit_note should accumulate notes across multiple calls."""
-        from pptgenius.agent.outline.knowledge import _make_submit_note
-
-        tool, notes = _make_submit_note()
-        r1 = await tool.ainvoke({"text": "要点1: LangChain是一个LLM框架"})
-        r2 = await tool.ainvoke({"text": "要点2: 支持Agent和Tool"})
-        assert "已记录 (1条)" in r1
-        assert "已记录 (2条)" in r2
-        assert len(notes) == 2
-        assert notes[0] == "要点1: LangChain是一个LLM框架"
-
-    @pytest.mark.asyncio
-    async def test_submit_note_concurrent(self):
-        """Multiple concurrent submit_note calls should all be recorded."""
-        import asyncio
-        from pptgenius.agent.outline.knowledge import _make_submit_note
-
-        tool, notes = _make_submit_note()
-
-        async def write(i):
-            await tool.ainvoke({"text": f"note_{i}"})
-
-        await asyncio.gather(*[write(i) for i in range(20)])
-        assert len(notes) == 20
-        texts = sorted(notes)
-        assert texts[0] == "note_0"
-        assert texts[-1] == "note_9"
-
-    @pytest.mark.asyncio
-    async def test_read_file_tool(self, db):
-        """read_file should return file content from DB chunks."""
-        from pptgenius.agent.outline.knowledge_tools import make_read_file
-
-        d = Database(db)
-        u = await d.create_user("kt_user")
-        conv = await d.create_conversation(u.id)
-        kf = await d.create_knowledge_file(u.id, "test.txt", "/tmp/kttest.txt", "txt", conversation_id=conv.id)
-        await d.create_chunk(kf.id, 0, "chunk zero")
-        await d.create_chunk(kf.id, 1, "chunk one")
-
-        count = [0]
-        fetched = set()
-        tool = make_read_file(d, count, fetched)
-        result = await tool.ainvoke({"file_id": kf.id})
-        assert "chunk zero" in result
-        assert "chunk one" in result
-        assert kf.id in fetched
-        assert count[0] == 1
-
-    @pytest.mark.asyncio
-    async def test_read_file_limit(self, db):
-        """read_file should enforce the 5-call limit."""
-        from pptgenius.agent.outline.knowledge_tools import make_read_file
-
-        d = Database(db)
-        u = await d.create_user("kt2_user")
-        conv = await d.create_conversation(u.id)
-        kf = await d.create_knowledge_file(u.id, "t.txt", "/tmp/kt2.txt", "txt", conversation_id=conv.id)
-        await d.create_chunk(kf.id, 0, "x")
-
-        count = [5]  # already at limit
-        fetched = set()
-        tool = make_read_file(d, count, fetched)
-        result = await tool.ainvoke({"file_id": kf.id})
-        assert "已达上限" in result
-
-    @pytest.mark.asyncio
-    async def test_knowledge_tools_concurrent(self, db):
-        """Concurrent read_file + submit_note should work safely with DB lock."""
-        import asyncio
-        from pptgenius.agent.outline.knowledge import _make_submit_note
-        from pptgenius.agent.outline.knowledge_tools import make_read_file
-
-        d = Database(db)
-        u = await d.create_user("ktc_user")
-        conv = await d.create_conversation(u.id)
-
-        kf = await d.create_knowledge_file(u.id, "ct.txt", "/tmp/ktc.txt", "txt", conversation_id=conv.id)
-        for i in range(10):
-            await d.create_chunk(kf.id, i, f"concurrent chunk {i}")
-
-        count = [0]
-        fetched = set()
-        read_tool = make_read_file(d, count, fetched)
-        note_tool, notes = _make_submit_note()
-
-        async def read_and_note(i):
-            result = await read_tool.ainvoke({"file_id": kf.id})
-            await note_tool.ainvoke({"text": f"from_{i}: {result[:50]}"})
-
-        await asyncio.gather(*[read_and_note(i) for i in range(3)])
-        assert len(notes) >= 1
-        assert count[0] >= 1
 
 
 class TestGeneratorPromptKnowledgeFiles:
@@ -760,4 +672,8 @@ from pptgenius.agent.tools.perception import (
     make_search_styles,
     make_switch_outline,
 )
-from pptgenius.agent.tools.structure import make_modify_outline_structure, make_write_outline_structure
+from pptgenius.agent.tools.structure import (
+    make_create_empty_outline,
+    make_modify_outline_structure,
+    make_write_outline_structure,
+)

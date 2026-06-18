@@ -15,11 +15,6 @@ from pptgenius.infrastructure.utils import get_logger
 from ..common.agent_registry import push_agent
 from ..common.middleware import build_middlewares
 from pptgenius.infrastructure.llm import create_llm
-from .knowledge_tools import (
-    make_fetch_web,
-    make_search_knowledge,
-    make_search_web,
-)
 from .prompts import build_generator_system_prompt, build_generator_user_prompt
 from .prompts import _STATUS_HINTS
 
@@ -31,6 +26,46 @@ def _get_writer():
         return get_stream_writer()
     except (RuntimeError, KeyError):
         return lambda _: None
+
+
+async def _build_citation_knowledge(db: Database, section) -> str:
+    citations = section.citations or {}
+    file_ids = citations.get("file_ids", [])[:4]
+    chunk_ids = citations.get("chunk_ids", [])
+
+    if not file_ids and not chunk_ids:
+        return ""
+
+    chunks_by_file: dict[int, list] = {}
+    for fid in file_ids:
+        db_chunks = await db.list_chunks_by_file(fid)
+        chunks_by_file[fid] = sorted(db_chunks, key=lambda c: c.chunk_index)
+
+    selected: list[str] = []
+    for fid in file_ids:
+        clist = chunks_by_file.get(fid, [])
+        if not clist:
+            continue
+        n = len(clist)
+        indices = set()
+        for i in range(min(15, n)):
+            indices.add(i)
+        for i in range(max(0, n - 5), n):
+            indices.add(i)
+        for i in sorted(indices):
+            selected.append(clist[i].chunk_text)
+
+    if chunk_ids:
+        for cid in chunk_ids[:10]:
+            c = await db.get_chunk_by_id(cid)
+            if c and c.chunk_text not in selected:
+                selected.append(c.chunk_text)
+
+    if not selected:
+        return ""
+
+    text = "\n\n---\n\n".join(selected)
+    return f"## 知识库引用内容 ({len(selected)} chunks)\n\n{text[:50_000]}"
 
 
 # ── write tools (single-slide) ──────────────────────────────────────────────────
@@ -149,32 +184,21 @@ async def run_outline_generator(
     section_title = section.title
 
     outline = await db.get_outline(outline_id)
-    conv = await db.get_conversation(conversation_id)
-    user_id = conv.user_id if conv else 0
-    rag_mode = await db.get_rag_mode(user_id) if user_id else "user"
-    web_enabled = await db.get_web_search_enabled(user_id) if user_id else True
-
-    kb_count = [0]
-    web_count = [0]
-    fetch_count = [0]
 
     write_slide, pending_slides, _written = _make_write_tools(db, outline_id, section_id)
-    full_tools = [
-        write_slide,
-        pending_slides,
-        make_search_knowledge(db, user_id, conversation_id, rag_mode, kb_count,
-                              filter_web=not web_enabled),
-        make_search_web(web_count, enabled=web_enabled),
-        make_fetch_web(db, user_id, conversation_id, fetch_count,
-                       agent_id=agent_id, enabled=web_enabled),
-    ]
+    # Generator no longer has search tools — knowledge comes from citations
+    full_tools = [write_slide, pending_slides]
+
+    # Build knowledge text from section citations
+    knowledge_text = await _build_citation_knowledge(db, section)
 
     system_prompt = build_generator_system_prompt()
     user_prompt = await build_generator_user_prompt(
         db=db, outline_id=outline_id, section_id=section_id,
         query=query, knowledge_mode=knowledge_mode,
-        user_id=user_id, conversation_id=conversation_id,
     )
+    if knowledge_text:
+        user_prompt = knowledge_text + "\n\n" + user_prompt
 
     llm, agent_id = create_llm(conversation_id)
     mws, _ = build_middlewares(conversation_id, agent_id)

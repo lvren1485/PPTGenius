@@ -99,6 +99,7 @@ class OutlineSection(Base):
     title: Mapped[str] = mapped_column(String(256), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     slide_count: Mapped[int | None] = mapped_column(Integer, default=0)
+    citations: Mapped[dict | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     outline: Mapped["Outline"] = relationship(back_populates="sections")

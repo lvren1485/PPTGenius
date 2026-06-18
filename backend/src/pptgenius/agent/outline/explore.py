@@ -82,6 +82,13 @@ async def run_explore_agent(
     rag_mode = await db.get_rag_mode(user_id)
     web_enabled = await db.get_web_search_enabled(user_id)
 
+    # ── Read old explore result if modifying an existing outline ──
+    old_explore = ""
+    if conv.current_outline_id:
+        outline = await db.get_outline(conv.current_outline_id)
+        if outline and outline.explore_result_json:
+            old_explore = str(outline.explore_result_json)[:8_000]
+
     # ── Build file summary section ──
     kf_list = await db.list_knowledge_files(user_id, conversation_id=conversation_id)
     if file_ids:
@@ -93,9 +100,17 @@ async def run_explore_agent(
 {query or '根据文件内容生成PPT大纲'}
 
 ## 文件摘要
-{summary_section}
+{summary_section}"""
 
-请先理解所有文件摘要，然后用工具搜索补充信息，最后输出 JSON 格式的大纲结构建议。"""
+    if old_explore:
+        user_prompt += f"""
+
+## 上次探索结果（供参考）
+{old_explore}
+
+请基于上次结果和新的需求，更新或补充大纲结构。只修改需要变化的部分。"""
+
+    user_prompt += "\n\n请先理解所有文件摘要，然后用工具搜索补充信息，最后输出 JSON 格式的大纲结构建议。"
     if not web_enabled:
         user_prompt += (
             "\n\n**重要：网络搜索功能已关闭。**"

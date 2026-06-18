@@ -1,7 +1,4 @@
-"""Structure tools — write_outline_structure, modify_outline_structure.
-
-Auto-inject conversation_id via closure.  All operations use slide IDs (not indices).
-"""
+"""Structure tools — create_empty_outline, write_outline_structure, modify_outline_structure, rearrange."""
 
 from __future__ import annotations
 
@@ -12,17 +9,14 @@ from langchain_core.tools import tool
 from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import get_logger
 
-
 _log = get_logger("pptgenius.agent.tools.structure")
 
 _STATUS_MERGE = "merge"
 _STATUS_SPLIT = "split"
 _STATUS_NEW = "new"
 _STATUS_MODIFY = "modify"
-
 _PRES_MODIFIED_PREFIX = "o_modified_"
 
-# keys that reference slide IDs in each operation type
 _ID_KEYS = {
     "rename": ["slide_id"],
     "delete": ["target_id", "merge_id"],
@@ -32,24 +26,15 @@ _ID_KEYS = {
 
 
 def _check_duplicates(operations: list[dict]) -> str | None:
-    """Pre-validate: no slide ID may appear in multiple operations.
-
-    Returns an error message listing which IDs are duplicated and in which
-    operations, plus a suggestion to split into separate calls.  Returns
-    None if all IDs are unique.
-    """
-    # {slide_id: [op_index, ...]}
     id_positions: dict[int, list[int]] = {}
     for i, op in enumerate(operations):
         for key in _ID_KEYS.get(op.get("op", ""), []):
             v = op.get(key)
             if v is not None:
                 id_positions.setdefault(v, []).append(i)
-
     duplicates = {k: v for k, v in id_positions.items() if len(v) > 1}
     if not duplicates:
         return None
-
     lines = ["错误: 以下 slide ID 在多个操作中重复出现，请拆分为多次独立调用:"]
     for sid, positions in sorted(duplicates.items()):
         ops = [f"#{p+1}({operations[p].get('op','?')})" for p in positions]
@@ -58,87 +43,147 @@ def _check_duplicates(operations: list[dict]) -> str | None:
     return "\n".join(lines)
 
 
+# ═══════════════════════════════════════════════════════════════════
+# create_empty_outline — call BEFORE explore
+# ═══════════════════════════════════════════════════════════════════
+
+def make_create_empty_outline(db: Database, conversation_id: int) -> Callable:
+
+    async def _create_empty_outline(title: str = "") -> str:
+        """Create a new empty outline and set it as the current outline.
+
+        MUST be called BEFORE explore_knowledge.  The outline starts with no
+        sections or slides — explore will provide the structure later.
+
+        Args:
+            title: Optional initial title (can be empty).
+        """
+        conv = await db.get_conversation(conversation_id)
+        if conv is None:
+            return f"错误: 对话 {conversation_id} 不存在"
+
+        outline = await db.create_outline(
+            user_id=conv.user_id,
+            conversation_id=conversation_id,
+            title=title or "未命名大纲",
+            slide_count=0,
+        )
+        await db.set_conversation_outline(conversation_id, outline.id)
+        _log.info("empty outline created: id=%d conv=%d", outline.id, conversation_id)
+        return f"已创建空白大纲 (id={outline.id})，现在可以调用 explore_knowledge 探索内容。"
+
+    return tool(_create_empty_outline)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# write_outline_structure — write sections + slides to current outline
+# ═══════════════════════════════════════════════════════════════════
+
 def make_write_outline_structure(db: Database, conversation_id: int) -> Callable:
 
     async def _write_outline_structure(
         title: str,
         sections: list[dict],
     ) -> str:
-        """Create a new outline skeleton with auto-created section slides.
+        """Write sections and slides to the CURRENT outline. Replaces old structure.
 
-        Title/TOC/ending are auto-added. Each section's slide_number field
-        determines how many slides to pre-create for that section.
-        First slide per section = layout_type="section", remaining = "content".
-        All section slides are created with content_json=null, status="new".
+        This tool modifies the existing outline — does NOT create a new one.  Call
+        create_empty_outline first if starting fresh.
+
+        Each section may include citations from explore_knowledge:
+        {title, description, slide_number, citations: {file_ids: [...], chunk_ids: [...]}}
+
+        The tool will: (1) soft-delete any old outline slides, (2) create new
+        sections with citations stored in DB, (3) pre-create section+content slides.
 
         Args:
-            title: The presentation title.
-            sections: List of {section_index, title, description, slide_number}.
-                section_index starts at 1. slide_number includes the section page.
-                Minimum 2 (1 section + 1 content).
+            title: The presentation title (updates existing outline title).
+            sections: List of {section_index, title, description, slide_number, citations?}.
         """
         conv = await db.get_conversation(conversation_id)
         if conv is None:
             return f"错误: 对话 {conversation_id} 不存在"
+        outline_id = conv.current_outline_id
+        if outline_id is None:
+            return "错误: 没有选中大纲。请先调用 create_empty_outline。"
 
         n_sections = len(sections)
         if n_sections == 0:
             return "错误: 至少需要1个章节"
 
-        total_body = sum(max(s.get("slide_number", 2), 2) for s in sections)
-        total = total_body + 3
+        # ── 1. Soft-delete old outline slides ──
+        old_slides = await db.get_slides_by_outline_id(outline_id)
+        deleted = 0
+        for s in old_slides:
+            if s.status != "deleted":
+                await db.soft_delete_outline_slide(s.id)
+                deleted += 1
 
-        outline = await db.create_outline(
-            user_id=conv.user_id,
-            conversation_id=conversation_id,
-            title=title,
-            slide_count=total,
-        )
+        # ── 2. Soft-delete old sections ──
+        old_secs = await db.get_sections_by_outline_id(outline_id)
+        for s in old_secs:
+            await db.soft_delete_outline_section(s.id)
 
-        slide_index = 2
+        # ── 3. Update outline title ──
+        await db.set_outline_title(outline_id, title)
+
+        # ── 4. Create new sections + slides ──
+        total_body = 0
+        slide_index = 2  # 0=title, 1=TOC
         for s in sections:
+            count = max(s.get("slide_number", 3), 2)
+            total_body += count
+
+            citations = s.get("citations", None)
+
             sec = await db.create_outline_section(
-                outline_id=outline.id,
+                outline_id=outline_id,
                 section_index=s["section_index"],
                 title=s["title"],
                 description=s.get("description", ""),
+                citations=citations,
             )
-            count = max(s.get("slide_number", 2), 2)
+            # Update slide_count on section
+            await db.update_outline_section(sec.id, slide_count=count)
 
             # First slide: section divider
             await db.create_outline_slide(
-                outline_id=outline.id, slide_index=slide_index,
+                outline_id=outline_id, slide_index=slide_index,
                 title=s["title"], layout_type="section",
                 section_id=sec.id,
             )
             slide_index += 1
 
-            # Remaining: content slides
+            # Content slides
             for j in range(count - 1):
                 await db.create_outline_slide(
-                    outline_id=outline.id, slide_index=slide_index,
+                    outline_id=outline_id, slide_index=slide_index,
                     title=f"{s['title']} - {j + 1}", layout_type="content",
                     section_id=sec.id,
                 )
                 slide_index += 1
 
-            total_body += count
+        # Title at 0, TOC at 1, ending at 99
+        await db.create_outline_slide(outline_id, 0, title, layout_type="title")
+        await db.create_outline_slide(outline_id, 1, "目录", layout_type="content")
+        await db.create_outline_slide(outline_id, 99, "谢谢", layout_type="thanks")
 
-        # Title at 0, TOC at 0, ending at 99
-        await db.create_outline_slide(outline.id, 0, title, layout_type="title")
-        await db.create_outline_slide(outline.id, 0, "目录", layout_type="content")
-        await db.create_outline_slide(outline.id, 99, "谢谢", layout_type="thanks")
+        total = total_body + 3
+        await db.set_outline_slide_count(outline_id, total)
 
-        await db.set_conversation_outline(conversation_id, outline.id)
-        _log.info("outline created: id=%d title='%s' sections=%d slides=%d",
-                   outline.id, title, n_sections, total)
+        _log.info("outline written: id=%d title='%s' sections=%d slides=%d (deleted %d old)",
+                   outline_id, title, n_sections, total, deleted)
         return (
-            f"已创建大纲:'{title}'(id={outline.id}), "
-            f"{n_sections} sections, 共 {total} 页"
+            f"已写入大纲:'{title}'(id={outline_id}), "
+            f"{n_sections} sections, 共 {total} 页 (清理了 {deleted} 个旧 slide)"
         )
 
     return tool(_write_outline_structure)
 
+
+# ═══════════════════════════════════════════════════════════════════
+# modify_outline_structure
+# ═══════════════════════════════════════════════════════════════════
 
 def make_modify_outline_structure(db: Database, conversation_id: int) -> Callable:
 
@@ -147,7 +192,7 @@ def make_modify_outline_structure(db: Database, conversation_id: int) -> Callabl
 
         Batch pre-check: every slide_id/target_id/after_id/merge_id must be unique.
         Duplicate slide IDs will cause the entire batch to be rejected.
-        is_copy and is_change_section are bool flags, default False. 
+        is_copy and is_change_section are bool flags, default False.
 
         Operations:
           rename: {op, slide_id, new_title, modify_content?} — rename slide.
@@ -167,7 +212,6 @@ def make_modify_outline_structure(db: Database, conversation_id: int) -> Callabl
         Args:
             operations: List of operation dicts, executed in order.
         """
-        # ── pre-validation: duplicate slide IDs ──
         err = _check_duplicates(operations)
         if err:
             return {"error": err}
@@ -236,8 +280,7 @@ def make_modify_outline_structure(db: Database, conversation_id: int) -> Callabl
                 new_slide = await db.insert_outline_slide_after(
                     outline_id=outline_id, after_slide_id=after_id,
                     title=new_title, section_id=after.section_id,
-                    content_json=content,
-                    notes=None,
+                    content_json=content, notes=None,
                 )
                 await db.update_outline_slide_status(new_slide.id, new_status)
                 placeholder_ids.append(new_slide.id)
@@ -256,28 +299,21 @@ def make_modify_outline_structure(db: Database, conversation_id: int) -> Callabl
                         f"需设置 is_change_section=true"
                     )
                     continue
-                # Reindex: shift slides between target and after
                 all_slides = await db.get_slides_by_outline_id(outline_id)
                 tgt_idx = target.slide_index
                 aft_idx = after.slide_index
                 if tgt_idx < aft_idx:
-                    # target is before after: shift slides (tgt+1 .. aft) down by 1
                     for s in all_slides:
                         if tgt_idx < s.slide_index <= aft_idx:
                             await db.update_outline_slide_index(s.id, s.slide_index - 1)
-                    # target now goes at aft_idx
                     await db.update_outline_slide_index(target_id, aft_idx)
                 elif tgt_idx > aft_idx:
-                    # target is after after: shift slides (aft+1 .. tgt-1) up by 1
                     for s in all_slides:
                         if aft_idx < s.slide_index < tgt_idx:
                             await db.update_outline_slide_index(s.id, s.slide_index + 1)
-                    # target now goes after after
                     await db.update_outline_slide_index(target_id, aft_idx + 1)
-                # else tgt_idx == aft_idx: no-op (shouldn't happen with unique check)
                 await db.update_outline_slide(target_id, section_id=after.section_id)
 
-        # ── result ──
         parts = []
         if rename_count:
             parts.append(f"rename×{rename_count}")
@@ -295,6 +331,10 @@ def make_modify_outline_structure(db: Database, conversation_id: int) -> Callabl
     return tool(_modify_outline_structure)
 
 
+# ═══════════════════════════════════════════════════════════════════
+# rearrange_presentation_slides
+# ═══════════════════════════════════════════════════════════════════
+
 def make_rearrange_presentation_slides(db: Database, conversation_id: int) -> Callable:
 
     async def _rearrange_presentation_slides() -> str:
@@ -304,8 +344,6 @@ def make_rearrange_presentation_slides(db: Database, conversation_id: int) -> Ca
         - Other o_modified_* → keep status (content agent reads it via prompt)
         - Creates missing pres slides for new outline slides
         - Overwrites all pres slide_index from outline slides
-
-        No args needed — reads current_outline_id from conversation.
         """
         conv = await db.get_conversation(conversation_id)
         if conv is None or conv.current_outline_id is None:
@@ -321,7 +359,6 @@ def make_rearrange_presentation_slides(db: Database, conversation_id: int) -> Ca
         from sqlalchemy import select as _sel
         from pptgenius.infrastructure.db.models import PresentationSlide
 
-        # Find all pres slides marked with o_modified_*
         result = await db.db.execute(
             _sel(PresentationSlide)
             .where(PresentationSlide.presentation_id == pres.id)
@@ -335,12 +372,9 @@ def make_rearrange_presentation_slides(db: Database, conversation_id: int) -> Ca
             if st.endswith("_deleted"):
                 await db.soft_delete_presentation_slide(ps.id)
                 deleted += 1
-            # Other o_modified_* statuses kept — content agent reads them via prompt
         if deleted:
             await db.db.commit()
 
-        # Overwrite all pres slide indexes from outline slides.
-        # Create missing pres slides, delete orphans already handled above.
         outline_slides = await db.get_slides_by_outline_id(outline_id)
         all_pres = await db.get_slides_by_presentation_id(pres.id)
         pres_by_outline = {s.outline_slide_id: s for s in all_pres if s.outline_slide_id}
@@ -362,18 +396,17 @@ def make_rearrange_presentation_slides(db: Database, conversation_id: int) -> Ca
         if created:
             await db.db.commit()
 
-        # Reset presentation version — structure changed, new baseline
         pres.version = 0
-
         return f"重排完成: 删除 {deleted}, 新建 {created}"
 
     return tool(_rearrange_presentation_slides)
 
 
-async def _cascade_pres_status(
-    db: Database, outline_slide_id: int, status: str,
-) -> None:
-    """Set *status* on all presentation_slides that reference *outline_slide_id*."""
+# ═══════════════════════════════════════════════════════════════════
+# helpers
+# ═══════════════════════════════════════════════════════════════════
+
+async def _cascade_pres_status(db: Database, outline_slide_id: int, status: str) -> None:
     from sqlalchemy import update as _up
     from pptgenius.infrastructure.db.models import PresentationSlide
     await db.db.execute(
@@ -383,8 +416,6 @@ async def _cascade_pres_status(
     )
 
 
-# ── helpers ──────────────────────────────────────────────────────────────────
-
 def _find(slides: list, slide_id: int):
     for s in slides:
         if s.id == slide_id:
@@ -393,7 +424,6 @@ def _find(slides: list, slide_id: int):
 
 
 def _merge_into(target, into) -> None:
-    """Copy target's content_json into 'into'. Both are ORM objects mutated in-place."""
     tc = target.content_json or {}
     ic = into.content_json or {}
     if not ic:
