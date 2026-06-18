@@ -86,23 +86,41 @@ class TestSetMessageCost:
 
 
 class TestModelBuilder:
-    """Validate build_llm returns expected triple."""
+    """Validate create_llm + build_middlewares."""
 
-    def test_build_llm_returns_triple(self):
-        from pptgenius.agent.common.model_builder import build_llm
-        llm, agent_id, middleware = build_llm(conversation_id=1)
+    def test_create_llm_returns_pair(self):
+        from pptgenius.infrastructure.llm import create_llm
+        llm, agent_id = create_llm(conversation_id=1)
         assert llm is not None
         assert isinstance(agent_id, str)
         assert len(agent_id) == 8  # token_hex(4) = 8 hex chars
-        assert middleware is not None
 
-    def test_build_llm_agent_id_unique(self):
-        from pptgenius.agent.common.model_builder import build_llm
-        ids = {build_llm(1)[1] for _ in range(10)}
+    def test_build_middlewares_sub_agent(self):
+        from pptgenius.infrastructure.llm import create_llm
+        from pptgenius.agent.common.middleware import build_middlewares
+        _, agent_id = create_llm(conversation_id=1)
+        mws, persist = build_middlewares(1, agent_id)
+        assert len(mws) == 2  # SSE + Token
+        assert persist is None
+
+    def test_build_middlewares_master(self):
+        from pptgenius.infrastructure.llm import create_llm
+        from pptgenius.agent.common.middleware import build_middlewares
+        _, agent_id = create_llm(conversation_id=1)
+        mws, persist = build_middlewares(1, agent_id, ctypes={"t": "c"}, sub_agent_types={"x"})
+        assert len(mws) == 3  # Persist + SSE + Token
+        assert persist is not None
+
+    def test_create_llm_agent_id_unique(self):
+        from pptgenius.infrastructure.llm import create_llm
+        ids = {create_llm(1)[1] for _ in range(10)}
         assert len(ids) == 10
 
-    def test_build_llm_middleware_has_correct_ids(self):
-        from pptgenius.agent.common.model_builder import build_llm
-        _, agent_id, mw = build_llm(42)
-        assert mw.conversation_id == 42
-        assert mw.agent_id == agent_id
+    def test_create_llm_token_mw_ids(self):
+        from pptgenius.infrastructure.llm import create_llm
+        from pptgenius.agent.common.middleware import build_middlewares
+        _, agent_id = create_llm(42)
+        mws, _ = build_middlewares(42, agent_id)
+        token_mw = [m for m in mws if type(m).__name__ == "TokenCountingMiddleware"][0]
+        assert token_mw.conversation_id == 42
+        assert token_mw.agent_id == agent_id

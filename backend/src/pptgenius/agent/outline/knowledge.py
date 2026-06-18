@@ -14,8 +14,8 @@ from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_agent
-from ..common.middleware import SSEToolMiddleware
-from ..common.model_builder import build_llm
+from ..common.middleware import build_middlewares
+from pptgenius.infrastructure.llm import create_llm
 from .knowledge_tools import make_read_file
 
 _log = get_logger("pptgenius.agent.outline.knowledge")
@@ -91,12 +91,13 @@ async def run_knowledge_agent(
 
     tools = [make_read_file(db, read_count, fetched_ids), submit_note]
 
-    llm, agent_id, mw = build_llm(conversation_id)
+    llm, agent_id = create_llm(conversation_id)
+    mws, _ = build_middlewares(conversation_id, agent_id)
     push_agent(conversation_id, agent_id)
     agent = create_agent(
         model=llm, tools=tools,
         system_prompt=_load_system_prompt(),
-        middleware=[SSEToolMiddleware(), mw],
+        middleware=mws,
     )
 
     writer({"type": "knowledge_agent_start"})
@@ -155,7 +156,7 @@ async def run_knowledge_agent(
     if not final_text and notes:
         _log.info("no final output — calling LLM with notes")
         try:
-            llm2, _, _ = build_llm(conversation_id)
+            llm2, _ = create_llm(conversation_id)
             notes_text = "\n\n---\n\n".join(notes)
             summary_prompt = f"""基于以下文件探索笔记，给出PPT大纲结构建议。
 

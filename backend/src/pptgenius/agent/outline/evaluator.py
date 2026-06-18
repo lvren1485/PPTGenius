@@ -14,8 +14,8 @@ from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_agent
 from ..common.message_utils import strip_dangling_tool_calls
-from ..common.middleware import SSEToolMiddleware
-from ..common.model_builder import build_llm
+from ..common.middleware import build_middlewares
+from pptgenius.infrastructure.llm import create_llm
 from .prompts import (
     build_evaluator_system_prompt,
     compute_outline_metrics,
@@ -160,13 +160,14 @@ async def run_outline_evaluator(
     ])
     user_prompt = "\n".join(user_prompt_parts)
 
-    llm, agent_id, mw = build_llm(conversation_id)
+    llm, agent_id = create_llm(conversation_id)
+    mws, _ = build_middlewares(conversation_id, agent_id)
     push_agent(conversation_id, agent_id)
     agent = create_agent(
         model=llm,
         tools=[_make_submit_evaluation(db, outline_id)],
         system_prompt=system_prompt,
-        middleware=[SSEToolMiddleware(), mw],
+        middleware=mws,
     )
 
     writer({"type": "outline_evaluator_start", "outline": outline.title})

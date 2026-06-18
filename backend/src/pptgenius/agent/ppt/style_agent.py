@@ -19,8 +19,8 @@ from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_agent
-from ..common.middleware import SSEToolMiddleware
-from ..common.model_builder import build_llm
+from ..common.middleware import build_middlewares
+from pptgenius.infrastructure.llm import create_llm
 from .common.instruction_loader import get_instruction
 
 _log = get_logger("pptgenius.agent.ppt.style_agent")
@@ -183,7 +183,8 @@ async def run_style_agent(
 
     # ── build agent ──────────────────────────────────────────────────
 
-    llm, agent_id, mw = build_llm(conversation_id)
+    llm, agent_id = create_llm(conversation_id)
+    mws, _ = build_middlewares(conversation_id, agent_id)
     push_agent(conversation_id, agent_id)
 
     slides = await db.get_slides_by_outline_id(outline_id)
@@ -213,7 +214,7 @@ async def run_style_agent(
     agent = create_agent(
         model=llm, tools=tools,
         system_prompt=_load_system_prompt(),
-        middleware=[SSEToolMiddleware(), mw],
+        middleware=mws,
     )
 
     try:
@@ -234,7 +235,7 @@ async def run_style_agent(
             model=llm,
             tools=[tool(_set_presentation_style)],
             system_prompt="你必须立即调用 _set_presentation_style 提交风格选择。直接选择最合适的样式并提交。",
-            middleware=[SSEToolMiddleware(), mw],
+            middleware=mws,
         )
         await retry_agent.ainvoke(
             {"messages": [

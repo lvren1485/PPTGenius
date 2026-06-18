@@ -1,5 +1,4 @@
-"""
-DeepSeek V4 适配层 — 修复 LangChain/LangGraph 与 DeepSeek Thinking Mode 的兼容性。
+"""DeepSeek V4 适配层 — 修复 LangChain 与 DeepSeek Thinking Mode 兼容性。
 
 问题：
   DeepSeek V4 默认开启 thinking mode，每轮 assistant 响应携带 `reasoning_content`。
@@ -11,7 +10,7 @@ DeepSeek V4 适配层 — 修复 LangChain/LangGraph 与 DeepSeek Thinking Mode 
   2. `_convert_message_to_dict` — 将 AIMessage 序列化为 API 请求时未注入该字段
 
 用法：
-  from pptgenius_agent.llm.langchain_adapter import apply_deepseek_patch
+  from pptgenius.infrastructure.llm import apply_deepseek_patch
 
   apply_deepseek_patch()  # 在创建任何 ChatOpenAI 实例之前调用一次即可
 """
@@ -53,7 +52,6 @@ def _patched_convert_message_to_dict(
     message_dict = _original_convert_message_to_dict(message, api)
 
     if isinstance(message, AIMessage):
-        # 直接携带的 reasoning_content
         rc = message.additional_kwargs.get("reasoning_content")
         if rc:
             message_dict["reasoning_content"] = rc

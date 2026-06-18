@@ -12,7 +12,7 @@ from pptgenius.infrastructure.config.settings import RESOURCES_DIR
 from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import TokenCounter, get_logger
 
-from .common.middleware import PersistToolMiddleware, SSEToolMiddleware
+from .common.middleware import build_middlewares
 
 _log = get_logger("pptgenius.agent.master")
 
@@ -40,7 +40,7 @@ _TOOL_CTYPE: dict[str, str] = {
 # Tools that spawn a sub-agent (have their own LLM + TokenCountingMiddleware)
 _SUB_AGENT_TOOLS: set[str] = {"gen_content", "mod_section", "evaluate", "explore", "ppt_style", "slides_content", "mod_slides"}
 
-from .common.model_builder import build_llm
+from pptgenius.infrastructure.llm import create_llm
 from .tools.explore_knowledge import make_explore_knowledge
 from .tools.outline_evaluate import make_outline_evaluate
 from .tools.outline_section import make_generate_outline_content, make_modify_outline_section
@@ -107,7 +107,11 @@ async def run_master_agent(
     writer = _build_sse_writer()
 
     # --- 1. Build LLM + middleware ---
-    llm, agent_id, mw = build_llm(conversation_id)
+    llm, agent_id = create_llm(conversation_id)
+    mws, persist_mw = build_middlewares(
+        conversation_id, agent_id,
+        ctypes=_TOOL_CTYPE, sub_agent_types=_SUB_AGENT_TOOLS,
+    )
     _log.info("master agent start conv=%d agent=%s", conversation_id, agent_id)
 
     # --- 2. Assemble tools ---
@@ -115,14 +119,13 @@ async def run_master_agent(
     _log.debug("assembled %d tools for conv=%d", len(tools), conversation_id)
 
     # --- 3. Build agent ---
-    persist_mw = PersistToolMiddleware(conversation_id, _TOOL_CTYPE, _SUB_AGENT_TOOLS)
     prompt_path = RESOURCES_DIR / "prompts" / "master.md"
     system_prompt = prompt_path.read_text(encoding="utf-8")
     agent = create_agent(
         model=llm,
         tools=tools,
         system_prompt=system_prompt,
-        middleware=[persist_mw, SSEToolMiddleware(), mw],
+        middleware=mws,
     )
 
     # --- 4. Load context + run ---
