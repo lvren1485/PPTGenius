@@ -204,7 +204,7 @@ async def run_master_agent(
             await db.increase_outline_version(conv.current_outline_id)
             outline = await db.get_outline(conv.current_outline_id)
             if outline:
-                await db.create_outline_snapshot(
+                snap = await db.create_outline_snapshot(
                     outline_id=conv.current_outline_id,
                     user_id=outline.user_id,
                     conversation_id=conversation_id,
@@ -215,6 +215,14 @@ async def run_master_agent(
                         await db.get_slides_by_outline_id(conv.current_outline_id),
                     ),
                 )
+                await db.create_message(
+                    conversation_id=conversation_id,
+                    role="document",
+                    content=str(snap.id),
+                    content_type="outline",
+                )
+                writer({"type": "outline_snapshot", "snapshot_id": snap.id,
+                        "version": outline.version})
 
     if presentation_changed:
         conv = await db.get_conversation(conversation_id)
@@ -227,10 +235,10 @@ async def run_master_agent(
             )
             if pres:
                 await db.increment_presentation_version(pres.id)
-                pres = await db.get_presentation(pres.id)  # refresh to get new version
+                pres = await db.get_presentation(pres.id)
                 outline = await db.get_outline(conv.current_outline_id)
                 slides = await db.get_slides_by_presentation_id(pres.id)
-                await db.create_snapshot(
+                snap = await db.create_snapshot(
                     presentation_id=pres.id,
                     user_id=pres.user_id,
                     conversation_id=conversation_id,
@@ -238,6 +246,14 @@ async def run_master_agent(
                     presentation_json=_build_presentation_snapshot_json(pres, slides),
                     pres_version=pres.version,
                 )
+                await db.create_message(
+                    conversation_id=conversation_id,
+                    role="document",
+                    content=str(snap.id),
+                    content_type="presentation",
+                )
+                writer({"type": "presentation_snapshot", "snapshot_id": snap.id,
+                        "version": pres.version})
 
     # Ensure all DB changes are committed before the session closes
     await db.db.commit()
