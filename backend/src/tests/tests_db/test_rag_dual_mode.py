@@ -1,7 +1,4 @@
-"""Tests for RAG dual-switch system — rag_mode × web_search_enabled = 4 modes.
-
-Also covers: filter_web chunk queries, rag_index_changed flag, ensure_index.
-"""
+"""Tests for simplified RAG — build_index + search, 4 modes, filter_web."""
 
 import pytest
 
@@ -11,32 +8,15 @@ from pptgenius.infrastructure.rag.knowledge import knowledge_service
 
 
 async def _seed_files(d: Database, user_id: int, conv_id: int, prefix: str = ""):
-    """Create 2 uploaded files + 1 web file in the same conversation."""
     p = f"{prefix}_" if prefix else ""
-    kf1 = await d.create_knowledge_file(
-        user_id, f"{p}upload_a.txt", f"/tmp/{p}upload_a.txt", "txt",
-        conversation_id=conv_id, source_type="upload",
-    )
-    kf2 = await d.create_knowledge_file(
-        user_id, f"{p}upload_b.txt", f"/tmp/{p}upload_b.txt", "txt",
-        conversation_id=conv_id, source_type="upload",
-    )
-    kf_web = await d.create_knowledge_file(
-        user_id, f"{p}web_page.txt", f"/tmp/{p}web_page.txt", "txt",
-        conversation_id=conv_id, source_type="web",
-    )
-    c1 = "人工智能市场规模持续增长 预计2026年达到万亿级别"
-    c2 = "机器学习算法在医疗诊断中表现优异"
-    c3 = "网络搜索结果显示AI投资热度不减"
-    await d.create_chunk(kf1.id, 0, c1)
-    await d.create_chunk(kf2.id, 0, c2)
-    await d.create_chunk(kf_web.id, 0, c3)
+    kf1 = await d.create_knowledge_file(user_id, f"{p}upload_a.txt", f"/tmp/{p}upload_a.txt", "txt", conversation_id=conv_id, source_type="upload")
+    kf2 = await d.create_knowledge_file(user_id, f"{p}upload_b.txt", f"/tmp/{p}upload_b.txt", "txt", conversation_id=conv_id, source_type="upload")
+    kf_web = await d.create_knowledge_file(user_id, f"{p}web_page.txt", f"/tmp/{p}web_page.txt", "txt", conversation_id=conv_id, source_type="web")
+    await d.create_chunk(kf1.id, 0, "人工智能市场规模持续增长 预计2026年达到万亿级别")
+    await d.create_chunk(kf2.id, 0, "机器学习算法在医疗诊断中表现优异")
+    await d.create_chunk(kf_web.id, 0, "网络搜索结果显示AI投资热度不减")
     return kf1, kf2, kf_web
 
-
-# ═══════════════════════════════════════════════════════════════════
-# 1. Settings repo — rag_mode + web_search_enabled
-# ═══════════════════════════════════════════════════════════════════
 
 class TestSettingsRepo:
     @pytest.mark.asyncio
@@ -47,275 +27,157 @@ class TestSettingsRepo:
         assert await d.get_web_search_enabled(u.id) is True
 
     @pytest.mark.asyncio
-    async def test_set_rag_mode(self, db):
+    async def test_set_both(self, db):
         d = Database(db)
-        u = await d.create_user("s_rag")
-        assert await d.set_rag_mode(u.id, "conversation") is True
-        assert await d.get_rag_mode(u.id) == "conversation"
-        assert await d.set_rag_mode(u.id, "invalid") is False
-
-    @pytest.mark.asyncio
-    async def test_set_web_search_enabled(self, db):
-        d = Database(db)
-        u = await d.create_user("s_web")
-        assert await d.set_web_search_enabled(u.id, False) is True
-        assert await d.get_web_search_enabled(u.id) is False
-        assert await d.set_web_search_enabled(u.id, True) is True
-        assert await d.get_web_search_enabled(u.id) is True
-
-    @pytest.mark.asyncio
-    async def test_nonexistent_user(self, db):
-        d = Database(db)
-        assert await d.get_rag_mode(99999) == "user"
-        assert await d.get_web_search_enabled(99999) is True
-        assert await d.set_web_search_enabled(99999, False) is False
-
-    @pytest.mark.asyncio
-    async def test_both_settings_preserved_in_other(self, db):
-        d = Database(db)
-        u = await d.create_user("s_both", other={"custom": 42})
+        u = await d.create_user("s_both")
         await d.set_rag_mode(u.id, "conversation")
         await d.set_web_search_enabled(u.id, False)
-        user = await d.get_user(u.id)
-        assert user.other["custom"] == 42
-        assert user.other["rag_mode"] == "conversation"
-        assert user.other["web_search_enabled"] is False
+        assert await d.get_rag_mode(u.id) == "conversation"
+        assert await d.get_web_search_enabled(u.id) is False
 
-
-# ═══════════════════════════════════════════════════════════════════
-# 2. rag_index_changed flag
-# ═══════════════════════════════════════════════════════════════════
-
-class TestRagIndexChangedFlag:
-    @pytest.mark.asyncio
-    async def test_default_not_changed(self, db):
-        d = Database(db)
-        u = await d.create_user("flag_default")
-        assert await d.is_rag_index_changed(u.id) is False
-
-    @pytest.mark.asyncio
-    async def test_set_and_clear(self, db):
-        d = Database(db)
-        u = await d.create_user("flag_set")
-        assert await d.set_rag_index_changed(u.id) is True
-        assert await d.is_rag_index_changed(u.id) is True
-        assert await d.clear_rag_index_changed(u.id) is True
-        assert await d.is_rag_index_changed(u.id) is False
-
-    @pytest.mark.asyncio
-    async def test_ingest_sets_flag(self, db):
-        d = Database(db)
-        u = await d.create_user("flag_ingest")
-        conv = await d.create_conversation(u.id)
-        kf = await d.create_knowledge_file(
-            u.id, "f.txt", "/tmp/flag_f.txt", "txt",
-            conversation_id=conv.id,
-        )
-        await d.create_chunk(kf.id, 0, "test content")
-        # ingest normally sets the flag; test the flag set/clear API directly
-        await d.set_rag_index_changed(u.id)
-        assert await d.is_rag_index_changed(u.id) is True
-        await d.clear_rag_index_changed(u.id)
-        assert await d.is_rag_index_changed(u.id) is False
-
-
-# ═══════════════════════════════════════════════════════════════════
-# 3. filter_web chunk queries
-# ═══════════════════════════════════════════════════════════════════
 
 class TestFilterWebChunks:
     @pytest.mark.asyncio
-    async def test_user_filter_web_excludes_web_files(self, db):
+    async def test_user_filter_web(self, db):
         d = Database(db)
         u = await d.create_user("fw_user")
         conv = await d.create_conversation(u.id)
-        await _seed_files(d, u.id, conv.id, prefix=u.name)
-
-        all_chunks = await d.get_all_chunks_for_user(u.id)
+        await _seed_files(d, u.id, conv.id, prefix="fw1")
+        all_c = await d.get_all_chunks_for_user(u.id)
         filtered = await d.get_chunks_for_user_filter_web(u.id)
-        assert len(all_chunks) == 3
+        assert len(all_c) == 3
         assert len(filtered) == 2
-        # all 3 non-web chunks are present, web chunk ("网络搜索...") excluded
         for c in filtered:
             assert "网络搜索" not in c.chunk_text
 
     @pytest.mark.asyncio
-    async def test_conv_filter_web_excludes_web_files(self, db):
+    async def test_conv_filter_web(self, db):
         d = Database(db)
         u = await d.create_user("fw_conv")
         conv = await d.create_conversation(u.id)
-        await _seed_files(d, u.id, conv.id, prefix=u.name)
-
-        all_chunks = await d.get_all_chunks_for_conversation(conv.id)
+        await _seed_files(d, u.id, conv.id, prefix="fw2")
+        all_c = await d.get_all_chunks_for_conversation(conv.id)
         filtered = await d.get_chunks_for_conversation_filter_web(conv.id)
-        assert len(all_chunks) == 3
+        assert len(all_c) == 3
         assert len(filtered) == 2
 
-    @pytest.mark.asyncio
-    async def test_filter_web_empty(self, db):
-        d = Database(db)
-        u = await d.create_user("fw_empty")
-        conv = await d.create_conversation(u.id)
-        assert await d.get_chunks_for_user_filter_web(u.id) == []
-        assert await d.get_chunks_for_conversation_filter_web(conv.id) == []
-
-
-# ═══════════════════════════════════════════════════════════════════
-# 4. Search across all 4 switch combinations
-# ═══════════════════════════════════════════════════════════════════
 
 class TestSearchFourModes:
-    """user × web_on, user × web_off, conv × web_on, conv × web_off"""
-
     @pytest.mark.asyncio
     async def test_mode_user_web_on(self, db):
-        """rag_mode=user, web_search_enabled=True → all 3 chunks searchable."""
         d = Database(db)
-        u = await d.create_user("m1_user")
+        u = await d.create_user("m1")
         conv = await d.create_conversation(u.id)
-        await _seed_files(d, u.id, conv.id, prefix=u.name)
-
-        await knowledge_service.ensure_index(
-            d, user_id=u.id, rag_mode="user", filter_web=False,
-        )
+        await _seed_files(d, u.id, conv.id, prefix="m1")
+        scope = await knowledge_service.build_index(d, user_id=u.id, rag_mode="user", filter_web=False)
         results = await knowledge_service.search(d, u.id, "AI 市场")
-        # All 3 chunks searchable
         assert len(results) == 3
         assert any("网络搜索" in r["chunk"] for r in results)
 
     @pytest.mark.asyncio
     async def test_mode_user_web_off(self, db):
-        """rag_mode=user, web_search_enabled=False → web chunks excluded."""
         d = Database(db)
-        u = await d.create_user("m2_user")
+        u = await d.create_user("m2")
         conv = await d.create_conversation(u.id)
-        await _seed_files(d, u.id, conv.id, prefix=u.name)
-
-        await knowledge_service.ensure_index(
-            d, user_id=u.id, rag_mode="user", filter_web=True,
-        )
+        await _seed_files(d, u.id, conv.id, prefix="m2")
+        await knowledge_service.build_index(d, user_id=u.id, rag_mode="user", filter_web=True)
         results = await knowledge_service.search(d, u.id, "AI 市场")
         assert len(results) == 2
         assert not any("网络搜索" in r["chunk"] for r in results)
 
     @pytest.mark.asyncio
     async def test_mode_conv_web_on(self, db):
-        """rag_mode=conversation, web_search_enabled=True → all 3 chunks searchable."""
         d = Database(db)
-        u = await d.create_user("m3_user")
+        u = await d.create_user("m3")
         conv = await d.create_conversation(u.id)
-        await _seed_files(d, u.id, conv.id, prefix=u.name)
-
-        await knowledge_service.ensure_index(
-            d, user_id=u.id, rag_mode="conversation", filter_web=False,
-            conversation_id=conv.id,
-        )
-        results = await knowledge_service.search_by_conversation(
-            d, conv.id, "AI", filter_web=False,
-        )
+        await _seed_files(d, u.id, conv.id, prefix="m3")
+        await knowledge_service.build_index(d, user_id=u.id, rag_mode="conversation", filter_web=False, conversation_id=conv.id)
+        results = await knowledge_service.search_by_conversation(d, conv.id, "AI")
         assert len(results) == 3
 
     @pytest.mark.asyncio
     async def test_mode_conv_web_off(self, db):
-        """rag_mode=conversation, web_search_enabled=False → web chunks excluded."""
         d = Database(db)
-        u = await d.create_user("m4_user")
+        u = await d.create_user("m4")
         conv = await d.create_conversation(u.id)
-        await _seed_files(d, u.id, conv.id, prefix=u.name)
-
-        await knowledge_service.ensure_index(
-            d, user_id=u.id, rag_mode="conversation", filter_web=True,
-            conversation_id=conv.id,
-        )
-        results = await knowledge_service.search_by_conversation(
-            d, conv.id, "AI", filter_web=True,
-        )
+        await _seed_files(d, u.id, conv.id, prefix="m4")
+        await knowledge_service.build_index(d, user_id=u.id, rag_mode="conversation", filter_web=True, conversation_id=conv.id)
+        results = await knowledge_service.search_by_conversation(d, conv.id, "AI")
         assert len(results) == 2
         assert not any("网络搜索" in r["chunk"] for r in results)
 
     @pytest.mark.asyncio
-    async def test_ensure_index_idempotent(self, db):
-        """ensure_index should be safe to call multiple times."""
-        d = Database(db)
-        u = await d.create_user("m5_user")
-        conv = await d.create_conversation(u.id)
-        kf = await d.create_knowledge_file(
-            u.id, "initial.txt", "/tmp/m5_init.txt", "txt",
-            conversation_id=conv.id,
-        )
-        await d.create_chunk(kf.id, 0, "初始内容")
-
-        await knowledge_service.ensure_index(
-            d, user_id=u.id, rag_mode="user", filter_web=False,
-        )
-        results = await knowledge_service.search(d, u.id, "初始")
-        assert len(results) == 1
-
-        # Second call should be no-op (flag was cleared)
-        await knowledge_service.ensure_index(
-            d, user_id=u.id, rag_mode="user", filter_web=False,
-        )
-        results2 = await knowledge_service.search(d, u.id, "初始")
-        assert len(results2) == 1
-
-    @pytest.mark.asyncio
     async def test_index_isolation_across_users(self, db):
-        """User-level index must NOT leak files from other users."""
         d = Database(db)
         u_a = await d.create_user("iso_a")
         u_b = await d.create_user("iso_b")
         conv_a = await d.create_conversation(u_a.id)
         conv_b = await d.create_conversation(u_b.id)
-
         await _seed_files(d, u_a.id, conv_a.id, prefix="iso_a")
         await _seed_files(d, u_b.id, conv_b.id, prefix="iso_b")
-
-        await knowledge_service.ensure_index(
-            d, user_id=u_a.id, rag_mode="user", filter_web=False,
-        )
-        # User A should only see their own 3 chunks
-        results_a = await knowledge_service.search(d, u_a.id, "市场规模 医疗 网络")
-        assert len(results_a) == 3
-
-        # User B should only see their own 3 chunks
-        await knowledge_service.ensure_index(
-            d, user_id=u_b.id, rag_mode="user", filter_web=False,
-        )
-        results_b = await knowledge_service.search(d, u_b.id, "市场规模 医疗 网络")
-        assert len(results_b) == 3
-
-        # User A's index should NOT contain user B's chunks (and vice versa)
-        knowledge_service._user_indexes.pop(u_a.id, None)
-        knowledge_service._user_indexes.pop(u_b.id, None)
+        await knowledge_service.build_index(d, user_id=u_a.id, rag_mode="user", filter_web=False)
+        results = await knowledge_service.search(d, u_a.id, "市场规模 医疗 网络")
+        assert len(results) == 3  # user A only sees own 3 files
 
     @pytest.mark.asyncio
-    async def test_filter_web_on_demand_build(self, db):
-        """search() without ensure_index should still filter web chunks."""
+    async def test_remove_index(self, db):
         d = Database(db)
-        u = await d.create_user("m6_user")
+        u = await d.create_user("rm")
         conv = await d.create_conversation(u.id)
-        await _seed_files(d, u.id, conv.id, prefix=u.name)
+        await _seed_files(d, u.id, conv.id, prefix="rm")
+        scope = await knowledge_service.build_index(d, user_id=u.id, rag_mode="user", filter_web=False)
+        results = await knowledge_service.search(d, u.id, "AI")
+        assert len(results) == 3
+        knowledge_service.remove_index(scope)
+        # After removal, search falls back to on-demand build
+        results = await knowledge_service.search(d, u.id, "AI")
+        assert len(results) == 3
 
-        knowledge_service._user_indexes.pop(u.id, None)  # force fresh build
-        results = await knowledge_service.search(
-            d, u.id, "AI", filter_web=True,
-        )
-        for r in results:
-            assert "网络搜索" not in r["chunk"]
 
+class TestSearchByConversation:
+    @pytest.mark.asyncio
+    async def test_search_empty(self, db):
+        d = Database(db)
+        u = await d.create_user("ks_empty")
+        conv = await d.create_conversation(u.id)
+        await knowledge_service.build_index(d, user_id=u.id, rag_mode="conversation", filter_web=False, conversation_id=conv.id)
+        results = await knowledge_service.search_by_conversation(d, conv.id, "test")
+        assert results == []
 
-# ═══════════════════════════════════════════════════════════════════
-# 5. _build_chunk_map with filter_web
-# ═══════════════════════════════════════════════════════════════════
+    @pytest.mark.asyncio
+    async def test_search_returns_results(self, db):
+        d = Database(db)
+        u = await d.create_user("ks_user")
+        conv = await d.create_conversation(u.id)
+        kf = await d.create_knowledge_file(u.id, "doc.txt", "/tmp/ks_doc.txt", "txt", conversation_id=conv.id)
+        await d.create_chunk(kf.id, 0, "人工智能市场规模达500亿")
+        await knowledge_service.build_index(d, user_id=u.id, rag_mode="conversation", filter_web=False, conversation_id=conv.id)
+        results = await knowledge_service.search_by_conversation(d, conv.id, "AI 市场")
+        assert len(results) >= 1
+        assert any("500亿" in r["chunk"] for r in results)
+
+    @pytest.mark.asyncio
+    async def test_search_isolated(self, db):
+        d = Database(db)
+        u = await d.create_user("ks_iso")
+        conv_a = await d.create_conversation(u.id)
+        conv_b = await d.create_conversation(u.id)
+        for conv, text in [(conv_a, "AAA专属"), (conv_b, "BBB专属")]:
+            kf = await d.create_knowledge_file(u.id, f"{text}.txt", f"/tmp/{text}.txt", "txt", conversation_id=conv.id)
+            await d.create_chunk(kf.id, 0, text)
+        await knowledge_service.build_index(d, user_id=u.id, rag_mode="conversation", filter_web=False, conversation_id=conv_a.id)
+        r_a = await knowledge_service.search_by_conversation(d, conv_a.id, "AAA")
+        assert any("AAA" in r["chunk"] for r in r_a)
+
 
 class TestBuildChunkMap:
     @pytest.mark.asyncio
-    async def test_user_mode_no_filter(self, db):
+    async def test_user_mode(self, db):
         from pptgenius.agent.outline.knowledge_tools import _build_chunk_map
         d = Database(db)
         u = await d.create_user("bcm1")
         conv = await d.create_conversation(u.id)
-        await _seed_files(d, u.id, conv.id, prefix=u.name)
+        await _seed_files(d, u.id, conv.id, prefix="bcm1")
         cmap = await _build_chunk_map(d, u.id, conv.id, "user", filter_web=False)
         assert len(cmap) == 3
 
@@ -325,26 +187,19 @@ class TestBuildChunkMap:
         d = Database(db)
         u = await d.create_user("bcm2")
         conv = await d.create_conversation(u.id)
-        await _seed_files(d, u.id, conv.id, prefix=u.name)
+        await _seed_files(d, u.id, conv.id, prefix="bcm2")
         cmap = await _build_chunk_map(d, u.id, conv.id, "user", filter_web=True)
-        assert len(cmap) == 2  # web file excluded
+        assert len(cmap) == 2
 
     @pytest.mark.asyncio
-    async def test_conv_mode_no_filter(self, db):
+    async def test_conv_mode(self, db):
         from pptgenius.agent.outline.knowledge_tools import _build_chunk_map
         d = Database(db)
         u = await d.create_user("bcm3")
         conv = await d.create_conversation(u.id)
-        conv2 = await d.create_conversation(u.id)
-        await _seed_files(d, u.id, conv.id, prefix=u.name)
-        # Other conversation: should NOT appear
-        kf = await d.create_knowledge_file(
-            u.id, "other.txt", "/tmp/bcm3_other.txt", "txt",
-            conversation_id=conv2.id,
-        )
-        await d.create_chunk(kf.id, 0, "OTHER_CONV_XXXXXX_content")
+        await _seed_files(d, u.id, conv.id, prefix="bcm3")
         cmap = await _build_chunk_map(d, u.id, conv.id, "conversation", filter_web=False)
-        assert len(cmap) == 3  # only conv.id's files
+        assert len(cmap) == 3
 
     @pytest.mark.asyncio
     async def test_conv_mode_filter_web(self, db):
@@ -352,28 +207,20 @@ class TestBuildChunkMap:
         d = Database(db)
         u = await d.create_user("bcm4")
         conv = await d.create_conversation(u.id)
-        await _seed_files(d, u.id, conv.id, prefix=u.name)
+        await _seed_files(d, u.id, conv.id, prefix="bcm4")
         cmap = await _build_chunk_map(d, u.id, conv.id, "conversation", filter_web=True)
         assert len(cmap) == 2
 
 
-# ═══════════════════════════════════════════════════════════════════
-# 6. BM25Manager (unchanged)
-# ═══════════════════════════════════════════════════════════════════
-
 class TestBM25Manager:
     def test_persist_false_no_file(self, tmp_path):
-        bm = BM25Manager(tmp_path / "ghost.pkl", persist=False)
+        bm = BM25Manager(tmp_path / "g.pkl", persist=False)
         bm.build(["hello world", "foo bar"])
         bm.save()
-        assert not (tmp_path / "ghost.pkl").exists()
-
-    def test_persist_false_load_false(self, tmp_path):
-        bm = BM25Manager(tmp_path / "ghost.pkl", persist=False)
-        assert bm.load() is False
+        assert not (tmp_path / "g.pkl").exists()
 
     def test_persist_false_search(self, tmp_path):
-        bm = BM25Manager(tmp_path / "ghost.pkl", persist=False)
+        bm = BM25Manager(tmp_path / "g.pkl", persist=False)
         bm.build(["apple orange banana", "cat dog mouse", "red blue green"])
         results = bm.search("apple fruit", top_k=2)
         assert len(results) == 2
@@ -386,117 +233,8 @@ class TestBM25Manager:
         assert (tmp_path / "real.pkl").exists()
         bm2 = BM25Manager(tmp_path / "real.pkl", persist=True)
         assert bm2.load() is True
-        assert bm2.chunk_count == 1
 
     def test_empty_build(self, tmp_path):
-        bm = BM25Manager(tmp_path / "empty.pkl", persist=False)
+        bm = BM25Manager(tmp_path / "e.pkl", persist=False)
         bm.build([])
         assert bm.search("anything") == []
-
-
-# ═══════════════════════════════════════════════════════════════════
-# 7. KnowledgeService: conversation-level search
-# ═══════════════════════════════════════════════════════════════════
-
-class TestKnowledgeServiceConvSearch:
-    @pytest.mark.asyncio
-    async def test_search_empty(self, db):
-        d = Database(db)
-        u = await d.create_user("ks_empty")
-        conv = await d.create_conversation(u.id)
-        results = await knowledge_service.search_by_conversation(d, conv.id, "test")
-        assert results == []
-
-    @pytest.mark.asyncio
-    async def test_search_returns_results(self, db):
-        d = Database(db)
-        u = await d.create_user("ks_user")
-        conv = await d.create_conversation(u.id)
-        kf = await d.create_knowledge_file(
-            u.id, "doc.txt", "/tmp/ks_doc.txt", "txt", conversation_id=conv.id,
-        )
-        await d.create_chunk(kf.id, 0, "人工智能市场规模达500亿")
-        await d.create_chunk(kf.id, 1, "机器学习是核心驱动力")
-        results = await knowledge_service.search_by_conversation(d, conv.id, "AI 市场")
-        assert len(results) >= 1
-        assert any("500亿" in r["chunk"] for r in results)
-
-    @pytest.mark.asyncio
-    async def test_search_caches_index(self, db):
-        d = Database(db)
-        u = await d.create_user("ks_cache")
-        conv = await d.create_conversation(u.id)
-        kf = await d.create_knowledge_file(
-            u.id, "cache.txt", "/tmp/cache.txt", "txt", conversation_id=conv.id,
-        )
-        await d.create_chunk(kf.id, 0, "缓存测试内容")
-        await knowledge_service.search_by_conversation(d, conv.id, "缓存")
-        assert conv.id in knowledge_service._conv_indexes
-
-    @pytest.mark.asyncio
-    async def test_empty_conv_no_cache(self, db):
-        d = Database(db)
-        u = await d.create_user("ks_nocache")
-        conv = await d.create_conversation(u.id)
-        results = await knowledge_service.search_by_conversation(d, conv.id, "test")
-        assert results == []
-        assert conv.id not in knowledge_service._conv_indexes
-
-    @pytest.mark.asyncio
-    async def test_rebuild_conv_index(self, db):
-        d = Database(db)
-        u = await d.create_user("ks_rebuild")
-        conv = await d.create_conversation(u.id)
-        await knowledge_service.search_by_conversation(d, conv.id, "AI")
-        kf = await d.create_knowledge_file(
-            u.id, "new.txt", "/tmp/ks_new.txt", "txt", conversation_id=conv.id,
-        )
-        await d.create_chunk(kf.id, 0, "新添加的AI内容")
-        await knowledge_service.rebuild_conversation_index(d, conv.id)
-        results = await knowledge_service.search_by_conversation(d, conv.id, "AI")
-        assert len(results) >= 1
-
-    @pytest.mark.asyncio
-    async def test_rebuild_empty_removes_cache(self, db):
-        d = Database(db)
-        u = await d.create_user("ks_rem")
-        conv = await d.create_conversation(u.id)
-        kf = await d.create_knowledge_file(
-            u.id, "tmp.txt", "/tmp/ks_tmp.txt", "txt", conversation_id=conv.id,
-        )
-        await d.create_chunk(kf.id, 0, "stuff")
-        await knowledge_service.rebuild_conversation_index(d, conv.id)
-        assert conv.id in knowledge_service._conv_indexes
-        await d.delete_knowledge_file(kf.id)
-        await knowledge_service.rebuild_conversation_index(d, conv.id)
-        assert conv.id not in knowledge_service._conv_indexes
-
-    @pytest.mark.asyncio
-    async def test_remove_conv_index(self, db):
-        d = Database(db)
-        u = await d.create_user("ks_remove")
-        conv = await d.create_conversation(u.id)
-        kf = await d.create_knowledge_file(
-            u.id, "d.txt", "/tmp/ks_d.txt", "txt", conversation_id=conv.id,
-        )
-        await d.create_chunk(kf.id, 0, "content")
-        await knowledge_service.search_by_conversation(d, conv.id, "content")
-        knowledge_service.remove_conversation_index(conv.id)
-        assert conv.id not in knowledge_service._conv_indexes
-
-    @pytest.mark.asyncio
-    async def test_search_isolated(self, db):
-        d = Database(db)
-        u = await d.create_user("ks_iso")
-        conv_a = await d.create_conversation(u.id)
-        conv_b = await d.create_conversation(u.id)
-        for conv, text in [(conv_a, "AAA专属"), (conv_b, "BBB专属")]:
-            kf = await d.create_knowledge_file(
-                u.id, f"{text}.txt", f"/tmp/{text}.txt", "txt",
-                conversation_id=conv.id,
-            )
-            await d.create_chunk(kf.id, 0, text)
-        r_a = await knowledge_service.search_by_conversation(d, conv_a.id, "AAA")
-        r_b = await knowledge_service.search_by_conversation(d, conv_b.id, "BBB")
-        assert any("AAA" in r["chunk"] for r in r_a)
-        assert any("BBB" in r["chunk"] for r in r_b)

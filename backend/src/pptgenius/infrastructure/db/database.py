@@ -45,9 +45,6 @@ class Database:
     async def set_rag_mode(self, *a, **kw): return await self._call(user_repo.set_rag_mode, *a, **kw)
     async def get_web_search_enabled(self, *a, **kw): return await self._call(user_repo.get_web_search_enabled, *a, **kw)
     async def set_web_search_enabled(self, *a, **kw): return await self._call(user_repo.set_web_search_enabled, *a, **kw)
-    async def set_rag_index_changed(self, *a, **kw): return await self._call(user_repo.set_rag_index_changed, *a, **kw)
-    async def clear_rag_index_changed(self, *a, **kw): return await self._call(user_repo.clear_rag_index_changed, *a, **kw)
-    async def is_rag_index_changed(self, *a, **kw): return await self._call(user_repo.is_rag_index_changed, *a, **kw)
 
     # ─── conversation ───
     async def create_conversation(self, *a, **kw): return await self._call(conv_repo.create_conversation, *a, **kw)

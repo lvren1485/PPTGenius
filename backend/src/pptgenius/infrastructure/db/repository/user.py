@@ -98,33 +98,3 @@ async def set_web_search_enabled(db: AsyncSession, user_id: int, enabled: bool) 
     return True
 
 
-async def set_rag_index_changed(db: AsyncSession, user_id: int) -> bool:
-    """Mark that the user's RAG index needs rebuilding."""
-    u = await db.get(User, user_id)
-    if u is None:
-        return False
-    other = dict(u.other or {})
-    other["rag_index_changed"] = True
-    u.other = other
-    await db.commit()
-    return True
-
-
-async def clear_rag_index_changed(db: AsyncSession, user_id: int) -> bool:
-    """Reset the rag_index_changed flag after rebuild."""
-    u = await db.get(User, user_id)
-    if u is None:
-        return False
-    other = dict(u.other or {})
-    other["rag_index_changed"] = False
-    u.other = other
-    await db.commit()
-    return True
-
-
-async def is_rag_index_changed(db: AsyncSession, user_id: int) -> bool:
-    """Check if the RAG index needs rebuilding."""
-    u = await db.get(User, user_id)
-    if u is None:
-        return False
-    return (u.other or {}).get("rag_index_changed", False)

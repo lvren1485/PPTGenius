@@ -121,17 +121,6 @@ async def run_master_agent(
     )
     _log.info("master agent start conv=%d agent=%s", conversation_id, agent_id)
 
-    # --- 1.5. Ensure RAG index is fresh ---
-    from pptgenius.infrastructure.rag.knowledge import knowledge_service
-    conv = await db.get_conversation(conversation_id)
-    if conv and conv.user_id:
-        rag_mode = await db.get_rag_mode(conv.user_id)
-        web_enabled = await db.get_web_search_enabled(conv.user_id)
-        await knowledge_service.ensure_index(
-            db, user_id=conv.user_id, rag_mode=rag_mode,
-            filter_web=not web_enabled, conversation_id=conversation_id,
-        )
-
     # --- 2. Assemble tools ---
     tools = _assemble_tools(db, conversation_id)
     _log.debug("assembled %d tools for conv=%d", len(tools), conversation_id)

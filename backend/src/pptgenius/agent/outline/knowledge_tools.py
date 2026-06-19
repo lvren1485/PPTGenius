@@ -168,31 +168,6 @@ def make_fetch_web(db: Database, user_id: int, conv_id: int,
     return fetch_web
 
 
-def make_rebuild_rag_index(
-    db: Database,
-    user_id: int,
-    rag_mode: str,
-    conversation_id: int,
-    filter_web: bool = False,
-):
-    @tool
-    async def rebuild_rag_index() -> str:
-        """Rebuild the RAG knowledge base index.
-
-        Call this after uploading files or fetching web pages to make new
-        content searchable. Only needed when new documents were added during
-        this conversation.
-        """
-        from pptgenius.infrastructure.rag.knowledge import knowledge_service
-        await knowledge_service.ensure_index(
-            db, user_id=user_id, rag_mode=rag_mode,
-            filter_web=filter_web, conversation_id=conversation_id,
-        )
-        return "RAG 索引已重建。"
-
-    return rebuild_rag_index
-
-
 def make_read_file(db: Database, count: list[int], fetched_ids: set[int]):
     @tool
     async def read_file(file_id: int) -> str:

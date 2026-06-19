@@ -25,7 +25,6 @@ from .knowledge_tools import (
     make_search_knowledge,
     make_search_web,
     make_fetch_web,
-    make_rebuild_rag_index,
     _EXPLORE_KB_LIMIT,
     _EXPLORE_WEB_LIMIT,
     _EXPLORE_FETCH_LIMIT,
@@ -82,6 +81,14 @@ async def run_explore_agent(
     rag_mode = await db.get_rag_mode(user_id)
     web_enabled = await db.get_web_search_enabled(user_id)
 
+    # Build BM25 index for this explore session
+    from pptgenius.infrastructure.rag.knowledge import knowledge_service
+    _index_scope = ""
+    _index_scope = await knowledge_service.build_index(
+        db, user_id=user_id, rag_mode=rag_mode,
+        filter_web=not web_enabled, conversation_id=conversation_id,
+    )
+
     # ── Read old explore result if modifying an existing outline ──
     old_explore = ""
     if conv.current_outline_id:
@@ -131,8 +138,6 @@ async def run_explore_agent(
             db, user_id, conversation_id, rag_mode, kb_count,
             filter_web=not web_enabled, limit=_EXPLORE_KB_LIMIT,
         ),
-        make_rebuild_rag_index(db, user_id, rag_mode, conversation_id,
-                               filter_web=not web_enabled),
     ]
     if web_enabled:
         tools.append(make_search_web(web_count, limit=_EXPLORE_WEB_LIMIT))
@@ -150,24 +155,27 @@ async def run_explore_agent(
     writer({"type": "explore_agent_start"})
 
     try:
-        result = await agent.ainvoke(
-            {"messages": [HumanMessage(content=user_prompt)]},
-            config={"recursion_limit": 80},
-        )
-    except Exception:
-        _log.warning("explore agent failed conv=%d", conversation_id)
-        _log.debug("explore crash detail", exc_info=True)
-        return {"error": "探索失败，请重试"}
+        try:
+            result = await agent.ainvoke(
+                {"messages": [HumanMessage(content=user_prompt)]},
+                config={"recursion_limit": 80},
+            )
+        except Exception:
+            _log.warning("explore agent failed conv=%d", conversation_id)
+            _log.debug("explore crash detail", exc_info=True)
+            return {"error": "探索失败，请重试"}
 
-    # ── Extract final output ──
-    final_text = ""
-    for msg in reversed(result["messages"]):
-        if isinstance(msg, AIMessage) and msg.content and not msg.tool_calls:
-            final_text = str(msg.content)
-            break
+        # ── Extract final output ──
+        final_text = ""
+        for msg in reversed(result["messages"]):
+            if isinstance(msg, AIMessage) and msg.content and not msg.tool_calls:
+                final_text = str(msg.content)
+                break
 
-    if not final_text:
-        _log.warning("explore agent no final output conv=%d", conversation_id)
-        return {"error": "探索未产生有效结果"}
+        if not final_text:
+            _log.warning("explore agent no final output conv=%d", conversation_id)
+            return {"error": "探索未产生有效结果"}
 
-    return {"result": final_text, "status": "ok"}
+        return {"result": final_text, "status": "ok"}
+    finally:
+        knowledge_service.remove_index(_index_scope)
