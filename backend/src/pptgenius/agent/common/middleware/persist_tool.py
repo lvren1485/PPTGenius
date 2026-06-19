@@ -7,6 +7,7 @@ LangChain version that stabilises async middleware hooks.
 
 from __future__ import annotations
 
+import time as _time
 from collections.abc import Callable
 
 from langchain.agents.middleware import AgentMiddleware, AgentState
@@ -67,6 +68,7 @@ class PersistToolMiddleware(AgentMiddleware):
         ctype = self._ctypes.get(tc_name, "tool_call")
 
         # ① Collect tool_call entry
+        call_ts = _time.time()
         meta: dict = {
             "tool_name": tc_name,
             "args": tc_args,
@@ -79,10 +81,12 @@ class PersistToolMiddleware(AgentMiddleware):
             "content": tc_args.get("query", "") or "",
             "content_type": ctype,
             "metadata_json": meta,
+            "created_at": call_ts,
         })
 
         # ② Execute the tool
         result = handler(request)
+        result_ts = _time.time()
 
         # ③ Collect tool_result entry
         content = str(result.content) if hasattr(result, "content") else str(result)
@@ -96,6 +100,7 @@ class PersistToolMiddleware(AgentMiddleware):
             "content_type": ctype,
             "metadata_json": result_meta,
             "is_sub_agent": ctype in self._sub_agents,
+            "created_at": result_ts,
         })
 
         return result
@@ -129,6 +134,7 @@ class PersistToolMiddleware(AgentMiddleware):
                     content=entry["content"],
                     content_type=entry["content_type"],
                     metadata_json=entry["metadata_json"],
+                    created_at=entry.get("created_at"),
                 )
 
             elif role == "tool_result":
@@ -141,6 +147,7 @@ class PersistToolMiddleware(AgentMiddleware):
                     content=entry["content"],
                     content_type=entry["content_type"],
                     metadata_json=entry["metadata_json"],
+                    created_at=entry.get("created_at"),
                 )
 
                 # Flush sub-agent token counters

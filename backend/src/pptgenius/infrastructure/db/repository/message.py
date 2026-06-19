@@ -2,6 +2,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import Conversation, Message
+import time as _time
 
 
 async def _get_next_idx(db: AsyncSession, conversation_id: int) -> int:
@@ -30,9 +31,11 @@ async def create_message(
     estimated_cost: float | None = None,
     metadata_json: dict | None = None,
     token_cost_json: dict | None = None,
+    created_at: float | None = _time.time(),
 ) -> Message:
+    from datetime import datetime as _dt
     idx = await _get_next_idx(db, conversation_id)
-    msg = Message(
+    kwargs = dict(
         conversation_id=conversation_id,
         idx=idx,
         role=role,
@@ -42,6 +45,9 @@ async def create_message(
         metadata_json=metadata_json,
         token_cost_json=token_cost_json,
     )
+    if created_at is not None:
+        kwargs["created_at"] = _dt.fromtimestamp(created_at)
+    msg = Message(**kwargs)
     db.add(msg)
     if estimated_cost:
         await _add_conversation_cost(db, conversation_id, estimated_cost)

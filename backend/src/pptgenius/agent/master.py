@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 
 from langchain.agents import create_agent
@@ -141,11 +142,18 @@ async def run_master_agent(
     context.append(HumanMessage(content=user_message))
     state = {"messages": context}
     _log.debug("loaded %d context messages for conv=%d", len(context) - 1, conversation_id)
+    error_msg = ""
     try:
         result = await agent.ainvoke(state, config={"recursion_limit": recursion_limit})
-    except BaseException as e:
-        _log.warning("master agent crashed conv=%d error=%s type=%s", conversation_id, e, type(e).__name__, exc_info=True)
+    except asyncio.CancelledError:
+        error_msg = "已取消"
         result = {"messages": context}
+    except Exception as e:
+        _log.warning("master agent crashed conv=%d: %s", conversation_id, e)
+        _log.debug("master crash detail", exc_info=True)
+        error_msg = f"出错了，内容如下：{str(e)}，请联系管理员修复错误。"
+        result = {"messages": context}
+
     writer({"type": "master_done"})
     _log.info("master agent done conv=%d agent=%s", conversation_id, agent_id)
 
@@ -153,13 +161,16 @@ async def run_master_agent(
     await persist_mw.flush(db)
 
     # --- 6. Extract reply ---
-    reply = ""
-    messages = result.get("messages", [])
-    if messages:
-        last = messages[-1]
-        reply = last.content if hasattr(last, "content") else str(last)
-    if not reply:
-        reply = "操作已完成。您可以使用 get_outline 查看结果。"
+    if error_msg:
+        reply = error_msg
+    else:
+        reply = ""
+        messages = result.get("messages", [])
+        if messages:
+            last = messages[-1]
+            reply = last.content if hasattr(last, "content") else str(last)
+        if not reply:
+            reply = "操作已完成。您可以使用 get_outline 查看结果。"
 
     # --- 7. Persist Master's own token cost ---
     tc = TokenCounter.get_agent(agent_id)
@@ -182,6 +193,8 @@ async def run_master_agent(
     )
 
     # --- 8. Snapshot on exit ---
+    outline_snapshot_id = None
+    pres_snapshot_id = None
     outline_changed = _has_outline_changed(result)
     presentation_changed = _has_presentation_changed(result)
 
@@ -211,8 +224,7 @@ async def run_master_agent(
                     content=str(snap.id),
                     content_type="outline",
                 )
-                writer({"type": "outline_snapshot", "snapshot_id": snap.id,
-                        "version": outline.version})
+                outline_snapshot_id = snap.id
 
     if presentation_changed:
         conv = await db.get_conversation(conversation_id)
@@ -242,8 +254,7 @@ async def run_master_agent(
                     content=str(snap.id),
                     content_type="presentation",
                 )
-                writer({"type": "presentation_snapshot", "snapshot_id": snap.id,
-                        "version": pres.version})
+                pres_snapshot_id = snap.id
 
     # Ensure all DB changes are committed before the session closes
     await db.db.commit()
@@ -252,6 +263,8 @@ async def run_master_agent(
         "reply": reply,
         "outline_changed": outline_changed,
         "presentation_changed": presentation_changed,
+        "outline_snapshot_id": outline_snapshot_id,
+        "presentation_snapshot_id": pres_snapshot_id,
     }
 
 

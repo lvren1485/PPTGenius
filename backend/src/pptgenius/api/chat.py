@@ -1,13 +1,10 @@
-"""SSE streaming chat endpoint — single entry point for all user messages.
-
-Routes user messages to the Unified Master Agent.
-"""
+"""SSE streaming chat endpoint — with cancel support and disconnect handling."""
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
-from typing import AsyncGenerator
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
@@ -28,14 +25,34 @@ def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
+# ── Cancel Registry ────────────────────────────────────────────────────
+
+class CancelRegistry:
+    _tasks: dict[int, asyncio.Task] = {}
+
+    @classmethod
+    def register(cls, conv_id: int, task: asyncio.Task) -> None:
+        cls._tasks[conv_id] = task
+
+    @classmethod
+    def cancel(cls, conv_id: int) -> None:
+        t = cls._tasks.get(conv_id)
+        if t and not t.done():
+            t.cancel()
+
+    @classmethod
+    def unregister(cls, conv_id: int) -> None:
+        cls._tasks.pop(conv_id, None)
+
+
+# ── Endpoints ──────────────────────────────────────────────────────────
+
 @router.post("/send")
 async def chat_send(
     req: ChatSendRequest,
     request: Request,
     db: Database = Depends(get_db),
 ) -> StreamingResponse:
-    """Send a user message and receive SSE stream of agent progress."""
-
     conv = await db.get_conversation(req.conversation_id)
     if conv is None:
         return StreamingResponse(
@@ -43,31 +60,71 @@ async def chat_send(
             media_type="text/event-stream",
         )
 
-    # Save user message
     await db.create_human_message(req.conversation_id, req.message)
+    conv_id = req.conversation_id
 
-    async def event_stream() -> AsyncGenerator[str, None]:
+    async def event_stream():
         t0 = time.time()
+        task = asyncio.create_task(run_master_agent(db, conv_id, req.message))
+        CancelRegistry.register(conv_id, task)
+        last_hb = time.monotonic()
+
         try:
-            yield _sse("message", {"type": "master_start", "content": req.message})
+            yield _sse("message", {"type": "master_start"})
 
-            result = await run_master_agent(db, req.conversation_id, req.message)
+            while not task.done():
+                # heartbeat
+                now = time.monotonic()
+                if now - last_hb > 5:
+                    yield _sse("message", {"type": "heartbeat"})
+                    last_hb = now
 
+                if await request.is_disconnected():
+                    CancelRegistry.cancel(conv_id)
+                    break
+
+                await asyncio.sleep(1)
+
+            # ── normal (cancel handled inside master) ──
+            result = await task
             yield _sse("message", {
                 "type": "master_reply",
                 "reply": result["reply"],
-                "outline_changed": result["outline_changed"],
-                "presentation_changed": result["presentation_changed"],
+                "outline_changed": result.get("outline_changed", False),
+                "presentation_changed": result.get("presentation_changed", False),
             })
-
+            if result.get("outline_snapshot_id"):
+                yield _sse("message", {
+                    "type": "outline_snapshot",
+                    "snapshot_id": result["outline_snapshot_id"],
+                })
+            if result.get("presentation_snapshot_id"):
+                yield _sse("message", {
+                    "type": "presentation_snapshot",
+                    "snapshot_id": result["presentation_snapshot_id"],
+                })
             elapsed = round(time.time() - t0, 2)
             yield _sse("done", {
                 "estimated_cost": round(conv.estimated_cost or 0, 4),
                 "elapsed_seconds": elapsed,
             })
+
+        except asyncio.CancelledError:
+            CancelRegistry.cancel(conv_id)
+            raise  # must re-raise for Starlette teardown
+
         except Exception as exc:
-            _log.warning("agent error conv=%d: %s", req.conversation_id, exc)
+            _log.warning("agent error conv=%d: %s", conv_id, exc)
             _log.debug("agent error detail", exc_info=True)
             yield _sse("error", {"code": 40200, "message": str(exc), "retryable": True})
 
+        finally:
+            CancelRegistry.unregister(conv_id)
+
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@router.post("/{conversation_id}/cancel")
+async def cancel_agent(conversation_id: int):
+    CancelRegistry.cancel(conversation_id)
+    return {"status": "ok"}
