@@ -38,9 +38,9 @@ class ConversationBrief(BaseModel):
     user_id: int
     title: str
     status: str
-    current_phase: str | None = None
     message_count: int = 0
     estimated_cost: float | None = None
+    context_usage: float | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -65,9 +65,9 @@ class ConversationDetail(BaseModel):
     user_id: int
     title: str
     status: str
-    current_phase: str | None = None
     workspace_path: str
     estimated_cost: float | None = None
+    context_usage: float | None = None
     created_at: datetime
     updated_at: datetime
     messages: list[MessageItem] = []

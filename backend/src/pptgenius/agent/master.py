@@ -167,6 +167,12 @@ async def run_master_agent(
 
     # --- 7. Persist Master's own token cost ---
     tc = TokenCounter.get_agent(agent_id)
+    # Persist context usage before removing the counter
+    if tc and tc.total_tokens > 0:
+        await db.update_context_usage(
+            conversation_id,
+            round(tc.total_tokens / 1_000_000, 4),
+        )
     TokenCounter.remove_agent(agent_id)  # prevent memory leak
     # Extract reasoning_content from the last AIMessage in the result chain
     reasoning = ""

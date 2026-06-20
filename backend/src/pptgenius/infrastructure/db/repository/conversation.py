@@ -49,15 +49,6 @@ async def update_conversation_title(db: AsyncSession, conv_id: int, title: str) 
     return True
 
 
-async def update_conversation_phase(db: AsyncSession, conv_id: int, phase: str) -> bool:
-    conv = await db.get(Conversation, conv_id)
-    if conv is None or conv.status == "deleted":
-        return False
-    conv.current_phase = phase
-    await db.commit()
-    return True
-
-
 async def set_conversation_outline(
     db: AsyncSession, conv_id: int, outline_id: int | None
 ) -> bool:
@@ -68,6 +59,15 @@ async def set_conversation_outline(
     await db.commit()
     # Refresh to ensure identity map is consistent with DB
     await db.refresh(conv)
+    return True
+
+
+async def update_context_usage(db: AsyncSession, conv_id: int, usage: float) -> bool:
+    conv = await db.get(Conversation, conv_id)
+    if conv is None or conv.status == "deleted":
+        return False
+    conv.context_usage = usage
+    await db.commit()
     return True
 
 

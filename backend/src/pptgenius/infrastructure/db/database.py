@@ -51,8 +51,8 @@ class Database:
     async def get_conversation(self, *a, **kw): return await self._call(conv_repo.get_conversation, *a, **kw)
     async def list_conversations(self, *a, **kw): return await self._call(conv_repo.list_conversations, *a, **kw)
     async def update_conversation_title(self, *a, **kw): return await self._call(conv_repo.update_conversation_title, *a, **kw)
-    async def update_conversation_phase(self, *a, **kw): return await self._call(conv_repo.update_conversation_phase, *a, **kw)
     async def set_conversation_outline(self, *a, **kw): return await self._call(conv_repo.set_conversation_outline, *a, **kw)
+    async def update_context_usage(self, *a, **kw): return await self._call(conv_repo.update_context_usage, *a, **kw)
     async def archive_conversation(self, *a, **kw): return await self._call(conv_repo.archive_conversation, *a, **kw)
     async def soft_delete_conversation(self, *a, **kw): return await self._call(conv_repo.soft_delete_conversation, *a, **kw)
 

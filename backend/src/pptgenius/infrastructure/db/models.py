@@ -25,12 +25,12 @@ class Conversation(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     title: Mapped[str] = mapped_column(String(256), nullable=False, default="")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
-    current_phase: Mapped[str | None] = mapped_column(String(32), default="chat")
     current_outline_id: Mapped[int | None] = mapped_column(
         ForeignKey("outlines.id", ondelete="SET NULL")
     )
     workspace_path: Mapped[str] = mapped_column(String(512), nullable=False, default="")
     estimated_cost: Mapped[float | None] = mapped_column(Float, default=0)
+    context_usage: Mapped[float | None] = mapped_column(Float)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
