@@ -14,6 +14,7 @@ from .outline import router as outline_router
 from .ppt import router as ppt_router
 from .snapshot import router as snapshot_router
 from .system import router as system_router
+from .user import router as user_router
 from .workspace import router as workspace_router
 
 api_router = APIRouter()
@@ -27,5 +28,6 @@ api_router.include_router(snapshot_router)
 api_router.include_router(export_router)
 api_router.include_router(cost_router)
 api_router.include_router(knowledge_router)
+api_router.include_router(user_router)
 api_router.include_router(workspace_router)
 api_router.include_router(system_router)

@@ -4,14 +4,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
-import { streamChat } from '../api/sse'
+import { streamChat, cancelChat } from '../api/sse'
 import ConversationSidebar from '../components/layout/ConversationSidebar.vue'
 import MessageBubble from '../components/chat/MessageBubble.vue'
 import FileCard from '../components/chat/FileCard.vue'
-import ImageCard from '../components/chat/ImageCard.vue'
 import DocumentCard from '../components/chat/DocumentCard.vue'
-import OutlineCard from '../components/chat/OutlineCard.vue'
-import PptCard from '../components/chat/PptCard.vue'
 import ChatInput from '../components/chat/ChatInput.vue'
 import SseStatus from '../components/chat/SseStatus.vue'
 
@@ -28,9 +25,8 @@ interface MsgItem {
 
 interface SseState {
   phase: string
-  step: string
   detail: string
-  pct: number
+  slideIndex: number
 }
 
 const route = useRoute()
@@ -42,7 +38,7 @@ const convId = computed(() => {
 })
 
 const messages = ref<MsgItem[]>([])
-const sse = ref<SseState>({ phase: '', step: '', detail: '', pct: 0 })
+const sse = ref<SseState>({ phase: '', detail: '', slideIndex: 0 })
 const convTitle = ref('')
 
 const suggestions = [
@@ -53,9 +49,8 @@ const suggestions = [
   '制作公司年度总结报告',
 ]
 
-// Reload when switching conversations
 watch(convId, async (id) => {
-  if (sending.value) return  // don't interfere with active sendMessage flow
+  if (sending.value) return
   if (id > 0) {
     await loadConversation()
     scrollBottom()
@@ -78,7 +73,6 @@ onMounted(async () => {
     if (msg) {
       router.replace({ query: {} })
       await sendMessage(msg)
-      await loadConversation()
     }
   }
 })
@@ -95,7 +89,7 @@ async function loadConversation() {
   }
 }
 
-const sending = ref(false)  // true while SSE stream is active
+const sending = ref(false)
 
 async function ensureConversation(title?: string): Promise<number> {
   if (convId.value > 0) return convId.value
@@ -104,9 +98,7 @@ async function ensureConversation(title?: string): Promise<number> {
     title: title || '新对话',
   })
   const id = data.data.id
-  // Navigate to the new conversation
   await router.replace(`/chat/${id}`)
-  // Small delay to let the watch(convId) handler clear old state
   await nextTick()
   return id
 }
@@ -115,10 +107,8 @@ async function sendMessage(text: string) {
   if (!text.trim() || sending.value) return
   sending.value = true
   try {
-    // Lazy-create conversation if needed, auto-title from first 10 chars
     const cid = await ensureConversation(text.slice(0, 10))
 
-    // Push user message
     messages.value.push({
       id: 0, idx: messages.value.length + 1,
       role: 'user', content: text, content_type: 'text',
@@ -127,9 +117,7 @@ async function sendMessage(text: string) {
     await nextTick()
     scrollBottom()
 
-    // Reset SSE state for the new stream
-    sse.value = { phase: '', step: '', detail: '', pct: 0 }
-    // Push a loading placeholder
+    sse.value = { phase: '正在分析需求...', detail: '', slideIndex: 0 }
     const loadingIdx = messages.value.length + 1
     messages.value.push({
       id: -1, idx: loadingIdx,
@@ -140,7 +128,6 @@ async function sendMessage(text: string) {
 
     try {
       for await (const evt of streamChat(cid, text)) {
-        // Remove loading placeholder on first real event
         if (messages.value.some(m => m.id === -1)) {
           messages.value = messages.value.filter(m => m.id !== -1)
         }
@@ -150,7 +137,7 @@ async function sendMessage(text: string) {
       ElMessage.error(e.message || '请求失败')
       messages.value = messages.value.filter(m => m.id !== -1)
     } finally {
-      sse.value = { phase: '', step: '', detail: '', pct: 0 }
+      sse.value = { phase: '', detail: '', slideIndex: 0 }
     }
 
     await loadConversation()
@@ -160,26 +147,52 @@ async function sendMessage(text: string) {
   }
 }
 
+function handleStop() {
+  if (convId.value > 0) {
+    cancelChat(convId.value).catch(() => {})
+  }
+  ElMessage.info('正在停止...')
+}
+
 function handleSseEvent(evt: { event: string; data: Record<string, any> }) {
   const d = evt.data
-  switch (evt.event) {
-    case 'phase':
-      sse.value = { ...sse.value, phase: d.phase || '', detail: d.message || '' }
+  if (evt.event === 'error') {
+    ElMessage.error(d.message || '执行出错')
+    return
+  }
+  if (evt.event === 'done') {
+    sse.value = { phase: '', detail: '', slideIndex: 0 }
+    return
+  }
+  // evt.event === 'message' — 按内部 type 分发
+  switch (d.type) {
+    case 'master_start':
+      sse.value = { ...sse.value, phase: '正在分析需求...', detail: '' }
       break
-    case 'progress':
-      sse.value = {
-        phase: '',
-        step: d.step || '',
-        detail: d.detail || '',
-        pct: d.pct || 0,
-      }
+    case 'explore_agent_start':
+      sse.value = { ...sse.value, phase: '正在搜索知识库...', detail: '' }
       break
-    case 'outline':
-    case 'ppt_done':
-    case 'ppt_ready':
-      // Handled via 'document' event; ignore old-format inline data
+    case 'outline_generator_start':
+      sse.value = { ...sse.value, phase: '正在生成大纲...', detail: d.section || '' }
       break
-    case 'knowledge':
+    case 'outline_generator_end':
+      sse.value = { ...sse.value, detail: '' }
+      break
+    case 'outline_evaluator_start':
+      sse.value = { ...sse.value, phase: '正在评估大纲...', detail: d.outline || '' }
+      break
+    case 'style_agent_start':
+      sse.value = { ...sse.value, phase: '正在选择样式...', detail: '' }
+      break
+    case 'slide_agent_start':
+      sse.value = { ...sse.value, phase: '正在生成幻灯片...', slideIndex: d.slide_index || 1, detail: '' }
+      break
+    case 'tool_start':
+      sse.value = { ...sse.value, detail: toolLabel(d.tool || '') }
+      break
+    case 'tool_end':
+    case 'tool_error':
+      sse.value = { ...sse.value, detail: '' }
       break
     case 'document':
       messages.value.push({
@@ -188,17 +201,53 @@ function handleSseEvent(evt: { event: string; data: Record<string, any> }) {
         content: d.title || '',
         content_type: d.doc_type,
         metadata_json: d.doc_type === 'outline'
-          ? { outline_id: d.outline_id, title: d.title }
-          : { presentation_id: d.presentation_id, title: d.title },
+          ? { outline_id: d.snapshot_id, title: d.title }
+          : { presentation_id: d.snapshot_id, title: d.title },
         estimated_cost: null,
         created_at: new Date().toISOString(),
       })
       scrollBottom()
       break
-    case 'error':
-      ElMessage.error(d.message || '执行出错')
+    case 'master_reply':
+      messages.value.push({
+        id: 0, idx: messages.value.length + 1,
+        role: 'assistant',
+        content: d.reply || '',
+        content_type: 'text',
+        metadata_json: null,
+        estimated_cost: null,
+        created_at: new Date().toISOString(),
+      })
+      scrollBottom()
+      break
+    case 'master_done':
+      sse.value = { phase: '', detail: '', slideIndex: 0 }
       break
   }
+}
+
+function toolLabel(name: string): string {
+  const map: Record<string, string> = {
+    _get_conversation_status: '读取会话状态',
+    _switch_outline: '切换大纲',
+    _get_outline: '读取大纲',
+    _get_outline_slide: '读取大纲页面',
+    _get_presentation: '读取PPT',
+    _get_knowledge_files: '读取知识文件',
+    _search_styles: '搜索样式',
+    _create_empty_outline: '创建空白大纲',
+    _write_outline_structure: '写入大纲结构',
+    _modify_outline_structure: '修改大纲结构',
+    _rearrange_presentation_slides: '重排PPT页面',
+    _generate_outline_content: '生成大纲内容',
+    _modify_outline_section: '修改大纲章节',
+    _outline_evaluate: '评估大纲',
+    _explore_knowledge: '探索知识库',
+    _ppt_style: '选择样式',
+    _slides_content: '生成幻灯片内容',
+    _modify_slides_content: '修改幻灯片',
+  }
+  return map[name] || name
 }
 
 async function handleUpload(files: File[]) {
@@ -237,9 +286,7 @@ const visibleMessages = computed(() => {
       others.push(m)
     }
   }
-  // Keep last 5 documents only
   const keptDocs = docs.slice(-5)
-  // Interleave by original idx order
   const all = [...others, ...keptDocs]
   all.sort((a, b) => a.idx - b.idx)
   return all
@@ -248,9 +295,6 @@ const visibleMessages = computed(() => {
 function renderMsg(msg: MsgItem) {
   if (msg.role === 'document') return 'document'
   if (msg.content_type === 'file') return 'file'
-  if (msg.content_type === 'image') return 'image'
-  if (msg.content_type === 'outline') return 'outline'
-  if (msg.content_type === 'ppt') return 'ppt'
   return 'text'
 }
 </script>
@@ -294,33 +338,21 @@ function renderMsg(msg: MsgItem) {
             :content="msg.content"
             :created-at="msg.created_at"
           />
-          <ImageCard
-            v-else-if="renderMsg(msg) === 'image'"
-            :content="msg.content"
-            :created-at="msg.created_at"
-          />
           <DocumentCard
             v-else-if="renderMsg(msg) === 'document'"
             :doc-type="msg.content_type || ''"
             :metadata="msg.metadata_json || {}"
           />
-          <OutlineCard
-            v-else-if="renderMsg(msg) === 'outline'"
-            :outline-data="JSON.parse(msg.content)"
-          />
-          <PptCard
-            v-else-if="renderMsg(msg) === 'ppt'"
-            :ppt-data="JSON.parse(msg.content)"
-          />
         </template>
       </div>
 
       <SseStatus
-        v-if="sse.phase || sse.step"
+        v-if="sse.phase"
         :phase="sse.phase"
-        :step="sse.step"
         :detail="sse.detail"
-        :pct="sse.pct"
+        :slide-index="sse.slideIndex"
+        :sending="sending"
+        @stop="handleStop"
       />
 
       <ChatInput @send="sendMessage" @upload="handleUpload" />
@@ -396,9 +428,5 @@ function renderMsg(msg: MsgItem) {
   padding: 24px;
   display: flex;
   flex-direction: column;
-}
-/* Make SseStatus and loading visible inside the flow */
-.msg-container :deep(.sse-status) {
-  margin: 0 0 16px;
 }
 </style>

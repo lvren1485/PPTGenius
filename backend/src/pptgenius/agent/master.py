@@ -191,6 +191,7 @@ async def run_master_agent(
     state = {"messages": context}
     _log.debug("loaded %d context messages for conv=%d", len(context) - 1, conversation_id)
     error_msg = ""
+    messages: list = []
     try:
         result = await agent.ainvoke(state, config={"recursion_limit": recursion_limit})
     except asyncio.CancelledError:
@@ -278,6 +279,8 @@ async def run_master_agent(
                     content=str(snap.id),
                     content_type="outline",
                 )
+                writer({"type": "document", "doc_type": "outline",
+                        "snapshot_id": snap.id, "title": outline.title})
                 outline_snapshot_id = snap.id
 
     if presentation_changed:
@@ -308,6 +311,8 @@ async def run_master_agent(
                     content=str(snap.id),
                     content_type="presentation",
                 )
+                writer({"type": "document", "doc_type": "presentation",
+                        "snapshot_id": snap.id, "title": outline.title if outline else ""})
                 pres_snapshot_id = snap.id
 
     # Ensure all DB changes are committed before the session closes

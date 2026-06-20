@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS outline_sections (
     title VARCHAR(256) NOT NULL,
     description TEXT,
     slide_count INT DEFAULT 0,
+    citations JSON,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (outline_id) REFERENCES outlines(id) ON DELETE CASCADE,
     UNIQUE KEY uk_outline_section (outline_id, section_index)

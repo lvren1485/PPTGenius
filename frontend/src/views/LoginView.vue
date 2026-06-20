@@ -8,6 +8,7 @@ import { useAuthStore } from '../stores/auth'
 const router = useRouter()
 const auth = useAuthStore()
 const form = ref({ name: '', password: '' })
+const remember = ref(false)
 const loading = ref(false)
 
 async function handleLogin() {
@@ -15,7 +16,7 @@ async function handleLogin() {
   try {
     const { data } = await api.post('/auth/login', form.value)
     if (data.code === 0) {
-      auth.setAuth(data.data.token, data.data.user_id, data.data.name)
+      auth.setAuth(data.data.token, data.data.user_id, data.data.name, remember.value)
       router.push('/')
     }
   } catch (e: any) {
@@ -40,6 +41,9 @@ async function handleLogin() {
         </el-form-item>
         <el-form-item label="密码">
           <el-input v-model="form.password" type="password" show-password placeholder="请输入密码" />
+        </el-form-item>
+        <el-form-item>
+          <el-checkbox v-model="remember">记住我（7天内自动登录）</el-checkbox>
         </el-form-item>
         <el-button type="primary" native-type="submit" :loading="loading" block>
           登 录

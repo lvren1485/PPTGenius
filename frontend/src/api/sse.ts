@@ -53,9 +53,10 @@ export async function* streamChat(conversationId: number, message: string): Asyn
   }
 }
 
-export async function* streamChatNew(messages: string): AsyncGenerator<SseEvent> {
-  // Used from HomeView where no conversation exists yet;
-  // conversation is created by the backend on first message.
-  // Actually, we create it ourselves first.
-  throw new Error('Use createConversation + streamChat instead')
+export async function cancelChat(conversationId: number): Promise<void> {
+  const auth = useAuthStore()
+  await fetch(`/api/chat/${conversationId}/cancel`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${auth.token}` },
+  })
 }

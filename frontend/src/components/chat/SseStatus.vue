@@ -3,42 +3,54 @@ import { computed } from 'vue'
 
 const props = defineProps<{
   phase: string
-  step: string
   detail: string
-  pct: number
+  slideIndex: number
+  sending: boolean
 }>()
+
+defineEmits<{ stop: [] }>()
 
 const phaseLabel = computed(() => {
   const m: Record<string, string> = {
-    loading_state: '加载中',
-    coordinator_decision: '分析中',
-    searching_knowledge: '检索知识库',
-    searching_web: '搜索网络',
-    fetching_web: '获取网页',
-    writing_outline: '生成大纲',
-    evaluating: '评估中',
-    slide_generating: '生成页面',
-    slide_done: '页面完成',
-    ppt: 'PPT生成',
-    ppt_done: 'PPT完成',
+    '正在分析需求...': '正在分析需求...',
+    '正在搜索知识库...': '正在搜索知识库...',
+    '正在生成大纲...': '正在生成大纲...',
+    '正在评估大纲...': '正在评估大纲...',
+    '正在选择样式...': '正在选择样式...',
+    '正在生成幻灯片...': '正在生成幻灯片...',
   }
-  return m[props.step] || props.step || props.phase || ''
+  return m[props.phase] || props.phase || '处理中...'
 })
 
-const pctSafe = computed(() => Math.min(100, Math.max(0, props.pct || 0)))
+const progressText = computed(() => {
+  if (props.slideIndex > 0) return `正在生成第 ${props.slideIndex} 页...`
+  if (props.detail) return props.detail
+  return ''
+})
 </script>
 
 <template>
-  <div v-if="phase || step" class="sse-status">
-    <div class="sse-row">
-      <el-tag size="small" :type="pctSafe === 100 ? 'success' : 'primary'">
-        {{ phaseLabel }}
-      </el-tag>
-      <span class="sse-detail">{{ detail }}</span>
+  <div class="sse-status">
+    <div class="sse-top">
+      <div class="sse-left">
+        <el-tag type="primary" size="small" effect="dark">{{ phaseLabel }}</el-tag>
+        <span class="sse-detail" v-if="progressText">{{ progressText }}</span>
+      </div>
+      <el-button
+        v-if="sending"
+        type="danger"
+        size="small"
+        text
+        @click="$emit('stop')"
+      >
+        停止生成
+      </el-button>
     </div>
+    <el-skeleton v-if="sending && !progressText" :rows="1" animated style="margin-top:6px" />
     <el-progress
-      v-if="pctSafe > 0"
-      :percentage="pctSafe"
+      v-if="slideIndex > 0"
+      :percentage="0"
+      :indeterminate="true"
       :stroke-width="4"
       :show-text="false"
       style="margin-top: 6px"
@@ -53,7 +65,12 @@ const pctSafe = computed(() => Math.min(100, Math.max(0, props.pct || 0)))
   padding: 10px 24px;
   flex-shrink: 0;
 }
-.sse-row {
+.sse-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sse-left {
   display: flex;
   align-items: center;
   gap: 10px;
