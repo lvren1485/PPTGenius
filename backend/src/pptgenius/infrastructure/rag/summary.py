@@ -136,6 +136,24 @@ class SummaryService:
                    file_id, url[:60], len(result["summary"]), result["estimated_cost_cny"])
         return result
 
+    async def summarize_chat(self, history_text: str) -> dict:
+        """Summarise a conversation history for context compression.
+
+        Returns ``{summary, token_cost_json, estimated_cost_cny}``.
+        """
+        result = await self._call_llm(
+            system_prompt=(
+                "你是一个对话摘要助手。用中文总结以下对话历史，保留关键信息：\n"
+                "- 用户的需求和目标\n"
+                "- PPT 大纲的结构和标题\n"
+                "- 已完成的操作（创建大纲、填充内容、评测等）\n"
+                "- 待处理的事项\n\n"
+                "控制在 300-600 字以内。只输出摘要本身，不要包含标题或前缀。"
+            ),
+            user_content=history_text,
+        )
+        return result
+
     # ── internal ──────────────────────────────────────────────────────
 
     async def _call_llm(self, system_prompt: str, user_content: str,

@@ -16,6 +16,8 @@ from .common.sse_context import get_sse_writer
 
 _log = get_logger("pptgenius.agent.master")
 
+_SUMMARIZE_THRESHOLD = 0.7
+
 # tool_name → content_type (≤32 chars, VARCHAR limit)
 _TOOL_CTYPE: dict[str, str] = {
     "_get_conversation_status":  "conv_status",
@@ -64,6 +66,52 @@ from .tools.structure import (
 )
 
 
+async def _generate_summary(db: Database, conversation_id: int) -> str:
+    """Summarize conversation history via SummaryService, save as a Message.
+
+    Never deletes messages — the summary message acts as a compression
+    checkpoint for ``_load_context_messages``.
+    """
+    rows = await db.get_messages_by_conversation(conversation_id)
+    if len(rows) < 6:
+        return ""
+
+    # Exclude the current-turn user message (last row, created by chat.py)
+    history_rows = rows[:-1] if rows and rows[-1].role == "user" else rows
+
+    parts = []
+    for r in history_rows:
+        if r.content_type == "summary":
+            continue
+        role_label = {"user": "用户", "assistant": "助手"}.get(r.role, r.role)
+        content = r.content[:2000] if r.content else ""
+        parts.append(f"[{role_label}] {content}")
+    history = "\n".join(parts)
+
+    from pptgenius.infrastructure.rag.summary import summary_service
+    try:
+        result = await summary_service.summarize_chat(history)
+    except Exception:
+        _log.warning("summary generation failed conv=%d", conversation_id)
+        return ""
+
+    summary = result.get("summary", "")
+    if not summary:
+        return ""
+
+    await db.create_message(
+        conversation_id=conversation_id,
+        role="assistant",
+        content=summary,
+        content_type="summary",
+        token_cost_json=result.get("token_cost_json"),
+        estimated_cost=result.get("estimated_cost_cny"),
+    )
+    _log.info("summary saved conv=%d len=%d chars cost=¥%.4f",
+              conversation_id, len(summary), result.get("estimated_cost_cny", 0))
+    return summary
+
+
 def _assemble_tools(db: Database, conversation_id: int) -> list:
     """Assemble all currently-implemented Master tools."""
     return [
@@ -106,6 +154,13 @@ async def run_master_agent(
     Returns ``{"reply": str, "outline_changed": bool, "presentation_changed": bool}``.
     """
     writer = get_sse_writer()
+
+    # --- 0. Summarize if context is near full ---
+    conv = await db.get_conversation(conversation_id)
+    if conv and conv.context_usage and conv.context_usage > _SUMMARIZE_THRESHOLD:
+        _log.info("context_usage=%.2f > %.2f — summarizing conv=%d",
+                  conv.context_usage, _SUMMARIZE_THRESHOLD, conversation_id)
+        await _generate_summary(db, conversation_id)
 
     # --- 1. Build LLM + middleware ---
     llm, agent_id = create_llm(conversation_id)
@@ -272,13 +327,31 @@ async def _load_context_messages(
 ) -> list:
     """Load recent messages from DB, reconstruct LangChain message chain.
 
+    If a summary message (content_type="summary") exists, everything before
+    the latest summary is compressed into a single HumanMessage.
+    Messages are never deleted — the summary acts as a checkpoint.
+
     Only emits complete AIMessage(tool_calls) → ToolMessage pairs.
     Incomplete pairs (from partial persistence) are silently dropped.
     """
     rows = await db.get_messages_by_conversation(conversation_id)
-    rows = rows[-max_turns:]
+
+    # Find the latest summary checkpoint
+    summary_text = ""
+    summary_idx = -1
+    for r in reversed(rows):
+        if r.content_type == "summary":
+            summary_text = r.content
+            summary_idx = r.idx
+            break
 
     msgs: list = []
+    if summary_idx > 0:
+        msgs.append(HumanMessage(content=f"[对话历史摘要]\n\n{summary_text}"))
+        rows = [r for r in rows if r.idx > summary_idx]
+    else:
+        rows = rows[-max_turns:]
+
     # Pending tool_calls keyed by tool_call_id (handles parallel calls)
     pending: dict[str, dict] = {}
 
