@@ -27,7 +27,7 @@ def _safe_args(kwargs: dict) -> dict:
 class SSEToolMiddleware(AgentMiddleware):
     """Emit tool_start / tool_end / tool_error SSE for every tool invocation."""
 
-    def wrap_tool_call(
+    async def awrap_tool_call(
         self,
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], ToolMessage | Command],
@@ -38,7 +38,7 @@ class SSEToolMiddleware(AgentMiddleware):
 
         writer({"type": "tool_start", "tool": tc_name, "args": _safe_args(tc_args)})
         try:
-            result = handler(request)
+            result = await handler(request)
         except Exception as exc:
             writer({"type": "tool_error", "tool": tc_name, "error": str(exc)})
             raise

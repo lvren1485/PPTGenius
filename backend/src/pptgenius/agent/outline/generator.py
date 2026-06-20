@@ -216,8 +216,8 @@ async def run_outline_generator(
 
     total_slides = len(await db.get_slides_by_outline_id(outline_id))
     sec_slides = sum(1 for s in (await db.get_slides_by_outline_id(outline_id)) if s.section_id == section_id)
-    _log.info("generator section=%d written=%d/%d kb=%d web=%d fetch=%d",
-              section_id, len(_written), sec_slides, kb_count[0], web_count[0], fetch_count[0])
+    _log.info("generator section=%d written=%d/%d",
+              section_id, len(_written), sec_slides)
 
     if len(_written) < sec_slides:
         _log.warning("generator retry section=%d (%d/%d written)", section_id, len(_written), sec_slides)

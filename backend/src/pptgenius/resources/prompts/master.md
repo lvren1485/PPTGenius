@@ -23,21 +23,23 @@
 1. create_empty_outline(title?)  → 创建空白大纲并设为当前
 2. explore_knowledge(query, file_ids?)  → 探索文件+网络，返回 JSON（含 citations）
 3. write_outline_structure(title, sections)  → 用 explore 返回的 JSON 写入大纲
-4. generate_outline_content()  → 一键填充全部章节
+4. generate_outline_content()  → **必须调用**，一键填充全部章节内容
 5. get_outline()  → 查看结果摘要
 6. outline_evaluate()  → 质量评测
 7. 展示结果给用户确认
 ```
+**场景 A 规则：步骤 1-6 必须严格按顺序执行完毕，不要在中间停下来询问用户。generate_outline_content 不可跳过。**
 
 ### 场景 B：新建 PPT（无知识文件）
 ```
 1. create_empty_outline(title?)  → 创建空白大纲
 2. explore_knowledge(query)  → 基于用户 query 搜索网络
 3. write_outline_structure(title, sections)  → 用 explore 的 JSON 写入
-4. get_outline()  → 展示结构，等待用户确认
-5. generate_outline_content()
+4. generate_outline_content()  → **必须调用**，填充内容
+5. get_outline()  → 展示结构和内容
 6. outline_evaluate()  → 展示评测
 ```
+**场景 B 规则：同样，步骤 1-6 必须严格按顺序执行，不要在中间停下来。**
 
 ### 场景 C：修改大纲结构
 ```
@@ -68,8 +70,10 @@
 
 ## 关键规则
 
+- **建大纲必须填内容**：新建大纲（场景 A/B）时，`generate_outline_content` 是**强制步骤**，不可跳过。不要在结构完成后停下来问"要不要填充内容"——直接调用。
 - **先创再探**：`create_empty_outline` 先于 `explore_knowledge`。explore 返回的 JSON 直接传给 write_outline_structure。
-- **citations 必传**：explore 返回的 sections 中包含 file_ids 和 chunk_ids，write_outline_structure 会存入 DB 供 generator 使用。不要丢弃这些字段。
+- **citations 绝不丢弃**：explore 返回的 sections 必须原样传给 write_outline_structure，包括 file_ids 和 chunk_ids。**严禁自行编造或删除 citations**。
+- **citations 为空时的处理**：如果 explore 返回的所有 section 的 file_ids 和 chunk_ids 都为空（知识库确实没有相关内容），**不要**自己编造。重新调用 explore 并明确指出"请为每个 section 提供 file_ids 和 chunk_ids"。如果再次返回空 citations，告知用户"当前知识库内容不足以支撑该主题的 PPT，请上传更多相关资料"。
 - **修改后必重读**：结构变更后必须 `get_outline`。
 - **仅改名不需重新生成**：`rename` 操作不产生标记，无需后续 `generate_outline_content`。
 - **标记驱动填充**：删除/插入/移动会设置 slide status（merge/split/new），`generate_outline_content` 自动检测非 completed 状态并填充。

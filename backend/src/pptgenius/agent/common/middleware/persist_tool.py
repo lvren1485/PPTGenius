@@ -57,7 +57,7 @@ class PersistToolMiddleware(AgentMiddleware):
                 )
         return None
 
-    def wrap_tool_call(
+    async def awrap_tool_call(
         self,
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], ToolMessage | Command],
@@ -66,44 +66,38 @@ class PersistToolMiddleware(AgentMiddleware):
         tc_args = request.tool_call["args"]
         tc_id = request.tool_call["id"]
         ctype = self._ctypes.get(tc_name, "tool_call")
-
-        # ① Collect tool_call entry
         call_ts = _time.time()
-        meta: dict = {
-            "tool_name": tc_name,
-            "args": tc_args,
-            "tool_call_id": tc_id,
-        }
-        if self._last_reasoning:
-            meta["reasoning_content"] = self._last_reasoning
+
         self._pending.append({
             "role": "tool_call",
             "content": tc_args.get("query", "") or "",
             "content_type": ctype,
-            "metadata_json": meta,
+            "metadata_json": self._build_meta(tc_name, tc_args, tc_id),
             "created_at": call_ts,
         })
 
-        # ② Execute the tool
-        result = handler(request)
-        result_ts = _time.time()
+        result = await handler(request)
+        self._collect_result(result, tc_name, tc_id, ctype, call_ts)
+        return result
 
-        # ③ Collect tool_result entry
+    def _build_meta(self, tc_name: str, tc_args: dict, tc_id: str) -> dict:
+        meta: dict = {"tool_name": tc_name, "args": tc_args, "tool_call_id": tc_id}
+        if self._last_reasoning:
+            meta["reasoning_content"] = self._last_reasoning
+        return meta
+
+    def _collect_result(self, result, tc_name: str, tc_id: str, ctype: str,
+                        call_ts: float) -> None:
+        result_ts = _time.time()
         content = str(result.content) if hasattr(result, "content") else str(result)
-        result_meta = {
-            "tool_name": tc_name,
-            "tool_call_id": tc_id,
-        }
         self._pending.append({
             "role": "tool_result",
             "content": content,
             "content_type": ctype,
-            "metadata_json": result_meta,
+            "metadata_json": {"tool_name": tc_name, "tool_call_id": tc_id},
             "is_sub_agent": ctype in self._sub_agents,
             "created_at": result_ts,
         })
-
-        return result
 
     # ── persistence — called after ainvoke ────────────────────────────
 
