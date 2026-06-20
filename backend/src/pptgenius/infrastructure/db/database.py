@@ -89,10 +89,6 @@ class Database:
     async def update_outline_slide_status(self, *a, **kw): return await self._call(out_repo.update_outline_slide_status, *a, **kw)
     async def soft_delete_outline_slide(self, *a, **kw): return await self._call(out_repo.soft_delete_outline_slide, *a, **kw)
     async def soft_delete_outline_section(self, *a, **kw): return await self._call(out_repo.soft_delete_outline_section, *a, **kw)
-    async def delete_outline_slide(self, *a, **kw): return await self._call(out_repo.delete_outline_slide, *a, **kw)
-    async def insert_outline_slide_after(self, *a, **kw): return await self._call(out_repo.insert_outline_slide_after, *a, **kw)
-    async def replace_outline_slides(self, *a, **kw): return await self._call(out_repo.replace_outline_slides, *a, **kw)
-    async def replace_section_slides(self, *a, **kw): return await self._call(out_repo.replace_section_slides, *a, **kw)
     # outline_section
     async def create_outline_section(self, *a, **kw): return await self._call(out_repo.create_outline_section, *a, **kw)
     async def get_outline_section(self, *a, **kw): return await self._call(out_repo.get_outline_section, *a, **kw)

@@ -202,7 +202,7 @@ async def soft_delete_outline_section(db: AsyncSession, section_id: int) -> bool
     section = await db.get(OutlineSection, section_id)
     if section is None:
         return False
-    await db.delete(section)  # sections are hard-deleted (slides use CASCADE NULL)
+    await db.delete(section)
     await db.commit()
     return True
 
@@ -280,19 +280,8 @@ async def soft_delete_outline_slide(db: AsyncSession, slide_id: int) -> bool:
     slide = await db.get(OutlineSlide, slide_id)
     if slide is None or slide.status == "deleted":
         return False
-    outline_id = slide.outline_id
-    deleted_index = slide.slide_index
     slide.status = "deleted"
-    await db.flush()
-    # Shift all non-deleted slides with higher index down by 1
-    from sqlalchemy import update as _up
-    await db.execute(
-        _up(OutlineSlide)
-        .where(OutlineSlide.outline_id == outline_id)
-        .where(OutlineSlide.slide_index > deleted_index)
-        .where(OutlineSlide.status != "deleted")
-        .values(slide_index=OutlineSlide.slide_index - 1)
-    )
+    slide.slide_index = -slide.id  # unique negative index, avoids unique constraint conflict
     await db.commit()
     return True
 
@@ -338,8 +327,6 @@ async def update_outline_slide_index(
     slide = await db.get(OutlineSlide, slide_id)
     if slide is None:
         return False
-    if new_index < 1:
-        return False
     slide.slide_index = new_index
     await db.commit()
     return True
@@ -365,126 +352,3 @@ async def update_outline_slide_status(
     slide.status = status
     await db.commit()
     return True
-
-
-async def delete_outline_slide(db: AsyncSession, slide_id: int) -> bool:
-    """Delete a slide and decrement all higher-indexed slides in the same outline."""
-    slide = await db.get(OutlineSlide, slide_id)
-    if slide is None:
-        return False
-    outline_id = slide.outline_id
-    deleted_index = slide.slide_index
-    await db.delete(slide)
-    await db.flush()
-    # Shift all slides with index > deleted_index down by 1
-    from sqlalchemy import update
-    await db.execute(
-        update(OutlineSlide)
-        .where(OutlineSlide.outline_id == outline_id)
-        .where(OutlineSlide.slide_index > deleted_index)
-        .values(slide_index=OutlineSlide.slide_index - 1)
-    )
-    await db.commit()
-    return True
-
-
-async def insert_outline_slide_after(
-    db: AsyncSession,
-    outline_id: int,
-    after_slide_id: int,
-    title: str,
-    section_id: int | None = None,
-    content_json: dict | None = None,
-    layout_type: str = "content",
-    notes: str | None = None,
-) -> OutlineSlide:
-    """Insert a slide after the slide identified by *after_slide_id*.
-
-    All slides with index > the reference slide's index are shifted up by 1.
-    The new slide gets index = reference.index + 1.
-    """
-    from sqlalchemy import update
-    ref = await db.get(OutlineSlide, after_slide_id)
-    if ref is None:
-        raise ValueError(f"Reference slide {after_slide_id} not found")
-    after_index = ref.slide_index
-    new_index = after_index + 1
-    await db.execute(
-        update(OutlineSlide)
-        .where(OutlineSlide.outline_id == outline_id)
-        .where(OutlineSlide.slide_index > after_index)
-        .values(slide_index=OutlineSlide.slide_index + 1)
-    )
-    await db.flush()
-    slide = OutlineSlide(
-        outline_id=outline_id,
-        section_id=section_id,
-        slide_index=new_index,
-        title=title,
-        content_json=content_json,
-        layout_type=layout_type,
-        notes=notes,
-    )
-    db.add(slide)
-    await db.commit()
-    await db.refresh(slide)
-    return slide
-
-
-async def replace_section_slides(
-    db: AsyncSession,
-    outline_id: int,
-    section_id: int,
-    slides: list[dict],
-) -> list[OutlineSlide]:
-    """Replace all slides within *section_id*, preserving slides in other sections."""
-    old = await get_slides_by_outline_id(db, outline_id)
-    for s in old:
-        if s.section_id == section_id:
-            await db.delete(s)
-    await db.flush()
-
-    new = []
-    for s in slides:
-        slide = await create_outline_slide(
-            db,
-            outline_id=outline_id,
-            section_id=section_id,
-            slide_index=s["slide_index"],
-            title=s["title"],
-            content_json=s.get("content_json"),
-            layout_type=s.get("layout_type", "content"),
-            has_image=s.get("has_image", False),
-            has_chart=s.get("has_chart", False),
-            notes=s.get("notes"),
-        )
-        new.append(slide)
-    return new
-
-
-async def replace_outline_slides(
-    db: AsyncSession,
-    outline_id: int,
-    slides: list[dict],
-) -> list[OutlineSlide]:
-    old = await get_slides_by_outline_id(db, outline_id)
-    for s in old:
-        await db.delete(s)
-    await db.commit()
-
-    new = []
-    for s in slides:
-        slide = await create_outline_slide(
-            db,
-            outline_id=outline_id,
-            section_id=s.get("section_id"),
-            slide_index=s["slide_index"],
-            title=s["title"],
-            content_json=s.get("content_json"),
-            layout_type=s.get("layout_type", "content"),
-            has_image=s.get("has_image", False),
-            has_chart=s.get("has_chart", False),
-            notes=s.get("notes"),
-        )
-        new.append(slide)
-    return new

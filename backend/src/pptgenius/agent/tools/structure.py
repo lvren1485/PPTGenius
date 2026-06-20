@@ -163,10 +163,10 @@ def make_write_outline_structure(db: Database, conversation_id: int) -> Callable
                 )
                 slide_index += 1
 
-        # Title at 0, TOC at 1, ending at 99
+        # Title at 0, TOC at 1, ending at last position
         await db.create_outline_slide(outline_id, 0, title, layout_type="title")
         await db.create_outline_slide(outline_id, 1, "目录", layout_type="content")
-        await db.create_outline_slide(outline_id, 99, "谢谢", layout_type="thanks")
+        await db.create_outline_slide(outline_id, slide_index, "谢谢", layout_type="thanks")
 
         total = total_body + 3
         await db.set_outline_slide_count(outline_id, total)
@@ -190,27 +190,16 @@ def make_modify_outline_structure(db: Database, conversation_id: int) -> Callabl
     async def _modify_outline_structure(operations: list[dict]) -> dict:
         """Modify the outline structure. All operations use slide IDs, NOT indices.
 
-        Batch pre-check: every slide_id/target_id/after_id/merge_id must be unique.
-        Duplicate slide IDs will cause the entire batch to be rejected.
-        is_copy and is_change_section are bool flags, default False.
+        Operations are applied to an in-memory list; indices are renumbered
+        and written back to DB at the end, avoiding unique-constraint conflicts.
 
         Operations:
-          rename: {op, slide_id, new_title, modify_content?} — rename slide.
-                   If modify_content=true, also sets status="modify" for regeneration.
-          delete: {op, target_id, merge_id?} — delete target_id. merge_id appends target's
-                   content to merge, sets merge status="merge".
-          insert: {op, after_id, is_copy?} — insert after after_id. is_copy=true copies
-                   content from after_id, sets both status="split". New slide inherits
-                   after_id's section_id.
-          move:   {op, target_id, after_id, is_change_section?} — move target_id after
-                   after_id. Inherits section_id. If section changes, is_change_section
-                   must be true or rejected.
+          rename: {op, slide_id, new_title, modify_content?}
+          delete: {op, target_id, merge_id?}
+          insert: {op, after_id, is_copy?}
+          move:   {op, target_id, after_id, is_change_section?}
 
-        Returns {summary, placeholder_slide_ids} where placeholder_slide_ids lists
-        slides that need content regeneration via modify_outline_section.
-
-        Args:
-            operations: List of operation dicts, executed in order.
+        Returns {summary, placeholder_slide_ids}.
         """
         err = _check_duplicates(operations)
         if err:
@@ -225,6 +214,21 @@ def make_modify_outline_structure(db: Database, conversation_id: int) -> Callabl
         placeholder_ids: list[int] = []
         notes: list[str] = []
 
+        # ── Load slides into memory ──
+        db_slides = await db.get_slides_by_outline_id(outline_id)
+        live = [s for s in db_slides if s.status != "deleted"]
+        # slide_list[i] is the slide at position i (0-indexed)
+        slide_list: list = sorted(live, key=lambda s: s.slide_index)
+        # Quick lookup: id → position in slide_list
+        _id_to_pos: dict[int, int] = {s.id: i for i, s in enumerate(slide_list)}
+
+        # Find a slide's position (raises if not found)
+        def _pos(slide_id: int) -> int:
+            if slide_id not in _id_to_pos:
+                raise KeyError(f"slide {slide_id} 不在大纲中或已被删除")
+            return _id_to_pos[slide_id]
+
+        # ── Apply operations to the in-memory list ──
         for op in operations:
             op_type = op.get("op")
 
@@ -245,74 +249,96 @@ def make_modify_outline_structure(db: Database, conversation_id: int) -> Callabl
 
             elif op_type == "delete":
                 target_id, merge_id = op["target_id"], op.get("merge_id")
-                target = await db.get_outline_slide(target_id)
-                if target is None:
+                try:
+                    pos = _pos(target_id)
+                except KeyError:
                     notes.append(f"delete 失败: target_id={target_id} 不存在")
                     continue
+                target_slide = slide_list[pos]
+
                 if merge_id is not None:
                     merge = await db.get_outline_slide(merge_id)
                     if merge is None:
                         notes.append(f"delete 失败: merge_id={merge_id} 不存在")
                         continue
-                    _merge_into(target, merge)
+                    _merge_into(target_slide, merge)
                     await db.update_outline_slide(merge_id, status=_STATUS_MERGE)
                     placeholder_ids.append(merge_id)
                     await _cascade_pres_status(db, merge_id, _PRES_MODIFIED_PREFIX + _STATUS_MERGE)
+
                 await db.soft_delete_outline_slide(target_id)
                 await _cascade_pres_status(db, target_id, _PRES_MODIFIED_PREFIX + "deleted")
+                slide_list.pop(pos)
+                _id_to_pos = {s.id: i for i, s in enumerate(slide_list)}
 
             elif op_type == "insert":
                 after_id, is_copy = op["after_id"], op.get("is_copy", False)
-                after = await db.get_outline_slide(after_id)
-                if after is None:
+                try:
+                    pos = _pos(after_id)
+                except KeyError:
                     notes.append(f"insert 失败: after_id={after_id} 不存在")
                     continue
-                new_title = after.title or "新页"
+                after_slide = slide_list[pos]
+
+                new_title = after_slide.title or "新页"
                 content = None
                 new_status = _STATUS_NEW
                 if is_copy:
                     await db.update_outline_slide(after_id, status=_STATUS_SPLIT)
-                    new_title = after.title or "新页"
-                    content = dict(after.content_json) if after.content_json else None
+                    new_title = after_slide.title or "新页"
+                    content = dict(after_slide.content_json) if after_slide.content_json else None
                     placeholder_ids.append(after_id)
                     await _cascade_pres_status(db, after_id, _PRES_MODIFIED_PREFIX + _STATUS_SPLIT)
                     new_status = _STATUS_SPLIT
-                new_slide = await db.insert_outline_slide_after(
-                    outline_id=outline_id, after_slide_id=after_id,
-                    title=new_title, section_id=after.section_id,
-                    content_json=content, notes=None,
+
+                new_slide = await db.create_outline_slide(
+                    outline_id=outline_id,
+                    slide_index=100000 + len(slide_list),  # unique temp, will be reindexed
+                    title=new_title,
+                    layout_type="content",
+                    section_id=after_slide.section_id,
                 )
+                new_slide.content_json = content
                 await db.update_outline_slide_status(new_slide.id, new_status)
                 placeholder_ids.append(new_slide.id)
+
+                # Insert into memory list
+                slide_list.insert(pos + 1, new_slide)
+                _id_to_pos = {s.id: i for i, s in enumerate(slide_list)}
 
             elif op_type == "move":
                 target_id, after_id = op["target_id"], op["after_id"]
                 is_change_section = op.get("is_change_section", False)
-                target = await db.get_outline_slide(target_id)
-                after = await db.get_outline_slide(after_id)
-                if target is None or after is None:
+                try:
+                    tgt_pos = _pos(target_id)
+                    aft_pos = _pos(after_id)
+                except KeyError:
                     notes.append(f"move 失败: slide 不存在")
                     continue
-                if target.section_id != after.section_id and not is_change_section:
+                target_slide = slide_list[tgt_pos]
+                after_slide = slide_list[aft_pos]
+
+                if target_slide.section_id != after_slide.section_id and not is_change_section:
                     notes.append(
-                        f"move: slide {target_id} 跨 section→{after.section_id}, "
+                        f"move: slide {target_id} 跨 section→{after_slide.section_id}, "
                         f"需设置 is_change_section=true"
                     )
                     continue
-                all_slides = await db.get_slides_by_outline_id(outline_id)
-                tgt_idx = target.slide_index
-                aft_idx = after.slide_index
-                if tgt_idx < aft_idx:
-                    for s in all_slides:
-                        if tgt_idx < s.slide_index <= aft_idx:
-                            await db.update_outline_slide_index(s.id, s.slide_index - 1)
-                    await db.update_outline_slide_index(target_id, aft_idx)
-                elif tgt_idx > aft_idx:
-                    for s in all_slides:
-                        if aft_idx < s.slide_index < tgt_idx:
-                            await db.update_outline_slide_index(s.id, s.slide_index + 1)
-                    await db.update_outline_slide_index(target_id, aft_idx + 1)
-                await db.update_outline_slide(target_id, section_id=after.section_id)
+
+                await db.update_outline_slide(target_id, section_id=after_slide.section_id)
+                slide_list.pop(tgt_pos)
+                # Recalculate aft_pos (may have shifted)
+                aft_pos = _id_to_pos[after_id]
+                slide_list.insert(aft_pos + 1, target_slide)
+                _id_to_pos = {s.id: i for i, s in enumerate(slide_list)}
+
+        # ── Reindex: write back sequential indices ──
+        for i, s in enumerate(slide_list):
+            await db.update_outline_slide_index(s.id, i)
+
+        # ── Update slide_count ──
+        live_count = len([s for s in slide_list if s.status != "deleted"])
+        await db.set_outline_slide_count(outline_id, live_count)
 
         parts = []
         if rename_count:
