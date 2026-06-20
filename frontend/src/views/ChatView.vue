@@ -9,6 +9,7 @@ import ConversationSidebar from '../components/layout/ConversationSidebar.vue'
 import MessageBubble from '../components/chat/MessageBubble.vue'
 import FileCard from '../components/chat/FileCard.vue'
 import DocumentCard from '../components/chat/DocumentCard.vue'
+import ToolCallCard from '../components/chat/ToolCallCard.vue'
 import ChatInput from '../components/chat/ChatInput.vue'
 import SseStatus from '../components/chat/SseStatus.vue'
 
@@ -21,6 +22,12 @@ interface MsgItem {
   content_type: string | null
   estimated_cost: number | null
   created_at: string
+}
+
+interface ToolBlock {
+  _tool: true
+  items: MsgItem[]
+  idx: number
 }
 
 interface SseState {
@@ -189,10 +196,40 @@ function handleSseEvent(evt: { event: string; data: Record<string, any> }) {
       break
     case 'tool_start':
       sse.value = { ...sse.value, detail: toolLabel(d.tool || '') }
+      // Push synthetic tool_call message for live streaming display
+      messages.value.push({
+        id: 0, idx: messages.value.length + 1,
+        role: 'tool_call',
+        content: d.tool || '',
+        content_type: toolCtype(d.tool || ''),
+        metadata_json: { tool_name: d.tool, args: d.args || {} },
+        estimated_cost: null,
+        created_at: new Date().toISOString(),
+      })
       break
     case 'tool_end':
+      sse.value = { ...sse.value, detail: '' }
+      messages.value.push({
+        id: 0, idx: messages.value.length + 1,
+        role: 'tool_result',
+        content: `完成 (${d.result_len || 0} 字符)`,
+        content_type: toolCtype(d.tool || ''),
+        metadata_json: { tool_name: d.tool, result_len: d.result_len },
+        estimated_cost: null,
+        created_at: new Date().toISOString(),
+      })
+      break
     case 'tool_error':
       sse.value = { ...sse.value, detail: '' }
+      messages.value.push({
+        id: 0, idx: messages.value.length + 1,
+        role: 'tool_result',
+        content: `错误: ${d.error || '未知错误'}`,
+        content_type: toolCtype(d.tool || ''),
+        metadata_json: { tool_name: d.tool, error: d.error },
+        estimated_cost: null,
+        created_at: new Date().toISOString(),
+      })
       break
     case 'document':
       messages.value.push({
@@ -250,6 +287,30 @@ function toolLabel(name: string): string {
   return map[name] || name
 }
 
+function toolCtype(name: string): string {
+  const map: Record<string, string> = {
+    _get_conversation_status: 'conv_status',
+    _switch_outline: 'switch_outline',
+    _get_outline: 'get_outline',
+    _get_outline_slide: 'get_slide',
+    _get_presentation: 'get_pres',
+    _get_knowledge_files: 'get_kfiles',
+    _search_styles: 'search_styles',
+    _create_empty_outline: 'create_outline',
+    _write_outline_structure: 'write_outline',
+    _modify_outline_structure: 'mod_outline',
+    _rearrange_presentation_slides: 'rearr_pres',
+    _generate_outline_content: 'gen_content',
+    _modify_outline_section: 'mod_section',
+    _outline_evaluate: 'evaluate',
+    _explore_knowledge: 'explore',
+    _ppt_style: 'ppt_style',
+    _slides_content: 'slides_content',
+    _modify_slides_content: 'mod_slides',
+  }
+  return map[name] || 'tool_call'
+}
+
 async function handleUpload(files: File[]) {
   const title = files.length > 0 ? files[0].name.slice(0, 20) : undefined
   const cid = await ensureConversation(title)
@@ -277,17 +338,33 @@ function scrollBottom() {
 }
 
 const visibleMessages = computed(() => {
+  const result: (MsgItem | ToolBlock)[] = []
   const docs: MsgItem[] = []
-  const others: MsgItem[] = []
+  let toolBuf: MsgItem[] = []
+
   for (const m of messages.value) {
+    if (m.role === 'tool_call' || m.role === 'tool_result') {
+      toolBuf.push(m)
+      continue
+    }
+    // Flush tool buffer before non-tool message
+    if (toolBuf.length > 0) {
+      result.push({ _tool: true, items: [...toolBuf], idx: toolBuf[0].idx })
+      toolBuf = []
+    }
     if (m.role === 'document') {
       docs.push(m)
     } else {
-      others.push(m)
+      result.push(m)
     }
   }
+  // Flush remaining tools
+  if (toolBuf.length > 0) {
+    result.push({ _tool: true, items: [...toolBuf], idx: toolBuf[0].idx })
+  }
+
   const keptDocs = docs.slice(-5)
-  const all = [...others, ...keptDocs]
+  const all = [...result, ...keptDocs]
   all.sort((a, b) => a.idx - b.idx)
   return all
 })
@@ -296,6 +373,10 @@ function renderMsg(msg: MsgItem) {
   if (msg.role === 'document') return 'document'
   if (msg.content_type === 'file') return 'file'
   return 'text'
+}
+
+function isToolBlock(item: MsgItem | ToolBlock): item is ToolBlock {
+  return '_tool' in item
 }
 </script>
 
@@ -325,23 +406,27 @@ function renderMsg(msg: MsgItem) {
       </div>
 
       <div class="msg-container" id="msg-container" v-if="convId">
-        <template v-for="msg in visibleMessages" :key="msg.id || msg.idx">
+        <template v-for="msg in visibleMessages" :key="'id' in msg ? msg.id : msg.idx">
+          <ToolCallCard
+            v-if="isToolBlock(msg)"
+            :items="(msg as any).items"
+          />
           <MessageBubble
-            v-if="renderMsg(msg) === 'text'"
-            :role="msg.role"
-            :content="msg.content"
-            :content_type="msg.content_type"
-            :created-at="msg.created_at"
+            v-else-if="renderMsg(msg as MsgItem) === 'text'"
+            :role="(msg as MsgItem).role"
+            :content="(msg as MsgItem).content"
+            :content_type="(msg as MsgItem).content_type"
+            :created-at="(msg as MsgItem).created_at"
           />
           <FileCard
-            v-else-if="renderMsg(msg) === 'file'"
-            :content="msg.content"
-            :created-at="msg.created_at"
+            v-else-if="renderMsg(msg as MsgItem) === 'file'"
+            :content="(msg as MsgItem).content"
+            :created-at="(msg as MsgItem).created_at"
           />
           <DocumentCard
-            v-else-if="renderMsg(msg) === 'document'"
-            :doc-type="msg.content_type || ''"
-            :metadata="msg.metadata_json || {}"
+            v-else-if="renderMsg(msg as MsgItem) === 'document'"
+            :doc-type="(msg as MsgItem).content_type || ''"
+            :metadata="(msg as MsgItem).metadata_json || {}"
           />
         </template>
       </div>

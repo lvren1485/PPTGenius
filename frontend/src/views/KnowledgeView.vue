@@ -62,11 +62,11 @@ function formatSize(b: number | null) {
     <EmptyState v-if="!loading && files.length === 0" description="暂无文件，前往对话页面上传" />
     <el-table v-if="!loading && files.length > 0" :data="files" stripe>
       <el-table-column prop="filename" label="文件名" min-width="180" />
-      <el-table-column prop="file_type" label="类型" width="80" />
+      <el-table-column prop="file_type" label="类型" width="65" />
       <el-table-column label="大小" width="100">
         <template #default="{ row }">{{ formatSize(row.file_size) }}</template>
       </el-table-column>
-      <el-table-column label="状态" width="100">
+      <el-table-column label="状态" width="110">
         <template #default="{ row }">
           <el-tag size="small" :type="row.status === 'indexed' ? 'success' : 'info'">
             {{ row.status }}

@@ -106,7 +106,17 @@ function onDrop(e: DragEvent) {
     @drop="onDrop"
   >
     <div class="input-toolbar">
-      <div class="toolbar-left">
+      <el-upload
+        :show-file-list="false"
+        :auto-upload="false"
+        :on-change="handleUpload as any"
+        :limit="MAX_FILES"
+        accept="*"
+        multiple
+      >
+        <el-button :icon="UploadFilled" class="upload-btn">上传</el-button>
+      </el-upload>
+      <div class="toolbar-right">
         <el-switch
           v-model="webSearchEnabled"
           size="small"
@@ -122,18 +132,6 @@ function onDrop(e: DragEvent) {
           <el-radio-button value="conversation">会话知识库</el-radio-button>
         </el-radio-group>
       </div>
-      <div class="toolbar-right">
-        <el-upload
-          :show-file-list="false"
-          :auto-upload="false"
-          :on-change="handleUpload as any"
-          :limit="MAX_FILES"
-          accept="*"
-          multiple
-        >
-          <el-button :icon="UploadFilled" size="small" circle class="upload-btn" />
-        </el-upload>
-      </div>
     </div>
     <div class="input-row">
       <el-input
@@ -146,10 +144,10 @@ function onDrop(e: DragEvent) {
       />
       <el-button
         type="primary"
-        size="large"
         :icon="Promotion"
         :disabled="!text.trim()"
         @click="handleSend"
+        class="send-btn"
       >
         发送
       </el-button>
@@ -163,6 +161,7 @@ function onDrop(e: DragEvent) {
   border-top: 1px solid #e8eaed;
   padding: 12px 24px 16px;
   background: #fafbfc;
+  position: relative;
   transition: border-color .2s, background .2s;
 }
 .chat-input.drag-over {
@@ -173,36 +172,44 @@ function onDrop(e: DragEvent) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
   margin-bottom: 10px;
   max-width: 800px;
   margin-left: auto;
   margin-right: auto;
 }
-.toolbar-left {
+.toolbar-right {
   display: flex;
   align-items: center;
   gap: 16px;
 }
-.toolbar-right {
-  display: flex;
-  align-items: center;
-}
 .input-row {
   display: flex;
   align-items: flex-end;
-  gap: 12px;
+  gap: 10px;
   max-width: 800px;
   margin: 0 auto;
 }
 .upload-btn {
-  color: #606266;
+  flex-shrink: 0;
+  height: 34px;
+  border-radius: 8px;
+  padding: 0 18px;
+  font-size: 14px;
+}
+.send-btn {
+  flex-shrink: 0;
+  height: 40px;
+  border-radius: 10px;
+  padding: 0 22px;
+  font-size: 15px;
 }
 .input-row :deep(.el-textarea__inner) {
   font-size: 15px;
   border-radius: 12px;
   padding: 10px 16px;
   background: #fff;
+  min-height: 40px;
 }
 .input-row :deep(.el-textarea) {
   flex: 1;
@@ -219,5 +226,6 @@ function onDrop(e: DragEvent) {
   background: rgba(236, 245, 255, 0.9);
   pointer-events: none;
   border-radius: 12px;
+  z-index: 1;
 }
 </style>

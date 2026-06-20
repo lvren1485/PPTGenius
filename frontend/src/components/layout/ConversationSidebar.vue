@@ -167,12 +167,16 @@ function formatDate(d: string) {
   min-width: 0;
 }
 .conv-actions {
-  display: none;
+  display: flex;
   gap: 2px;
   flex-shrink: 0;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity .15s;
 }
 .conv-item:hover .conv-actions {
-  display: flex;
+  visibility: visible;
+  opacity: 1;
 }
 .conv-meta {
   display: flex;
