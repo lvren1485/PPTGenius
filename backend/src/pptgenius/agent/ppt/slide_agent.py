@@ -11,13 +11,12 @@ import secrets
 from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.tools import tool
-from langgraph.config import get_stream_writer
-
 from pptgenius.infrastructure.ppt_engine.validator import validate_elements
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_agent
 from ..common.middleware import build_middlewares
+from ..common.sse_context import get_sse_writer
 from pptgenius.infrastructure.llm import create_llm
 from .common.tools import make_read_chart_instruction, make_read_instruction, make_search_icons
 from .slide_prompts import build_system_prompt, build_user_prompt
@@ -152,7 +151,7 @@ async def run_slide_agent(
     )
 
     try:
-        writer = get_stream_writer()
+        writer = get_sse_writer()
         writer({"type": "slide_agent_start", "slide_index": slide_index})
     except RuntimeError:
         pass

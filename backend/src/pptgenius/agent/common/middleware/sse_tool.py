@@ -11,15 +11,9 @@ from collections.abc import Callable
 from langchain.agents.middleware import AgentMiddleware
 from langchain.messages import ToolMessage
 from langchain.tools.tool_node import ToolCallRequest
-from langgraph.config import get_stream_writer
 from langgraph.types import Command
 
-
-def _get_writer():
-    try:
-        return get_stream_writer()
-    except (RuntimeError, KeyError):
-        return lambda _: None
+from ..sse_context import get_sse_writer
 
 
 def _safe_args(kwargs: dict) -> dict:
@@ -38,7 +32,7 @@ class SSEToolMiddleware(AgentMiddleware):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], ToolMessage | Command],
     ) -> ToolMessage | Command:
-        writer = _get_writer()
+        writer = get_sse_writer()
         tc_name = request.tool_call["name"]
         tc_args = request.tool_call["args"]
 

@@ -7,13 +7,12 @@ import uuid
 
 from langchain.agents import create_agent
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
-from langgraph.config import get_stream_writer
-
 from pptgenius.infrastructure.config.settings import RESOURCES_DIR
 from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import TokenCounter, get_logger
 
 from .common.middleware import build_middlewares
+from .common.sse_context import get_sse_writer
 
 _log = get_logger("pptgenius.agent.master")
 
@@ -93,12 +92,6 @@ def _assemble_tools(db: Database, conversation_id: int) -> list:
     ]
 
 
-def _build_sse_writer():
-    """Get stream writer or no-op fallback."""
-    try:
-        return get_stream_writer()
-    except RuntimeError:
-        return lambda _: None
 
 
 async def run_master_agent(
@@ -112,7 +105,7 @@ async def run_master_agent(
 
     Returns ``{"reply": str, "outline_changed": bool, "presentation_changed": bool}``.
     """
-    writer = _build_sse_writer()
+    writer = get_sse_writer()
 
     # --- 1. Build LLM + middleware ---
     llm, agent_id = create_llm(conversation_id)

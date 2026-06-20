@@ -7,14 +7,13 @@ import json
 from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
-from langgraph.config import get_stream_writer
-
 from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_agent
 from ..common.message_utils import strip_dangling_tool_calls
 from ..common.middleware import build_middlewares
+from ..common.sse_context import get_sse_writer
 from pptgenius.infrastructure.llm import create_llm
 from .prompts import (
     build_evaluator_system_prompt,
@@ -23,16 +22,6 @@ from .prompts import (
 )
 
 _log = get_logger("pptgenius.agent.outline.evaluator")
-
-
-def _get_writer():
-    try:
-        return get_stream_writer()
-    except (RuntimeError, KeyError):
-        return lambda _: None
-
-
-# ── tool ──────────────────────────────────────────────────────────────────────
 
 
 def _make_submit_evaluation(db: Database, outline_id: int):
@@ -115,7 +104,7 @@ async def run_outline_evaluator(
 
     Returns ``{overall: str, suggestions: list[str], score: float}``.
     """
-    writer = _get_writer()
+    writer = get_sse_writer()
 
     conv = await db.get_conversation(conversation_id)
     if conv is None or conv.current_outline_id is None:

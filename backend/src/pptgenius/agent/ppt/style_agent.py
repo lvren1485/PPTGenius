@@ -12,14 +12,13 @@ from pathlib import Path
 from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
-from langgraph.config import get_stream_writer
-
 from pptgenius.infrastructure.config import RESOURCES_DIR
 from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_agent
 from ..common.middleware import build_middlewares
+from ..common.sse_context import get_sse_writer
 from pptgenius.infrastructure.llm import create_llm
 from .common.instruction_loader import get_instruction
 
@@ -218,7 +217,7 @@ async def run_style_agent(
     )
 
     try:
-        writer = get_stream_writer()
+        writer = get_sse_writer()
         writer({"type": "style_agent_start"})
     except RuntimeError:
         pass

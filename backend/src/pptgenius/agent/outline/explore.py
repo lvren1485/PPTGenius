@@ -12,14 +12,13 @@ from functools import lru_cache
 
 from langchain.agents import create_agent
 from langchain_core.messages import AIMessage, HumanMessage
-from langgraph.config import get_stream_writer
-
 from pptgenius.infrastructure.config.settings import RESOURCES_DIR
 from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_agent
 from ..common.middleware import build_middlewares
+from ..common.sse_context import get_sse_writer
 from pptgenius.infrastructure.llm import create_llm
 from .knowledge_tools import (
     make_search_knowledge,
@@ -31,13 +30,6 @@ from .knowledge_tools import (
 )
 
 _log = get_logger("pptgenius.agent.outline.explore")
-
-
-def _get_writer():
-    try:
-        return get_stream_writer()
-    except (RuntimeError, KeyError):
-        return lambda _: None
 
 
 def _build_file_summaries(kf_list) -> str:
@@ -71,7 +63,7 @@ async def run_explore_agent(
     file_ids: list[int] | None = None,
 ) -> dict:
     """Explore knowledge files (via summaries) + web → outline structure."""
-    writer = _get_writer()
+    writer = get_sse_writer()
 
     conv = await db.get_conversation(conversation_id)
     if conv is None:

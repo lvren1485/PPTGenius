@@ -7,25 +7,17 @@ import json
 from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
-from langgraph.config import get_stream_writer
-
 from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import get_logger
 
 from ..common.agent_registry import push_agent
 from ..common.middleware import build_middlewares
+from ..common.sse_context import get_sse_writer
 from pptgenius.infrastructure.llm import create_llm
 from .prompts import build_generator_system_prompt, build_generator_user_prompt
 from .prompts import _STATUS_HINTS
 
 _log = get_logger("pptgenius.agent.outline.generator")
-
-
-def _get_writer():
-    try:
-        return get_stream_writer()
-    except (RuntimeError, KeyError):
-        return lambda _: None
 
 
 async def _build_citation_knowledge(db: Database, section) -> str:
@@ -175,7 +167,7 @@ async def run_outline_generator(
     knowledge_mode: str = "auto",
 ) -> str:
     """Fill content for one section's pre-created slides."""
-    writer = _get_writer()
+    writer = get_sse_writer()
 
     section = await db.get_outline_section(section_id)
     if section is None:

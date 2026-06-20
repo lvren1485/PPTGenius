@@ -9,6 +9,7 @@ import time
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
+from pptgenius.agent.common.sse_context import set_sse_writer
 from pptgenius.agent.master import run_master_agent
 from pptgenius.infrastructure.db import Database
 from pptgenius.infrastructure.utils import get_logger
@@ -65,6 +66,12 @@ async def chat_send(
 
     async def event_stream():
         t0 = time.time()
+        sse_queue: asyncio.Queue = asyncio.Queue()
+
+        def _queue_writer(data: dict):
+            sse_queue.put_nowait(data)
+
+        set_sse_writer(_queue_writer)
         task = asyncio.create_task(run_master_agent(db, conv_id, req.message))
         CancelRegistry.register(conv_id, task)
         last_hb = time.monotonic()
@@ -73,6 +80,11 @@ async def chat_send(
             yield _sse("message", {"type": "master_start"})
 
             while not task.done():
+                # drain agent SSE events
+                while not sse_queue.empty():
+                    event = sse_queue.get_nowait()
+                    yield _sse("message", event)
+
                 # heartbeat
                 now = time.monotonic()
                 if now - last_hb > 5:
@@ -83,7 +95,12 @@ async def chat_send(
                     CancelRegistry.cancel(conv_id)
                     break
 
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.5)
+
+            # drain remaining events
+            while not sse_queue.empty():
+                event = sse_queue.get_nowait()
+                yield _sse("message", event)
 
             # ── normal (cancel handled inside master) ──
             result = await task
