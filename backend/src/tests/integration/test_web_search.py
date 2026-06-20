@@ -70,7 +70,7 @@ class TestWebSearchService:
         # Verify via KnowledgeService
         from pptgenius.infrastructure.rag.knowledge import KnowledgeService
         ks = KnowledgeService()
-        sr = await ks.search(user.id, "Example Domain", top_k=3)
+        sr = await ks.search(db_obj, user.id, "Example Domain", top_k=3)
         if sr:
             print(f"  KM search hit: score={sr[0]['score']}  [{len(sr[0]['chunk'])} chars]")
             assert any("Example" in r["chunk"] for r in sr)

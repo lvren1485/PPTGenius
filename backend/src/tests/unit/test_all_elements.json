@@ -518,7 +518,7 @@
           "type": "shape", "shape_type": "chevron",
           "position": { "left": 8.3, "top": 4.9, "width": 2.0, "height": 1.0 },
           "fill": { "type": "solid", "color": "ea4335" },
-          "text": [{ "paragraph": { "alignment": "center", "runs": [{ "text": "人字形", "font": { "size": 10, "bold": true, "color": "ffffff" } }] } }]
+          "text": [{ "paragraph": { "alignment": "center", "runs": [{ "text": "人字形", "font": { "size": 11, "bold": true, "color": "ffffff" } }] } }]
         }
       ]
     },
@@ -721,35 +721,35 @@
           "type": "textbox",
           "position": { "left": 1.0, "top": 4.0, "width": 2.0, "height": 0.4 },
           "content": [
-            { "paragraph": { "alignment": "center", "runs": [{ "text": "chart-line (#1a73e8)", "font": { "size": 9, "color": "666666" } }] } }
+            { "paragraph": { "alignment": "center", "runs": [{ "text": "chart-line (#1a73e8)", "font": { "size": 11, "color": "666666" } }] } }
           ]
         },
         {
           "type": "textbox",
           "position": { "left": 3.5, "top": 4.0, "width": 2.0, "height": 0.4 },
           "content": [
-            { "paragraph": { "alignment": "center", "runs": [{ "text": "businessplan (#34a853)", "font": { "size": 9, "color": "666666" } }] } }
+            { "paragraph": { "alignment": "center", "runs": [{ "text": "businessplan (#34a853)", "font": { "size": 11, "color": "666666" } }] } }
           ]
         },
         {
           "type": "textbox",
           "position": { "left": 6.0, "top": 4.0, "width": 2.0, "height": 0.4 },
           "content": [
-            { "paragraph": { "alignment": "center", "runs": [{ "text": "chart-arcs-3 (#ea4335)", "font": { "size": 9, "color": "666666" } }] } }
+            { "paragraph": { "alignment": "center", "runs": [{ "text": "chart-arcs-3 (#ea4335)", "font": { "size": 11, "color": "666666" } }] } }
           ]
         },
         {
           "type": "textbox",
           "position": { "left": 8.5, "top": 4.0, "width": 2.0, "height": 0.4 },
           "content": [
-            { "paragraph": { "alignment": "center", "runs": [{ "text": "settings (#5f6368)", "font": { "size": 9, "color": "666666" } }] } }
+            { "paragraph": { "alignment": "center", "runs": [{ "text": "settings (#5f6368)", "font": { "size": 11, "color": "666666" } }] } }
           ]
         },
         {
           "type": "textbox",
           "position": { "left": 11.0, "top": 4.0, "width": 2.0, "height": 0.4 },
           "content": [
-            { "paragraph": { "alignment": "center", "runs": [{ "text": "bulb (#fbbc04)", "font": { "size": 9, "color": "666666" } }] } }
+            { "paragraph": { "alignment": "center", "runs": [{ "text": "bulb (#fbbc04)", "font": { "size": 11, "color": "666666" } }] } }
           ]
         },
         {
@@ -791,7 +791,7 @@
           "type": "textbox",
           "position": { "left": 1.0, "top": 6.6, "width": 9.0, "height": 0.4 },
           "content": [
-            { "paragraph": { "runs": [{ "text": "同一图标 (star) 五种颜色: fbbc04 / ea4335 / 34a853 / 1a73e8 / ab47bc", "font": { "size": 10, "color": "999999", "italic": true } }] } }
+            { "paragraph": { "runs": [{ "text": "同一图标 (star) 五种颜色: fbbc04 / ea4335 / 34a853 / 1a73e8 / ab47bc", "font": { "size": 11, "color": "999999", "italic": true } }] } }
           ]
         }
       ]
