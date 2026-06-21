@@ -53,6 +53,9 @@ function selectChat(id: number) {
 async function archiveConv(id: number, e: Event) {
   e.stopPropagation()
   try {
+    await ElMessageBox.confirm('确定归档该会话？', '确认归档', { type: 'warning' })
+  } catch { return }
+  try {
     await api.patch(`/conversations/${id}/archive`)
     convs.value = convs.value.filter(c => c.id !== id)
     ElMessage.success('已归档')
@@ -64,6 +67,9 @@ async function archiveConv(id: number, e: Event) {
 
 async function deleteConv(id: number, e: Event) {
   e.stopPropagation()
+  try {
+    await ElMessageBox.confirm('确定删除该会话？此操作不可恢复。', '确认删除', { type: 'error', confirmButtonText: '删除', cancelButtonText: '取消' })
+  } catch { return }
   try {
     await api.delete(`/conversations/${id}`)
     convs.value = convs.value.filter(c => c.id !== id)

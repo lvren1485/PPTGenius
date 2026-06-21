@@ -427,6 +427,7 @@ function isToolBlock(item: MsgItem | ToolBlock): item is ToolBlock {
             v-else-if="renderMsg(msg as MsgItem) === 'document'"
             :doc-type="(msg as MsgItem).content_type || ''"
             :metadata="(msg as MsgItem).metadata_json || {}"
+            :content="(msg as MsgItem).content"
           />
         </template>
       </div>

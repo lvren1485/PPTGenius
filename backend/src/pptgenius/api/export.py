@@ -16,6 +16,25 @@ from .deps import get_db
 router = APIRouter(prefix="/api", tags=["export"])
 
 
+# ── Snapshot listing ───────────────────────────────────────────────────
+
+
+@router.get("/export/outline/{outline_id}/snapshots")
+async def list_outline_snapshots(
+    outline_id: int,
+    db: Database = Depends(get_db),
+) -> dict:
+    """List snapshots for an outline."""
+    snaps = await db.list_outline_snapshots(outline_id)
+    return {
+        "code": 0,
+        "data": {
+            "outline_id": outline_id,
+            "snapshots": [{"id": s.id, "version": s.version, "created_at": s.created_at.isoformat()} for s in snaps],
+        },
+    }
+
+
 # ── Content endpoints (preview before download) ──────────────────────────
 
 

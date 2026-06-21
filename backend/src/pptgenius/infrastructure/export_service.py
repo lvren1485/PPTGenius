@@ -129,16 +129,21 @@ class ExportService:
                 cj = sl.get("content_json", {})
                 if isinstance(cj, dict):
                     if cj.get("main_points"):
+                        lines.append("")
                         lines.append("**要点:**")
                         for mp in cj["main_points"]:
                             lines.append(f"- {mp}")
                     if cj.get("detailed_content"):
+                        lines.append("")
                         lines.append(f"**内容:** {cj['detailed_content'][:500]}")
                     if cj.get("key_data"):
+                        lines.append("")
                         lines.append(f"**数据:** {cj['key_data']}")
                     if cj.get("visual_note"):
+                        lines.append("")
                         lines.append(f"**视觉:** {cj['visual_note']}")
                 if sl.get("notes"):
+                    lines.append("")
                     lines.append(f"*备注: {sl['notes'][:200]}*")
                 lines.append("")
             lines.append("")
