@@ -11,7 +11,6 @@ import FileCard from '../components/chat/FileCard.vue'
 import DocumentCard from '../components/chat/DocumentCard.vue'
 import ToolCallCard from '../components/chat/ToolCallCard.vue'
 import ChatInput from '../components/chat/ChatInput.vue'
-import SseStatus from '../components/chat/SseStatus.vue'
 
 interface MsgItem {
   id: number
@@ -30,12 +29,6 @@ interface ToolBlock {
   idx: number
 }
 
-interface SseState {
-  phase: string
-  detail: string
-  slideIndex: number
-}
-
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
@@ -45,7 +38,7 @@ const convId = computed(() => {
 })
 
 const messages = ref<MsgItem[]>([])
-const sse = ref<SseState>({ phase: '', detail: '', slideIndex: 0 })
+const thinking = ref(false)
 const convTitle = ref('')
 
 const suggestions = [
@@ -124,27 +117,17 @@ async function sendMessage(text: string) {
     await nextTick()
     scrollBottom()
 
-    sse.value = { phase: '正在分析需求...', detail: '', slideIndex: 0 }
-    const loadingIdx = messages.value.length + 1
-    messages.value.push({
-      id: -1, idx: loadingIdx,
-      role: 'assistant', content: '...', content_type: 'text',
-      metadata_json: null, estimated_cost: null, created_at: new Date().toISOString(),
-    })
+    thinking.value = true
     scrollBottom()
 
     try {
       for await (const evt of streamChat(cid, text)) {
-        if (messages.value.some(m => m.id === -1)) {
-          messages.value = messages.value.filter(m => m.id !== -1)
-        }
         handleSseEvent(evt)
       }
     } catch (e: any) {
       ElMessage.error(e.message || '请求失败')
-      messages.value = messages.value.filter(m => m.id !== -1)
     } finally {
-      sse.value = { phase: '', detail: '', slideIndex: 0 }
+      thinking.value = false
     }
 
     await loadConversation()
@@ -155,136 +138,75 @@ async function sendMessage(text: string) {
 }
 
 function handleStop() {
-  if (convId.value > 0) {
-    cancelChat(convId.value).catch(() => {})
-  }
-  ElMessage.info('正在停止...')
+  if (convId.value > 0) cancelChat(convId.value).catch(() => {})
+  thinking.value = false
 }
 
 function handleSseEvent(evt: { event: string; data: Record<string, any> }) {
   const d = evt.data
-  if (evt.event === 'error') {
-    ElMessage.error(d.message || '执行出错')
-    return
-  }
-  if (evt.event === 'done') {
-    sse.value = { phase: '', detail: '', slideIndex: 0 }
-    return
-  }
-  // evt.event === 'message' — 按内部 type 分发
+  if (evt.event === 'error') { ElMessage.error(d.message || '执行出错'); return }
+  if (evt.event === 'done') { thinking.value = false; return }
+  if (evt.event !== 'message') return
+
   switch (d.type) {
     case 'master_start':
-      sse.value = { ...sse.value, phase: '正在分析需求...', detail: '' }
-      break
-    case 'explore_agent_start':
-      sse.value = { ...sse.value, phase: '正在搜索知识库...', detail: '' }
-      break
-    case 'outline_generator_start':
-      sse.value = { ...sse.value, phase: '正在生成大纲...', detail: d.section || '' }
-      break
-    case 'outline_generator_end':
-      sse.value = { ...sse.value, detail: '' }
-      break
-    case 'outline_evaluator_start':
-      sse.value = { ...sse.value, phase: '正在评估大纲...', detail: d.outline || '' }
-      break
-    case 'style_agent_start':
-      sse.value = { ...sse.value, phase: '正在选择样式...', detail: '' }
-      break
-    case 'slide_agent_start':
-      sse.value = { ...sse.value, phase: '正在生成幻灯片...', slideIndex: d.slide_index || 1, detail: '' }
+      thinking.value = true
       break
     case 'tool_start':
-      sse.value = { ...sse.value, detail: toolLabel(d.tool || '') }
-      // Push synthetic tool_call message for live streaming display
       messages.value.push({
         id: 0, idx: messages.value.length + 1,
-        role: 'tool_call',
-        content: d.tool || '',
+        role: 'tool_call', content: d.tool || '',
         content_type: toolCtype(d.tool || ''),
         metadata_json: { tool_name: d.tool, args: d.args || {} },
-        estimated_cost: null,
-        created_at: new Date().toISOString(),
+        estimated_cost: null, created_at: new Date().toISOString(),
       })
+      scrollBottom()
       break
     case 'tool_end':
-      sse.value = { ...sse.value, detail: '' }
       messages.value.push({
         id: 0, idx: messages.value.length + 1,
-        role: 'tool_result',
-        content: `完成 (${d.result_len || 0} 字符)`,
+        role: 'tool_result', content: `完成 (${d.result_len || 0} 字符)`,
         content_type: toolCtype(d.tool || ''),
         metadata_json: { tool_name: d.tool, result_len: d.result_len },
-        estimated_cost: null,
-        created_at: new Date().toISOString(),
+        estimated_cost: null, created_at: new Date().toISOString(),
       })
+      scrollBottom()
       break
     case 'tool_error':
-      sse.value = { ...sse.value, detail: '' }
       messages.value.push({
         id: 0, idx: messages.value.length + 1,
-        role: 'tool_result',
-        content: `错误: ${d.error || '未知错误'}`,
+        role: 'tool_result', content: `错误: ${d.error || '未知错误'}`,
         content_type: toolCtype(d.tool || ''),
         metadata_json: { tool_name: d.tool, error: d.error },
-        estimated_cost: null,
-        created_at: new Date().toISOString(),
+        estimated_cost: null, created_at: new Date().toISOString(),
       })
+      scrollBottom()
       break
     case 'document':
       messages.value.push({
         id: 0, idx: messages.value.length + 1,
-        role: 'document',
-        content: d.title || '',
+        role: 'document', content: d.title || '',
         content_type: d.doc_type,
         metadata_json: d.doc_type === 'outline'
           ? { outline_id: d.snapshot_id, title: d.title }
           : { presentation_id: d.snapshot_id, title: d.title },
-        estimated_cost: null,
-        created_at: new Date().toISOString(),
+        estimated_cost: null, created_at: new Date().toISOString(),
       })
       scrollBottom()
       break
     case 'master_reply':
       messages.value.push({
         id: 0, idx: messages.value.length + 1,
-        role: 'assistant',
-        content: d.reply || '',
-        content_type: 'text',
-        metadata_json: null,
-        estimated_cost: null,
-        created_at: new Date().toISOString(),
+        role: 'assistant', content: d.reply || '',
+        content_type: 'text', metadata_json: null,
+        estimated_cost: null, created_at: new Date().toISOString(),
       })
       scrollBottom()
       break
     case 'master_done':
-      sse.value = { phase: '', detail: '', slideIndex: 0 }
+      thinking.value = false
       break
   }
-}
-
-function toolLabel(name: string): string {
-  const map: Record<string, string> = {
-    _get_conversation_status: '读取会话状态',
-    _switch_outline: '切换大纲',
-    _get_outline: '读取大纲',
-    _get_outline_slide: '读取大纲页面',
-    _get_presentation: '读取PPT',
-    _get_knowledge_files: '读取知识文件',
-    _search_styles: '搜索样式',
-    _create_empty_outline: '创建空白大纲',
-    _write_outline_structure: '写入大纲结构',
-    _modify_outline_structure: '修改大纲结构',
-    _rearrange_presentation_slides: '重排PPT页面',
-    _generate_outline_content: '生成大纲内容',
-    _modify_outline_section: '修改大纲章节',
-    _outline_evaluate: '评估大纲',
-    _explore_knowledge: '探索知识库',
-    _ppt_style: '选择样式',
-    _slides_content: '生成幻灯片内容',
-    _modify_slides_content: '修改幻灯片',
-  }
-  return map[name] || name
 }
 
 function toolCtype(name: string): string {
@@ -410,6 +332,7 @@ function isToolBlock(item: MsgItem | ToolBlock): item is ToolBlock {
           <ToolCallCard
             v-if="isToolBlock(msg)"
             :items="(msg as any).items"
+            :thinking="thinking"
           />
           <MessageBubble
             v-else-if="renderMsg(msg as MsgItem) === 'text'"
@@ -432,16 +355,7 @@ function isToolBlock(item: MsgItem | ToolBlock): item is ToolBlock {
         </template>
       </div>
 
-      <SseStatus
-        v-if="sse.phase"
-        :phase="sse.phase"
-        :detail="sse.detail"
-        :slide-index="sse.slideIndex"
-        :sending="sending"
-        @stop="handleStop"
-      />
-
-      <ChatInput @send="sendMessage" @upload="handleUpload" />
+      <ChatInput :sending="sending" @send="sendMessage" @stop="handleStop" @upload="handleUpload" />
     </div>
   </div>
 </template>

@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api", tags=["export"])
 # ── Snapshot listing ───────────────────────────────────────────────────
 
 
-@router.get("/export/outline/{outline_id}/snapshots")
+@router.get("/export/outline-snapshots/{outline_id}")
 async def list_outline_snapshots(
     outline_id: int,
     db: Database = Depends(get_db),

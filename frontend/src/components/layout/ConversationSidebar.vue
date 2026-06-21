@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, FolderChecked, Delete } from '@element-plus/icons-vue'
 import api from '../../api/client'
 import { useAuthStore } from '../../stores/auth'

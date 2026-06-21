@@ -11,7 +11,7 @@ interface ToolMsg {
   metadata_json: Record<string, any> | null
 }
 
-const props = defineProps<{ items: ToolMsg[] }>()
+const props = defineProps<{ items: ToolMsg[]; thinking?: boolean }>()
 
 const expanded = ref(false)
 
@@ -113,10 +113,12 @@ function truncate(s: string, max: number = 80): string {
           <span class="step-num">{{ i + 1 }}</span>
           <el-tag size="small" type="primary">{{ toolNameLabel(p.call?.metadata_json?.tool_name || '') || ctypeLabel(p.call?.content_type || '') }}</el-tag>
           <span class="step-ctype">{{ p.call?.content_type }}</span>
+          <span v-if="!p.result && thinking" class="thinking-dots"><i>.</i><i>.</i><i>.</i></span>
         </div>
         <div v-if="p.result" class="tool-result">
           {{ truncate(p.result.content) }}
         </div>
+        <div v-else-if="thinking && i === pairs.length - 1" class="tool-result thinking-line" />
       </div>
     </div>
   </div>
@@ -199,5 +201,28 @@ function truncate(s: string, max: number = 80): string {
   line-height: 1.5;
   max-height: 60px;
   overflow: hidden;
+}
+.thinking-line {
+  height: 20px;
+  background: linear-gradient(90deg, #ecf5ff, #d9ecff, #ecf5ff);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  padding: 0;
+}
+.thinking-dots i {
+  font-style: normal;
+  font-weight: 700;
+  color: #409eff;
+  animation: dotBounce 1.4s infinite;
+}
+.thinking-dots i:nth-child(2) { animation-delay: .2s; }
+.thinking-dots i:nth-child(3) { animation-delay: .4s; }
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@keyframes dotBounce {
+  0%, 80%, 100% { opacity: .2; }
+  40% { opacity: 1; }
 }
 </style>

@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { UploadFilled, Promotion } from '@element-plus/icons-vue'
+import { UploadFilled, Promotion, Close } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import type { UploadFile } from 'element-plus'
 import api from '../../api/client'
 
+defineProps<{ sending: boolean }>()
+
 const emit = defineEmits<{
   send: [text: string]
   upload: [files: File[]]
+  stop: []
 }>()
 
 const text = ref('')
@@ -143,6 +146,16 @@ function onDrop(e: DragEvent) {
         @keydown.enter.exact.prevent="handleSend"
       />
       <el-button
+        v-if="sending"
+        type="danger"
+        :icon="Close"
+        @click="$emit('stop')"
+        class="send-btn"
+      >
+        终止
+      </el-button>
+      <el-button
+        v-else
         type="primary"
         :icon="Promotion"
         :disabled="!text.trim()"

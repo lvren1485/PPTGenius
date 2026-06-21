@@ -75,6 +75,7 @@ async def chat_send(
         task = asyncio.create_task(run_master_agent(db, conv_id, req.message))
         CancelRegistry.register(conv_id, task)
         last_hb = time.monotonic()
+        completed = False  # track normal completion
 
         try:
             yield _sse("message", {"type": "master_start"})
@@ -83,12 +84,20 @@ async def chat_send(
                 # drain agent SSE events
                 while not sse_queue.empty():
                     event = sse_queue.get_nowait()
-                    yield _sse("message", event)
+                    try:
+                        yield _sse("message", event)
+                    except Exception:
+                        CancelRegistry.cancel(conv_id)
+                        return
 
                 # heartbeat
                 now = time.monotonic()
                 if now - last_hb > 5:
-                    yield _sse("message", {"type": "heartbeat"})
+                    try:
+                        yield _sse("message", {"type": "heartbeat"})
+                    except Exception:
+                        CancelRegistry.cancel(conv_id)
+                        return
                     last_hb = now
 
                 if await request.is_disconnected():
@@ -97,34 +106,39 @@ async def chat_send(
 
                 await asyncio.sleep(0.5)
 
-            # drain remaining events
+            # drain remaining events (still connected)
             while not sse_queue.empty():
                 event = sse_queue.get_nowait()
-                yield _sse("message", event)
+                try:
+                    yield _sse("message", event)
+                except Exception:
+                    break
 
-            # ── normal (cancel handled inside master) ──
-            result = await task
-            yield _sse("message", {
-                "type": "master_reply",
-                "reply": result["reply"],
-                "outline_changed": result.get("outline_changed", False),
-                "presentation_changed": result.get("presentation_changed", False),
-            })
-            if result.get("outline_snapshot_id"):
+            # ── normal completion ──
+            if not task.cancelled():
+                result = await task
+                completed = True
                 yield _sse("message", {
-                    "type": "outline_snapshot",
-                    "snapshot_id": result["outline_snapshot_id"],
+                    "type": "master_reply",
+                    "reply": result["reply"],
+                    "outline_changed": result.get("outline_changed", False),
+                    "presentation_changed": result.get("presentation_changed", False),
                 })
-            if result.get("presentation_snapshot_id"):
-                yield _sse("message", {
-                    "type": "presentation_snapshot",
-                    "snapshot_id": result["presentation_snapshot_id"],
+                if result.get("outline_snapshot_id"):
+                    yield _sse("message", {
+                        "type": "outline_snapshot",
+                        "snapshot_id": result["outline_snapshot_id"],
+                    })
+                if result.get("presentation_snapshot_id"):
+                    yield _sse("message", {
+                        "type": "presentation_snapshot",
+                        "snapshot_id": result["presentation_snapshot_id"],
+                    })
+                elapsed = round(time.time() - t0, 2)
+                yield _sse("done", {
+                    "estimated_cost": round(conv.estimated_cost or 0, 4),
+                    "elapsed_seconds": elapsed,
                 })
-            elapsed = round(time.time() - t0, 2)
-            yield _sse("done", {
-                "estimated_cost": round(conv.estimated_cost or 0, 4),
-                "elapsed_seconds": elapsed,
-            })
 
         except asyncio.CancelledError:
             CancelRegistry.cancel(conv_id)
@@ -136,6 +150,8 @@ async def chat_send(
             yield _sse("error", {"code": 40200, "message": str(exc), "retryable": True})
 
         finally:
+            if not completed:
+                CancelRegistry.cancel(conv_id)
             CancelRegistry.unregister(conv_id)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")

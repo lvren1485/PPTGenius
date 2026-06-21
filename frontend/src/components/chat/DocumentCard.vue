@@ -6,27 +6,23 @@ import { marked } from 'marked'
 import api from '../../api/client'
 
 const props = defineProps<{
-  docType: string         // "outline" | "presentation"
-  metadata: {
-    outline_id?: number
-    presentation_id?: number
-    title?: string
-  }
-  content: string         // title (from SSE) or snapshot id string (from DB)
+  docType: string
+  metadata: { outline_id?: number; presentation_id?: number; title?: string; version?: number }
+  content: string
 }>()
 
 const router = useRouter()
 const expanded = ref(false)
 const mkHtml = ref('')
+const mkSource = ref('')
 const mkFilename = ref('')
 const loading = ref(false)
 
 const title = computed(() => props.metadata.title || props.content || '')
+const version = computed(() => props.metadata.version)
 const snapId = computed(() => {
-  // From SSE: metadata has the snapshot id
   if (props.metadata.outline_id) return props.metadata.outline_id
   if (props.metadata.presentation_id) return props.metadata.presentation_id
-  // From DB: content might be the snapshot id
   const n = Number(props.content)
   return isNaN(n) ? 0 : n
 })
@@ -34,20 +30,12 @@ const snapId = computed(() => {
 const isOutline = computed(() => props.docType === 'outline')
 
 async function togglePreview() {
-  if (expanded.value) {
-    expanded.value = false
-    return
-  }
-  if (isOutline.value && mkHtml.value) {
-    expanded.value = true
-    return
-  }
+  if (expanded.value) { expanded.value = false; return }
+  if (isOutline.value && mkSource.value) { expanded.value = true; return }
   if (!isOutline.value) {
-    // PPT: navigate to snapshot detail
     if (snapId.value > 0) router.push(`/snapshot/${snapId.value}`)
     return
   }
-  // Outline: fetch markdown content
   await fetchMarkdown()
 }
 
@@ -57,20 +45,18 @@ async function fetchMarkdown() {
   try {
     const { data } = await api.get(`/export/outline/${snapId.value}/content`)
     if (data.code === 0) {
+      mkSource.value = data.data.content
       mkHtml.value = marked(data.data.content) as string
       mkFilename.value = data.data.filename
       expanded.value = true
     }
-  } catch {
-    // ignore
-  } finally {
-    loading.value = false
-  }
+  } catch { /* ignore */ }
+  finally { loading.value = false }
 }
 
 function downloadMarkdown() {
-  const txt = document.querySelector('.mk-body')?.textContent || mkHtml.value
-  const blob = new Blob([txt], { type: 'text/markdown; charset=utf-8' })
+  // Use raw markdown source with proper # formatting
+  const blob = new Blob([mkSource.value], { type: 'text/markdown; charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -97,9 +83,7 @@ async function downloadPptx() {
       a.click()
       URL.revokeObjectURL(url)
     }
-  } catch {
-    // ignore
-  }
+  } catch { /* ignore */ }
 }
 </script>
 
@@ -108,20 +92,19 @@ async function downloadPptx() {
     <div class="doc-header">
       <el-icon :size="18"><Document /></el-icon>
       <span class="doc-title">{{ isOutline ? '大纲' : 'PPT' }}：{{ title }}</span>
+      <el-tag v-if="version != null" size="small">v{{ version }}</el-tag>
       <el-tag size="small" :type="isOutline ? 'primary' : 'success'">
         {{ isOutline ? '大纲' : 'PPT' }}
       </el-tag>
     </div>
 
-    <!-- Outline: rendered markdown preview -->
     <div v-if="isOutline && expanded" class="doc-expand mk-body" v-html="mkHtml" @click.stop />
     <div v-if="isOutline && loading" class="doc-expand loading">加载中...</div>
 
-    <!-- Actions -->
     <div class="doc-actions" v-if="snapId > 0" @click.stop>
       <template v-if="isOutline">
         <el-button size="small" text type="primary" :loading="loading" @click="fetchMarkdown">
-          {{ expanded ? '刷新预览' : '查看大纲' }}
+          {{ expanded ? '刷新' : '查看大纲' }}
         </el-button>
         <el-button v-if="expanded" size="small" text :icon="Download" @click="downloadMarkdown">
           下载
@@ -141,56 +124,28 @@ async function downloadPptx() {
 
 <style scoped>
 .doc-card {
-  padding: 14px 18px;
-  border-radius: 10px;
-  margin-bottom: 14px;
-  max-width: 460px;
-  cursor: pointer;
-  transition: box-shadow .15s;
+  padding: 14px 18px; border-radius: 10px; margin-bottom: 14px;
+  max-width: 460px; cursor: pointer; transition: box-shadow .15s;
 }
-.doc-card:hover {
-  box-shadow: 0 2px 10px rgba(0,0,0,.06);
-}
+.doc-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,.06); }
 .outline { background: #ecf5ff; border: 1px solid #d9ecff; }
 .ppt { background: #f0f9eb; border: 1px solid #e1f3d8; }
-.doc-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+.doc-header { display: flex; align-items: center; gap: 8px; }
 .doc-title {
-  font-weight: 600;
-  font-size: 14px;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: 600; font-size: 14px; flex: 1;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .outline .doc-title { color: #409eff; }
 .ppt .doc-title { color: #67c23a; }
 .doc-expand {
-  margin-top: 12px;
-  padding: 12px 16px;
-  background: #fff;
-  border-radius: 8px;
-  max-height: 400px;
-  overflow-y: auto;
-  font-size: 13px;
-  line-height: 1.7;
-  cursor: default;
+  margin-top: 12px; padding: 12px 16px; background: #fff;
+  border-radius: 8px; max-height: 400px; overflow-y: auto;
+  font-size: 13px; line-height: 1.7; cursor: default;
 }
-.doc-expand.loading {
-  color: #909399;
-  text-align: center;
-  padding: 20px;
-}
+.doc-expand.loading { color: #909399; text-align: center; padding: 20px; }
 .mk-body :deep(h1) { font-size: 18px; margin-top: 0; }
 .mk-body :deep(h2) { font-size: 16px; }
 .mk-body :deep(h3) { font-size: 14px; }
 .mk-body :deep(ul) { padding-left: 18px; }
-.doc-actions {
-  display: flex;
-  gap: 6px;
-  margin-top: 10px;
-}
+.doc-actions { display: flex; gap: 6px; margin-top: 10px; }
 </style>

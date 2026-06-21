@@ -32,7 +32,7 @@ async function toggleSnapshots(outlineId: number) {
   expandedSnaps.value = outlineId
   if (!snapshots.value[outlineId]) {
     try {
-      const { data } = await api.get(`/export/outline/${outlineId}/snapshots`)
+      const { data } = await api.get(`/export/outline-snapshots/${outlineId}`)
       if (data.code === 0) {
         snapshots.value[outlineId] = data.data.snapshots || []
       }
