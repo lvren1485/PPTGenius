@@ -324,17 +324,27 @@ async def update_outline_slide(
 async def reindex_outline_slides(
     db: AsyncSession, outline_id: int, id_to_index: dict[int, int]
 ) -> bool:
-    """Set slide_index for multiple slides in a single UPDATE to avoid unique-key conflicts."""
+    """Set slide_index for multiple slides. Two-pass to avoid unique-key conflicts:
+    1) Set all to unique negative values (-id), 2) Set to final indices."""
     if not id_to_index:
         return True
     from sqlalchemy import case, update as _up
-    whens = [(OutlineSlide.id == sid, idx) for sid, idx in id_to_index.items()]
-    stmt = (
+    ids = list(id_to_index.keys())
+    # Pass 1: set to unique negative temp values
+    neg_whens = [(OutlineSlide.id == sid, -sid) for sid in ids]
+    await db.execute(
         _up(OutlineSlide)
-        .where(OutlineSlide.id.in_(id_to_index.keys()))
-        .values(slide_index=case(*whens, else_=OutlineSlide.slide_index))
+        .where(OutlineSlide.id.in_(ids))
+        .values(slide_index=case(*neg_whens, else_=OutlineSlide.slide_index))
     )
-    await db.execute(stmt)
+    await db.flush()
+    # Pass 2: set to final indices
+    pos_whens = [(OutlineSlide.id == sid, idx) for sid, idx in id_to_index.items()]
+    await db.execute(
+        _up(OutlineSlide)
+        .where(OutlineSlide.id.in_(ids))
+        .values(slide_index=case(*pos_whens, else_=OutlineSlide.slide_index))
+    )
     await db.commit()
     return True
 

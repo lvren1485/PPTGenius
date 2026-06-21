@@ -234,7 +234,6 @@ async def run_outline_generator(
         retry_user = await build_generator_user_prompt(
             db=db, outline_id=outline_id, section_id=section_id,
             query=query, knowledge_mode=knowledge_mode,
-            user_id=user_id, conversation_id=conversation_id,
         )
         pending = await pending_slides.ainvoke({})
         retry_content = (
