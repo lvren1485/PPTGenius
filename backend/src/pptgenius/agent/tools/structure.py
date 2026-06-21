@@ -332,9 +332,9 @@ def make_modify_outline_structure(db: Database, conversation_id: int) -> Callabl
                 slide_list.insert(aft_pos + 1, target_slide)
                 _id_to_pos = {s.id: i for i, s in enumerate(slide_list)}
 
-        # ── Reindex: write back sequential indices ──
-        for i, s in enumerate(slide_list):
-            await db.update_outline_slide_index(s.id, i)
+        # ── Reindex: bulk UPDATE with CASE WHEN to avoid unique-key conflicts ──
+        id_to_index = {s.id: i for i, s in enumerate(slide_list)}
+        await db.reindex_outline_slides(outline_id, id_to_index)
 
         # ── Update slide_count ──
         live_count = len([s for s in slide_list if s.status != "deleted"])

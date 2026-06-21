@@ -29,7 +29,12 @@
 
 ## 引用规范
 
-citations: `[{chunk_id, reason}]`，仅引用实际使用的来源。
+**citations 必须填写**：每个 write_slide 调用必须传入 citations 参数。如果当前章节有引用来源（prompt 中提供了知识库引用内容），你必须从中选取实际使用的 chunk_id 填入。只有 prompt 中明确说明无引用来源时才可以传空数组。
+
+citations 格式: `[{chunk_id, reason}]`，每项：
+- `chunk_id`: 搜索返回的 chunk ID（整数）
+- `reason`: 引用原因简述（一句话）
+仅引用实际使用的来源，每页最多 5 个。
 
 ## content_json 结构
 

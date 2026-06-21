@@ -26,14 +26,14 @@ async def _build_citation_knowledge(db: Database, section) -> str:
     chunk_ids = citations.get("chunk_ids", [])
 
     if not file_ids and not chunk_ids:
-        return ""
+        return "本 section 无引用来源。"
 
     chunks_by_file: dict[int, list] = {}
     for fid in file_ids:
         db_chunks = await db.list_chunks_by_file(fid)
         chunks_by_file[fid] = sorted(db_chunks, key=lambda c: c.chunk_index)
 
-    selected: list[str] = []
+    labeled: list[str] = []
     for fid in file_ids:
         clist = chunks_by_file.get(fid, [])
         if not clist:
@@ -45,19 +45,20 @@ async def _build_citation_knowledge(db: Database, section) -> str:
         for i in range(max(0, n - 5), n):
             indices.add(i)
         for i in sorted(indices):
-            selected.append(clist[i].chunk_text)
+            c = clist[i]
+            labeled.append(f"[chunk_id={c.id}, file_id={fid}]\n{c.chunk_text}")
 
     if chunk_ids:
         for cid in chunk_ids[:10]:
             c = await db.get_chunk_by_id(cid)
-            if c and c.chunk_text not in selected:
-                selected.append(c.chunk_text)
+            if c:
+                labeled.append(f"[chunk_id={c.id}, file_id={c.file_id}]\n{c.chunk_text}")
 
-    if not selected:
-        return ""
+    if not labeled:
+        return "本 section 无引用来源。"
 
-    text = "\n\n---\n\n".join(selected)
-    return f"## 知识库引用内容 ({len(selected)} chunks)\n\n{text[:50_000]}"
+    text = "\n\n---\n\n".join(labeled)
+    return f"## 知识库引用内容 ({len(labeled)} chunks)\n每个 chunk 标注了 chunk_id 和 file_id，write_slide 时必须引用。\n\n{text[:50_000]}"
 
 
 # ── write tools (single-slide) ──────────────────────────────────────────────────

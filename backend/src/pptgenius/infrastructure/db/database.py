@@ -85,6 +85,7 @@ class Database:
     async def get_slides_by_outline_id(self, *a, **kw): return await self._call(out_repo.get_slides_by_outline_id, *a, **kw)
     async def update_outline_slide(self, *a, **kw): return await self._call(out_repo.update_outline_slide, *a, **kw)
     async def update_outline_slide_index(self, *a, **kw): return await self._call(out_repo.update_outline_slide_index, *a, **kw)
+    async def reindex_outline_slides(self, *a, **kw): return await self._call(out_repo.reindex_outline_slides, *a, **kw)
     async def update_outline_slide_citations(self, *a, **kw): return await self._call(out_repo.update_outline_slide_citations, *a, **kw)
     async def update_outline_slide_status(self, *a, **kw): return await self._call(out_repo.update_outline_slide_status, *a, **kw)
     async def soft_delete_outline_slide(self, *a, **kw): return await self._call(out_repo.soft_delete_outline_slide, *a, **kw)
