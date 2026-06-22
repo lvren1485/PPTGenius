@@ -43,13 +43,30 @@ class ExportService:
             raise FileNotFoundError(f"outline snapshot {snapshot_id} not found")
 
         outline = snap.outline_json or {}
-        md = self._build_outline_markdown(outline)
+
+        # Build file info lookup from citations
+        file_map: dict[int, dict] = {}
+        for sec in outline.get("sections", []):
+            for sl in sec.get("slides", []):
+                for c in (sl.get("citations") or []):
+                    fid = c.get("knowledge_file_id")
+                    if fid and fid not in file_map:
+                        kf = await db.get_knowledge_file(fid)
+                        if kf:
+                            file_map[fid] = {
+                                "filename": kf.filename,
+                                "source_type": kf.source_type or "",
+                                "web_url": kf.web_url or "",
+                            }
+
+        md = self._build_outline_markdown(outline, file_map)
 
         conv_id = snap.conversation_id
         out_dir = self._ensure_output_dir(conv_id)
         filename = f"outline_v{snap.version}_{snapshot_id}.md"
         path = out_dir / filename
         path.write_text(md, encoding="utf-8")
+        self._cleanup_old(out_dir)
         return filename, path
 
     async def export_presentation_pptx(
@@ -106,7 +123,9 @@ class ExportService:
                     pass
 
     @staticmethod
-    def _build_outline_markdown(outline: dict) -> str:
+    def _build_outline_markdown(outline: dict, file_map: dict | None = None) -> str:
+        if file_map is None:
+            file_map = {}
         lines = [f"# {outline.get('title', '未命名')}", ""]
         lines.append(f"版本: {outline.get('version', '?')}")
         lines.append(f"页数: {outline.get('slide_count', 0)}")
@@ -145,6 +164,21 @@ class ExportService:
                 if sl.get("notes"):
                     lines.append("")
                     lines.append(f"*备注: {sl['notes'][:200]}*")
+                # Citations
+                citations = sl.get("citations")
+                if citations and isinstance(citations, list) and len(citations) > 0:
+                    lines.append("")
+                    lines.append("**参考来源:**")
+                    for i, c in enumerate(citations, 1):
+                        reason = c.get("reason", "") or ""
+                        fid = c.get("knowledge_file_id", "?")
+                        finfo = file_map.get(fid, {})
+                        fname = finfo.get("filename", f"file_id={fid}")
+                        if finfo.get("source_type") == "web" and finfo.get("web_url"):
+                            source = f"[{fname}]({finfo['web_url']})"
+                        else:
+                            source = fname
+                        lines.append(f"  [{i}] {reason} — {source}")
                 lines.append("")
             lines.append("")
         return "\n".join(lines)
