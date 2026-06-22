@@ -147,7 +147,7 @@ async def run_master_agent(
     conversation_id: int,
     user_message: str,
     *,
-    recursion_limit: int = 50,
+    recursion_limit: int = 80,
 ) -> dict:
     """Run the Unified Master Agent for one user turn.
 

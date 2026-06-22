@@ -21,6 +21,7 @@ agent:
     max_iterations: 5
     pass_score: 8           # 0-10, used by pass_score / mix modes
     evaluation_threshold: 0.7
+    generator_max_retries: 3
   ppt:
     mode: "super_freedom"          # super_freedom
     max_retries_per_slide: 3

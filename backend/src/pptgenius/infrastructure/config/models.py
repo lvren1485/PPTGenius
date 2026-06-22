@@ -25,6 +25,7 @@ class OutlineAgentConfig(BaseModel):
     max_iterations: int = 5
     pass_score: float = 8.0  # 0-10, used by pass_score / mix modes
     evaluation_threshold: float = 0.7
+    generator_max_retries: int = 3
 
 
 class PPTAgentConfig(BaseModel):

@@ -13,6 +13,8 @@ from langchain.messages import ToolMessage
 from langchain.tools.tool_node import ToolCallRequest
 from langgraph.types import Command
 
+import re
+
 from ..sse_context import get_sse_writer
 
 
@@ -22,6 +24,15 @@ def _safe_args(kwargs: dict) -> dict:
         s = str(v)
         safe[k] = s[:100] + "..." if len(s) > 100 else v
     return safe
+
+
+def _clean_error(msg: str) -> str:
+    """Strip verbose kwargs from LangChain default error messages."""
+    # "Error invoking tool 'X' with kwargs {...}" → just the tool name + reason
+    m = re.search(r"Error invoking tool '(\w+)'", msg)
+    if m:
+        return f"工具 {m.group(1)} 调用失败，请检查参数格式"
+    return msg[:200]
 
 
 class SSEToolMiddleware(AgentMiddleware):
@@ -40,7 +51,7 @@ class SSEToolMiddleware(AgentMiddleware):
         try:
             result = await handler(request)
         except Exception as exc:
-            writer({"type": "tool_error", "tool": tc_name, "error": str(exc)})
+            writer({"type": "tool_error", "tool": tc_name, "error": _clean_error(str(exc))})
             raise
         content = str(result.content) if hasattr(result, "content") else ""
         writer({

@@ -64,3 +64,4 @@ citations 格式: `[{chunk_id, reason}]`，每项：
 - **先 section 后 content**：section 页是章节引言，先写完它再展开 content 页
 - **查进度**：写完后用 pending_slides 确认
 - 工具返回有提示时直接写，不输出文本
+- 如果失败，根据提示调整后重试，不要放弃

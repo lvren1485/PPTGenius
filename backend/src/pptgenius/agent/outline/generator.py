@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 from langchain.agents import create_agent
-from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
 from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import get_logger
@@ -71,7 +71,7 @@ def _make_write_tools(db: Database, outline_id: int, section_id: int):
     async def write_slide(
         slide_index: int,
         title: str,
-        content_json: dict,
+        content_json: str | dict,
         has_image: bool = False,
         has_chart: bool = False,
         notes: str = "",
@@ -83,12 +83,20 @@ def _make_write_tools(db: Database, outline_id: int, section_id: int):
         ----------
         slide_index : int — the slide's index number.
         title : str — clean, specific title for this slide.
-        content_json : dict — {main_points: [...], detailed_content: "...", key_data: "...", visual_note: "...", recommended_ppt_format: "..."}
+        content_json : str | dict — {main_points: [...], detailed_content: "...", key_data: "...", visual_note: "...", recommended_ppt_format: "..."}. String or dict accepted.
         has_image : bool — whether the slide needs an image.
         has_chart : bool — whether the slide needs a chart.
         notes : str — speaker notes (optional).
         citations : list[dict] | None — [{chunk_id, reason}, ...] for knowledge sources used.
         """
+        if isinstance(content_json, str):
+            try:
+                content_json = json.loads(content_json)
+            except json.JSONDecodeError:
+                return f"错误: content_json 不是合法的 JSON: {content_json[:100]}"
+        if not isinstance(content_json, dict):
+            return f"错误: content_json 必须是 dict 或 JSON 字符串，收到了 {type(content_json).__name__}"
+
         existing = await db.get_slides_by_outline_id(outline_id)
         sec = sorted([s for s in existing if s.section_id == section_id], key=lambda s: s.slide_index)
         index_map = {s.slide_index: s for s in sec}
@@ -204,64 +212,39 @@ async def run_outline_generator(
 
     writer({"type": "outline_generator_start", "section": section_title})
 
-    # ── first attempt ──
-    try:
-        result = await agent.ainvoke(
-            {"messages": [HumanMessage(content=user_prompt)]},
-            config={"recursion_limit": 80},
-        )
-    except Exception:
-        _log.warning("generator crashed section=%d — retrying", section_id)
-        _log.debug("generator crash detail", exc_info=True)
-        result = {"messages": [HumanMessage(content=user_prompt)]}
-
-    total_slides = len(await db.get_slides_by_outline_id(outline_id))
     sec_slides = sum(1 for s in (await db.get_slides_by_outline_id(outline_id)) if s.section_id == section_id)
-    _log.info("generator section=%d written=%d/%d",
-              section_id, len(_written), sec_slides)
+    messages = [HumanMessage(content=user_prompt)]
 
-    if len(_written) < sec_slides:
-        _log.warning("generator retry section=%d (%d/%d written)", section_id, len(_written), sec_slides)
+    from pptgenius.infrastructure.config.settings import get_settings
+    max_retries = get_settings().agent.outline.generator_max_retries
 
-        # Collect all tool results into one string
-        tool_texts: list[str] = []
-        for m in result.get("messages", []):
-            if isinstance(m, ToolMessage) and m.content:
-                name = getattr(m, "name", "tool")
-                tool_texts.append(f"### [{name}]\n{str(m.content)}")
-        gathered = "\n\n---\n\n".join(tool_texts) if tool_texts else "（无知识搜索结果）"
-
-        retry_user = await build_generator_user_prompt(
-            db=db, outline_id=outline_id, section_id=section_id,
-            query=query, knowledge_mode=knowledge_mode,
-        )
-        pending = await pending_slides.ainvoke({})
-        retry_content = (
-            f"{retry_user}\n\n"
-            f"## 已收集的知识\n{gathered}\n\n"
-            f"## 当前进度\n{pending}\n\n"
-            f"---\n"
-            f"⚠️ 请逐个调用 write_slide 完成所有待写入的幻灯片。用 pending_slides 查看进度。"
-        )
-
-        # New agent: only write_slide + pending_slides
-        retry_agent = create_agent(
-            model=llm, tools=[write_slide, pending_slides],
-            system_prompt=system_prompt,
-            middleware=mws,
-        )
+    for attempt in range(max_retries + 1):
         try:
-            await retry_agent.ainvoke(
-                {"messages": [SystemMessage(content=system_prompt), HumanMessage(content=retry_content)]},
-                config={"recursion_limit": 30},
+            result = await agent.ainvoke(
+                {"messages": messages},
+                config={"recursion_limit": 80},
             )
-            _log.info("generator retry done section=%d written=%d/%d", section_id, len(_written), sec_slides)
         except Exception:
-            _log.warning("generator retry failed section=%d", section_id)
-            _log.debug("generator retry detail", exc_info=True)
+            _log.warning("generator crashed section=%d attempt=%d", section_id, attempt)
+            continue
+
+        _log.info("generator section=%d attempt=%d written=%d/%d",
+                  section_id, attempt, len(_written), sec_slides)
+
+        if len(_written) >= sec_slides:
+            break
+
+        if attempt < max_retries:
+            pending = await pending_slides.ainvoke({})
+            result["messages"].append(HumanMessage(content=(
+                f"## 当前进度\n{pending}\n\n"
+                f"请继续逐个调用 write_slide 完成剩余的幻灯片。"
+            )))
+            messages = result["messages"]
 
     if len(_written) < sec_slides:
-        _log.error("generator section=%d only %d/%d written", section_id, len(_written), sec_slides)
+        _log.error("generator section=%d only %d/%d written after %d attempts",
+                    section_id, len(_written), sec_slides, max_retries + 1)
         return f"错误: 章节'{section_title}'仅完成 {len(_written)}/{sec_slides} 页"
 
     writer({"type": "outline_generator_end", "section": section_title})
