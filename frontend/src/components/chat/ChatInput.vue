@@ -170,17 +170,8 @@ function onDrop(e: DragEvent) {
 </template>
 
 <style scoped>
-.chat-input {
-  border-top: 1px solid #e8eaed;
-  padding: 12px 24px 16px;
-  background: #fafbfc;
-  position: relative;
-  transition: border-color .2s, background .2s;
-}
-.chat-input.drag-over {
-  border-color: #409eff;
-  background: #ecf5ff;
-}
+.chat-input { border-top: 1px solid var(--border); padding: 12px 24px 16px; background: var(--bg-card); position: relative; transition: border-color .2s, background .2s; }
+.chat-input.drag-over { border-color: var(--primary); background: var(--primary-bg); }
 .input-toolbar {
   display: flex;
   align-items: center;

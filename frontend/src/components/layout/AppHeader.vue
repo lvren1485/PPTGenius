@@ -1,10 +1,28 @@
 <script setup lang="ts">
+import { ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
+import { Sunny, Moon } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
+const isDark = ref(false)
+
+onMounted(() => {
+  isDark.value = localStorage.getItem('theme') === 'dark'
+  applyTheme()
+})
+
+function toggleTheme() {
+  isDark.value = !isDark.value
+  localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
+  applyTheme()
+}
+
+function applyTheme() {
+  document.documentElement.classList.toggle('dark', isDark.value)
+}
 
 function handleLogout() {
   auth.logout()
@@ -37,6 +55,7 @@ const navItems = [
       </nav>
     </div>
     <div class="header-right">
+      <el-button text :icon="isDark ? Sunny : Moon" @click="toggleTheme" title="切换主题" />
       <el-button text @click="handleLogout">登出</el-button>
     </div>
   </el-header>
@@ -44,49 +63,24 @@ const navItems = [
 
 <style scoped>
 .app-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: #fafbfc;
-  border-bottom: 1px solid #e4e7ed;
-  padding: 0 24px;
-  height: 56px;
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--bg-card); border-bottom: 1px solid var(--border);
+  padding: 0 24px; height: 56px; transition: background .3s;
 }
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 32px;
-}
+.header-left { display: flex; align-items: center; gap: 32px; }
 .logo {
-  font-size: 18px;
-  font-weight: 700;
-  color: #409eff;
-  cursor: pointer;
-  white-space: nowrap;
+  font-size: 18px; font-weight: 800; cursor: pointer; white-space: nowrap;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
-.nav-links {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
+.nav-links { display: flex; align-items: center; gap: 2px; }
 .nav-item {
-  padding: 8px 16px;
-  text-decoration: none;
-  color: #606266;
-  border-radius: 4px;
-  font-size: 14px;
+  padding: 8px 16px; text-decoration: none; color: var(--text-secondary);
+  border-radius: var(--radius-sm); font-size: 14px; font-weight: 500;
   transition: background .2s, color .2s;
 }
-.nav-item:hover {
-  background: #f5f7fa;
-  color: #409eff;
-}
-.nav-item.active {
-  color: #409eff;
-  background: #ecf5ff;
-}
-.header-right {
-  display: flex;
-  align-items: center;
-}
+.nav-item:hover { background: var(--bg-hover); color: var(--primary); }
+.nav-item.active { color: var(--primary); background: var(--primary-bg); }
+.header-right { display: flex; align-items: center; gap: 4px; }
 </style>

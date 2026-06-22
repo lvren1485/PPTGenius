@@ -36,93 +36,26 @@ function formatTime(d: string) {
 </template>
 
 <style scoped>
-.msg-bubble {
-  display: flex;
-  flex-direction: column;
-  margin-bottom: 20px;
-  max-width: 80%;
-}
-.is-user {
-  align-self: flex-end;
-  align-items: flex-end;
-}
-.is-assistant {
-  align-self: flex-start;
-}
-.msg-role {
-  font-size: 12px;
-  color: #909399;
-  margin-bottom: 4px;
-}
-.msg-body {
-  padding: 16px 24px 16px 28px;
-  border-radius: 12px;
-  line-height: 1.7;
-}
-.is-user .msg-body {
-  background: #409eff;
-  color: #fff;
-  padding: 12px 20px;
-}
-.is-assistant .msg-body {
-  background: #fafbfc;
-  border: 1px solid #e8eaed;
-}
-.msg-content {
-  word-break: break-word;
-  overflow-wrap: break-word;
-}
+.msg-bubble { display: flex; flex-direction: column; margin-bottom: 20px; max-width: 80%; }
+.is-user { align-self: flex-end; align-items: flex-end; }
+.is-assistant { align-self: flex-start; }
+.msg-role { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+.msg-body { padding: 16px 24px 16px 28px; border-radius: 12px; line-height: 1.7; }
+.is-user .msg-body { background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: #fff; padding: 12px 20px; box-shadow: 0 2px 8px rgba(99,102,241,.25); }
+.is-assistant .msg-body { background: var(--bg-card); border: 1px solid var(--border); box-shadow: var(--shadow); }
+.msg-content { word-break: break-word; overflow-wrap: break-word; }
 .msg-content :deep(p) { margin: 0 0 8px; }
 .msg-content :deep(p:last-child) { margin: 0; }
-.msg-content :deep(ol), .msg-content :deep(ul) {
-  padding-left: 0;
-  margin-left: 0;
-  list-style-position: inside;
-}
-.msg-content :deep(ol li), .msg-content :deep(ul li) {
-  margin-bottom: 4px;
-  word-break: break-word;
-}
-.msg-content :deep(pre) {
-  background: #f5f7fa;
-  border-radius: 6px;
-  padding: 12px;
-  overflow-x: auto;
-  font-size: 13px;
-}
-.msg-content :deep(code) {
-  font-family: 'Fira Code', monospace;
-  font-size: 13px;
-}
-.msg-time {
-  font-size: 12px;
-  color: #c0c4cc;
-  margin-top: 4px;
-}
-.is-loading .msg-body {
-  background: #fafbfc;
-  border-color: #e4e7ed;
-  min-width: 80px;
-}
-.loading-dots {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  justify-content: center;
-  padding: 6px 0;
-}
-.loading-dots span {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #c0c4cc;
-  animation: bounce 1.4s ease-in-out infinite both;
-}
+.msg-content :deep(ol), .msg-content :deep(ul) { padding-left: 0; margin-left: 0; list-style-position: inside; }
+.msg-content :deep(ol li), .msg-content :deep(ul li) { margin-bottom: 4px; word-break: break-word; }
+.msg-content :deep(pre) { background: var(--bg-hover); border-radius: 6px; padding: 12px; overflow-x: auto; font-size: 13px; }
+.msg-content :deep(code) { font-family: 'Fira Code', monospace; font-size: 13px; }
+.msg-time { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.is-loading .msg-body { background: var(--bg-card); border-color: var(--border); min-width: 80px; }
+.loading-dots { display: flex; gap: 6px; align-items: center; justify-content: center; padding: 6px 0; }
+.loading-dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); animation: bounce 1.4s ease-in-out infinite both; }
 .loading-dots span:nth-child(1) { animation-delay: 0s; }
-.loading-dots span:nth-child(2) { animation-delay: 0.2s; }
-.loading-dots span:nth-child(3) { animation-delay: 0.4s; }
-@keyframes bounce {
-  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
-  40% { transform: scale(1); opacity: 1; }
-}
+.loading-dots span:nth-child(2) { animation-delay: .2s; }
+.loading-dots span:nth-child(3) { animation-delay: .4s; }
+@keyframes bounce { 0%, 80%, 100% { transform: scale(.6); opacity: .4; } 40% { transform: scale(1); opacity: 1; } }
 </style>

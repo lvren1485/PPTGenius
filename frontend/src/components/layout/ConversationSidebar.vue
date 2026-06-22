@@ -129,66 +129,19 @@ function formatDate(d: string) {
 
 <style scoped>
 .sidebar {
-  width: 260px;
-  min-width: 260px;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: #e8ecf1;
-  border-right: 1px solid #e4e7ed;
+  width: 260px; min-width: 260px; height: 100%;
+  display: flex; flex-direction: column;
+  background: var(--bg-sidebar); border-right: 1px solid var(--border);
+  transition: background .3s;
 }
-.new-btn {
-  margin: 12px;
-}
-.conv-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0 8px 8px;
-}
-.conv-item {
-  padding: 10px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  margin-bottom: 2px;
-  transition: background .15s;
-}
-.conv-item:hover {
-  background: #ebeef5;
-}
-.conv-item.active {
-  background: #d9ecff;
-}
-.conv-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.conv-title {
-  font-size: 14px;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1;
-  min-width: 0;
-}
-.conv-actions {
-  display: flex;
-  gap: 2px;
-  flex-shrink: 0;
-  visibility: hidden;
-  opacity: 0;
-  transition: opacity .15s;
-}
-.conv-item:hover .conv-actions {
-  visibility: visible;
-  opacity: 1;
-}
-.conv-meta {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 4px;
-  font-size: 12px;
-  color: #909399;
-}
+.new-btn { margin: 12px; }
+.conv-list { flex: 1; overflow-y: auto; padding: 0 8px 8px; }
+.conv-item { padding: 10px 12px; border-radius: var(--radius-sm); cursor: pointer; margin-bottom: 2px; transition: background .15s; }
+.conv-item:hover { background: var(--bg-hover); }
+.conv-item.active { background: var(--primary-bg); }
+.conv-row { display: flex; align-items: center; justify-content: space-between; }
+.conv-title { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+.conv-actions { display: flex; gap: 2px; flex-shrink: 0; visibility: hidden; opacity: 0; transition: opacity .15s; }
+.conv-item:hover .conv-actions { visibility: visible; opacity: 1; }
+.conv-meta { display: flex; justify-content: space-between; margin-top: 4px; font-size: 12px; color: var(--text-muted); }
 </style>

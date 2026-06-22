@@ -370,46 +370,14 @@ function isToolBlock(item: MsgItem | ToolBlock): item is ToolBlock {
 </template>
 
 <style scoped>
-.chat-layout {
-  display: flex;
-  height: calc(100vh - 56px);
-}
-.chat-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.chat-header {
-  padding: 12px 24px;
-  border-bottom: 1px solid #e8eaed;
-  background: #fafbfc;
-}
-.chat-title {
-  font-weight: 600;
-  font-size: 15px;
-}
-.chat-empty {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 40px;
-}
-.welcome {
-  text-align: center;
-  max-width: 560px;
-}
-.welcome h2 {
-  font-size: 32px;
-  color: #409eff;
-  margin-bottom: 8px;
-}
-.welcome-sub {
-  color: #909399;
-  margin-bottom: 32px;
-  font-size: 15px;
-}
+.chat-layout { display: flex; height: calc(100vh - 56px); }
+.chat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg); transition: background .3s; }
+.chat-header { padding: 12px 24px; border-bottom: 1px solid var(--border); background: var(--bg-card); }
+.chat-title { font-weight: 600; font-size: 15px; color: var(--text); }
+.chat-empty { flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px; }
+.welcome { text-align: center; max-width: 560px; }
+.welcome h2 { font-size: 32px; color: var(--primary); margin-bottom: 8px; }
+.welcome-sub { color: var(--text-secondary); margin-bottom: 32px; font-size: 15px; }
 .suggestions {
   display: flex;
   flex-wrap: wrap;
@@ -417,20 +385,8 @@ function isToolBlock(item: MsgItem | ToolBlock): item is ToolBlock {
   justify-content: center;
   margin-bottom: 28px;
 }
-.suggest-item {
-  padding: 10px 18px;
-  background: #fff;
-  border: 1px solid #dcdfe6;
-  border-radius: 20px;
-  cursor: pointer;
-  font-size: 14px;
-  color: #606266;
-  transition: border-color .2s, color .2s;
-}
-.suggest-item:hover {
-  border-color: #409eff;
-  color: #409eff;
-}
+.suggest-item { padding: 10px 18px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 20px; cursor: pointer; font-size: 14px; color: var(--text-secondary); transition: border-color .2s, color .2s; }
+.suggest-item:hover { border-color: var(--primary); color: var(--primary); }
 .msg-container {
   flex: 1;
   overflow-y: auto;
