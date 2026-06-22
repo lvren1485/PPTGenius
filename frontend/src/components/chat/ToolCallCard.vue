@@ -53,20 +53,23 @@ const groups = computed(() => {
 
 // Flatten sub-agent children into call/result pairs
 function childPairs(children: ToolMsg[]) {
-  const pairs: { call: ToolMsg | null; result: ToolMsg | null }[] = []
-  let cur: { call: ToolMsg | null; result: ToolMsg | null } = { call: null, result: null }
+  // Handle parallel calls: match each result to first unmatched call with same tool name
+  const pending: { call: ToolMsg | null; result: ToolMsg | null }[] = []
   for (const m of children) {
     if (m.role === 'tool_call') {
-      if (cur.call) pairs.push({ ...cur })
-      cur = { call: m, result: null }
+      pending.push({ call: m, result: null })
     } else if (m.role === 'tool_result') {
-      cur.result = m
-      pairs.push({ ...cur })
-      cur = { call: null, result: null }
+      const name = m.metadata_json?.tool_name || ''
+      const idx = pending.findIndex(p => !p.result && p.call?.metadata_json?.tool_name === name)
+      if (idx >= 0) {
+        pending[idx].result = m
+      } else {
+        // Orphan result — still show it
+        pending.push({ call: null, result: m })
+      }
     }
   }
-  if (cur.call) pairs.push({ ...cur })
-  return pairs
+  return pending
 }
 
 const summary = computed(() => {
@@ -160,7 +163,8 @@ function truncate(s: string, max: number = 80): string {
               <div v-for="(p, i) in childPairs(g.children)" :key="i" class="sub-step">
                 <div class="tool-step-header">
                   <span class="step-num sub-num">{{ i + 1 }}</span>
-                  <el-tag size="small">{{ toolNameLabel(p.call?.metadata_json?.tool_name || '') }}</el-tag>
+                  <el-tag v-if="p.call" size="small">{{ toolNameLabel(p.call.metadata_json?.tool_name || '') }}</el-tag>
+                  <el-tag v-else size="small" type="info">结果</el-tag>
                   <span v-if="!p.result && thinking && gi === groups.length - 1 && i === childPairs(g.children).length - 1"
                     class="thinking-dots"><i>.</i><i>.</i><i>.</i></span>
                 </div>
