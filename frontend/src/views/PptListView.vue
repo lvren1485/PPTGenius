@@ -6,8 +6,9 @@ import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 
 interface Ppt {
-  id: number; status: string; slide_count: number | null
-  file_path: string; file_size: number | null; created_at: string | null
+  id: number; outline_id: number | null; status: string
+  version: number; outline_version: number
+  slide_count: number | null; file_size: number | null; created_at: string | null
 }
 
 const router = useRouter()
@@ -25,11 +26,6 @@ onMounted(async () => {
 function download(id: number, e: Event) {
   e.stopPropagation()
   window.open('/api/ppt/' + id + '/download', '_blank')
-}
-
-function shortName(path: string) {
-  const name = path.replace(/\\/g, '/').split('/').pop() || path
-  return name.replace(/\.pptx$/i, '')
 }
 
 function fmtSize(b: number | null) {
@@ -50,9 +46,10 @@ function fmtSize(b: number | null) {
     <div v-else class="cards">
       <div v-for="p in ppts" :key="p.id" class="card" @click="router.push('/ppt/' + p.id)">
         <div class="card-body">
-          <strong class="card-title">{{ shortName(p.file_path) }}</strong>
+          <strong class="card-title">PPT #{{ p.id }}</strong>
           <div class="card-meta">
             <el-tag size="small" :type="p.status === 'completed' ? 'success' : 'warning'">{{ p.status }}</el-tag>
+            <span>v{{ p.version }}</span>
             <span>{{ p.slide_count ?? 0 }} 页</span>
             <span>{{ fmtSize(p.file_size) }}</span>
           </div>
@@ -67,68 +64,20 @@ function fmtSize(b: number | null) {
 </template>
 
 <style scoped>
-.lp {
-  max-width: 860px;
-  margin: 0 auto;
-  padding: 40px 24px;
-}
-.lp-title {
-  font-size: 22px;
-  margin-bottom: 6px;
-}
-.lp-sub {
-  color: #909399;
-  font-size: 14px;
-  margin-bottom: 28px;
-}
-.loading, .empty {
-  text-align: center;
-  padding: 60px 0;
-  color: #909399;
-}
-.cards {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
+.lp { max-width: 860px; margin: 0 auto; padding: 40px 24px; }
+.lp-title { font-size: 22px; margin-bottom: 6px; }
+.lp-sub { color: #909399; font-size: 14px; margin-bottom: 28px; }
+.loading, .empty { text-align: center; padding: 60px 0; color: #909399; }
+.cards { display: flex; flex-direction: column; gap: 14px; }
 .card {
-  background: #fff;
-  padding: 20px 24px;
-  border-radius: 10px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border: 1px solid #ebeef5;
-  transition: box-shadow .2s, border-color .2s;
+  background: #fff; padding: 20px 24px; border-radius: 10px; cursor: pointer;
+  display: flex; align-items: center; justify-content: space-between;
+  border: 1px solid #ebeef5; transition: box-shadow .2s, border-color .2s;
 }
-.card:hover {
-  box-shadow: 0 4px 16px rgba(0,0,0,.08);
-  border-color: #c6e2ff;
-}
-.card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.card-title {
-  font-size: 15px;
-}
-.card-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 13px;
-  color: #909399;
-}
-.card-right {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-.card-date {
-  font-size: 13px;
-  color: #c0c4cc;
-  white-space: nowrap;
-}
+.card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); border-color: #c6e2ff; }
+.card-body { display: flex; flex-direction: column; gap: 8px; }
+.card-title { font-size: 15px; }
+.card-meta { display: flex; align-items: center; gap: 12px; font-size: 13px; color: #909399; }
+.card-right { display: flex; align-items: center; gap: 16px; }
+.card-date { font-size: 13px; color: #c0c4cc; white-space: nowrap; }
 </style>
