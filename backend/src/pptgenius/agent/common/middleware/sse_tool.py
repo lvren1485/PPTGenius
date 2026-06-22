@@ -42,6 +42,11 @@ class SSEToolMiddleware(AgentMiddleware):
         except Exception as exc:
             writer({"type": "tool_error", "tool": tc_name, "error": str(exc)})
             raise
-        result_len = len(str(result.content)) if hasattr(result, "content") else 0
-        writer({"type": "tool_end", "tool": tc_name, "result_len": result_len})
+        content = str(result.content) if hasattr(result, "content") else ""
+        writer({
+            "type": "tool_end",
+            "tool": tc_name,
+            "result": content[:500],
+            "result_len": len(content),
+        })
         return result

@@ -155,7 +155,7 @@ function handleSseEvent(evt: { event: string; data: Record<string, any> }) {
     case 'tool_start':
       messages.value.push({
         id: 0, idx: messages.value.length + 1,
-        role: 'tool_call', content: d.tool || '',
+        role: 'tool_call', content: toolCallContent(d.tool || '', d.args || {}),
         content_type: toolCtype(d.tool || ''),
         metadata_json: { tool_name: d.tool, args: d.args || {} },
         estimated_cost: null, created_at: new Date().toISOString(),
@@ -165,7 +165,7 @@ function handleSseEvent(evt: { event: string; data: Record<string, any> }) {
     case 'tool_end':
       messages.value.push({
         id: 0, idx: messages.value.length + 1,
-        role: 'tool_result', content: `完成 (${d.result_len || 0} 字符)`,
+        role: 'tool_result', content: d.result || `完成 (${d.result_len || 0} 字符)`,
         content_type: toolCtype(d.tool || ''),
         metadata_json: { tool_name: d.tool, result_len: d.result_len },
         estimated_cost: null, created_at: new Date().toISOString(),
@@ -207,6 +207,15 @@ function handleSseEvent(evt: { event: string; data: Record<string, any> }) {
       thinking.value = false
       break
   }
+}
+
+function toolCallContent(tool: string, args: Record<string, any>): string {
+  // Match DB persist format: first arg used as content
+  const meaningful = args.query || args.title || args.description || args.message
+  if (meaningful) return meaningful
+  const keys = Object.keys(args)
+  if (keys.length === 0) return ''
+  return JSON.stringify(args).slice(0, 200)
 }
 
 function toolCtype(name: string): string {
