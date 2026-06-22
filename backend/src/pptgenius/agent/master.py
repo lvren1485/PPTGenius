@@ -278,9 +278,12 @@ async def run_master_agent(
                     role="document",
                     content=str(snap.id),
                     content_type="outline",
+                    metadata_json={"outline_id": snap.id, "title": outline.title,
+                                   "version": outline.version},
                 )
                 writer({"type": "document", "doc_type": "outline",
-                        "snapshot_id": snap.id, "title": outline.title})
+                        "snapshot_id": snap.id, "title": outline.title,
+                        "version": outline.version})
                 outline_snapshot_id = snap.id
 
     if presentation_changed:
@@ -310,9 +313,14 @@ async def run_master_agent(
                     role="document",
                     content=str(snap.id),
                     content_type="presentation",
+                    metadata_json={"presentation_id": snap.id,
+                                   "title": (outline.title if outline else "PPT"),
+                                   "version": pres.version},
                 )
                 writer({"type": "document", "doc_type": "presentation",
-                        "snapshot_id": snap.id, "title": outline.title if outline else ""})
+                        "snapshot_id": snap.id,
+                        "title": (outline.title if outline else "PPT"),
+                        "version": pres.version if pres else 0})
                 pres_snapshot_id = snap.id
 
     # Ensure all DB changes are committed before the session closes

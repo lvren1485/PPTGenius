@@ -12,7 +12,7 @@ const props = defineProps<{
 }>()
 
 const router = useRouter()
-const expanded = ref(false)
+const dialogVisible = ref(false)
 const mkHtml = ref('')
 const mkSource = ref('')
 const mkFilename = ref('')
@@ -29,14 +29,13 @@ const snapId = computed(() => {
 
 const isOutline = computed(() => props.docType === 'outline')
 
-async function togglePreview() {
-  if (expanded.value) { expanded.value = false; return }
-  if (isOutline.value && mkSource.value) { expanded.value = true; return }
+async function openDialog() {
   if (!isOutline.value) {
     if (snapId.value > 0) router.push(`/snapshot/${snapId.value}`)
     return
   }
-  await fetchMarkdown()
+  if (!mkSource.value) await fetchMarkdown()
+  if (mkSource.value) dialogVisible.value = true
 }
 
 async function fetchMarkdown() {
@@ -48,14 +47,12 @@ async function fetchMarkdown() {
       mkSource.value = data.data.content
       mkHtml.value = marked(data.data.content) as string
       mkFilename.value = data.data.filename
-      expanded.value = true
     }
   } catch { /* ignore */ }
   finally { loading.value = false }
 }
 
 function downloadMarkdown() {
-  // Use raw markdown source with proper # formatting
   const blob = new Blob([mkSource.value], { type: 'text/markdown; charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -88,38 +85,50 @@ async function downloadPptx() {
 </script>
 
 <template>
-  <div class="doc-card" :class="isOutline ? 'outline' : 'ppt'" @click="togglePreview">
+  <!-- Card -->
+  <div class="doc-card" :class="[isOutline ? 'outline' : 'ppt', loading ? 'card-loading' : '']" @click="openDialog">
     <div class="doc-header">
       <el-icon :size="18"><Document /></el-icon>
-      <span class="doc-title">{{ isOutline ? '大纲' : 'PPT' }}：{{ title }}</span>
-      <el-tag v-if="version != null" size="small">v{{ version }}</el-tag>
+      <span class="doc-title">{{ isOutline ? '大纲' : 'PPT' }}：{{ title }}{{ version != null ? ` v${version}` : '' }}</span>
       <el-tag size="small" :type="isOutline ? 'primary' : 'success'">
         {{ isOutline ? '大纲' : 'PPT' }}
       </el-tag>
     </div>
-
-    <div v-if="isOutline && expanded" class="doc-expand mk-body" v-html="mkHtml" @click.stop />
-    <div v-if="isOutline && loading" class="doc-expand loading">加载中...</div>
-
-    <div class="doc-actions" v-if="snapId > 0" @click.stop>
+    <div v-if="loading" class="card-loader"><div class="loader-bar" /></div>
+    <div class="doc-actions" v-if="snapId > 0">
       <template v-if="isOutline">
-        <el-button size="small" text type="primary" :loading="loading" @click="fetchMarkdown">
-          {{ expanded ? '刷新' : '查看大纲' }}
+        <el-button size="small" text type="primary" :loading="loading" @click.stop="openDialog">
+          查看大纲
         </el-button>
-        <el-button v-if="expanded" size="small" text :icon="Download" @click="downloadMarkdown">
+        <el-button v-if="mkSource" size="small" text :icon="Download" @click.stop="downloadMarkdown">
           下载
         </el-button>
       </template>
       <template v-else>
-        <el-button size="small" text type="primary" @click="router.push(`/snapshot/${snapId}`)">
+        <el-button size="small" text type="primary" @click.stop="router.push(`/snapshot/${snapId}`)">
           查看详情
         </el-button>
-        <el-button size="small" text :icon="Download" @click="downloadPptx">
+        <el-button size="small" text :icon="Download" @click.stop="downloadPptx">
           下载 PPTX
         </el-button>
       </template>
     </div>
   </div>
+
+  <!-- Outline preview dialog -->
+  <el-dialog
+    v-model="dialogVisible"
+    :title="`大纲预览：${title}`"
+    width="80%"
+    top="4vh"
+    destroy-on-close
+  >
+    <div class="dlg-mk-body" v-html="mkHtml" />
+    <template #footer>
+      <el-button :icon="Download" @click="downloadMarkdown">下载 Markdown</el-button>
+      <el-button type="primary" @click="dialogVisible = false">关闭</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <style scoped>
@@ -137,15 +146,27 @@ async function downloadPptx() {
 }
 .outline .doc-title { color: #409eff; }
 .ppt .doc-title { color: #67c23a; }
-.doc-expand {
-  margin-top: 12px; padding: 12px 16px; background: #fff;
-  border-radius: 8px; max-height: 400px; overflow-y: auto;
-  font-size: 13px; line-height: 1.7; cursor: default;
+.card-loading { opacity: .85; }
+.card-loader { margin-top: 8px; height: 4px; border-radius: 2px; overflow: hidden; background: #e4e7ed; }
+.loader-bar { height: 100%; width: 30%; border-radius: 2px; background: #409eff; animation: loaderSlide 1s infinite ease-in-out; }
+@keyframes loaderSlide {
+  0% { margin-left: -30%; }
+  100% { margin-left: 130%; }
 }
-.doc-expand.loading { color: #909399; text-align: center; padding: 20px; }
-.mk-body :deep(h1) { font-size: 18px; margin-top: 0; }
-.mk-body :deep(h2) { font-size: 16px; }
-.mk-body :deep(h3) { font-size: 14px; }
-.mk-body :deep(ul) { padding-left: 18px; }
 .doc-actions { display: flex; gap: 6px; margin-top: 10px; }
+</style>
+
+<style>
+.dlg-mk-body {
+  font-size: 16px; line-height: 1.9; color: #303133;
+  max-height: 70vh; overflow-y: auto; padding: 0 8px;
+}
+.dlg-mk-body h1 { font-size: 26px; margin: 0 0 16px; }
+.dlg-mk-body h2 { font-size: 20px; margin: 24px 0 12px; border-bottom: 1px solid #e4e7ed; padding-bottom: 8px; position: sticky; top: 0; background: #fff; z-index: 2; }
+.dlg-mk-body h3 { font-size: 17px; margin: 18px 0 8px; position: sticky; top: 0; background: #fff; z-index: 1; }
+.dlg-mk-body ul, .dlg-mk-body ol { padding-left: 24px; margin: 8px 0; }
+.dlg-mk-body li { margin-bottom: 6px; }
+.dlg-mk-body p { margin: 8px 0; }
+.dlg-mk-body strong { color: #409eff; }
+.dlg-mk-body em { color: #909399; }
 </style>

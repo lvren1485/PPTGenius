@@ -188,8 +188,8 @@ function handleSseEvent(evt: { event: string; data: Record<string, any> }) {
         role: 'document', content: d.title || '',
         content_type: d.doc_type,
         metadata_json: d.doc_type === 'outline'
-          ? { outline_id: d.snapshot_id, title: d.title }
-          : { presentation_id: d.snapshot_id, title: d.title },
+          ? { outline_id: d.snapshot_id, title: d.title, version: d.version }
+          : { presentation_id: d.snapshot_id, title: d.title, version: d.version },
         estimated_cost: null, created_at: new Date().toISOString(),
       })
       scrollBottom()
