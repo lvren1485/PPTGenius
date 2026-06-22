@@ -351,6 +351,12 @@ def make_modify_outline_structure(db: Database, conversation_id: int) -> Callabl
         if notes:
             summary += f"\n注意: {'; '.join(notes)}"
 
+        # Cascade to presentation: mark title/TOC/thanks slides as modified
+        for s in slide_list:
+            lt = s.layout_type or ""
+            if lt == "title" or lt == "thanks" or ("目录" in (s.title or "") or "TOC" in (s.title or "").upper()):
+                await _cascade_pres_status(db, s.id, _PRES_MODIFIED_PREFIX + _STATUS_MODIFY)
+
         _log.info("modify outline=%d: %s", outline_id, summary)
         return {"summary": summary, "placeholder_slide_ids": placeholder_ids}
 

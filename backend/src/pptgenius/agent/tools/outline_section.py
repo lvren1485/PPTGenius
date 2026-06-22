@@ -66,8 +66,7 @@ async def _finalize_special_slides(db: Database, outline_id: int) -> None:
                 },
                 status="completed",
             )
-        elif lt == "content" and sl.slide_index == 0:
-            # TOC slide: slide_index=0, layout_type=content, title contains "目录"
+        elif lt == "content":
             t = sl.title or ""
             if "目录" in t or "目錄" in t or "TOC" in t.upper():
                 await db.update_outline_slide(sl.id,
@@ -166,10 +165,12 @@ def make_modify_outline_section(db: Database, conversation_id: int) -> Callable:
             return "错误：没有选中大纲"
 
         push_sentinel(conversation_id)
-        return await run_outline_generator(
+        result = await run_outline_generator(
             db, conversation_id,
             section_id=section_id,
             query=query,
         )
+        await _finalize_special_slides(db, conv.current_outline_id)
+        return result
 
     return tool(_modify_outline_section)
