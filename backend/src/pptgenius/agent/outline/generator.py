@@ -226,6 +226,7 @@ async def run_outline_generator(
             )
         except Exception:
             _log.warning("generator crashed section=%d attempt=%d", section_id, attempt)
+            _log.debug("generator crashed details", exc_info=True)
             continue
 
         _log.info("generator section=%d attempt=%d written=%d/%d",

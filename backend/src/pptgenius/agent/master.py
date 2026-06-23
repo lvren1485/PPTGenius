@@ -189,7 +189,8 @@ async def run_master_agent(
     context = await _load_context_messages(db, conversation_id)
     context.append(HumanMessage(content=user_message))
     state = {"messages": context}
-    _log.debug("loaded %d context messages for conv=%d", len(context) - 1, conversation_id)
+    prev_count = len(context)
+    _log.debug("loaded %d context messages for conv=%d", prev_count - 1, conversation_id)
     error_msg = ""
     messages: list = []
     try:
@@ -250,8 +251,8 @@ async def run_master_agent(
     # --- 8. Snapshot on exit ---
     outline_snapshot_id = None
     pres_snapshot_id = None
-    outline_changed = _has_outline_changed(result)
-    presentation_changed = _has_presentation_changed(result)
+    outline_changed = _has_outline_changed(result, prev_count)
+    presentation_changed = _has_presentation_changed(result, prev_count)
 
     _log.debug("conv=%d outline_changed=%s presentation_changed=%s",
                conversation_id, outline_changed, presentation_changed)
@@ -414,12 +415,10 @@ async def _load_context_messages(
     return msgs
 
 
-def _has_outline_changed(state: dict) -> bool:
-    """Heuristic: check if any structure/perception tools were called."""
+def _has_outline_changed(state: dict, prev_count: int) -> bool:
+    """Check only newly-added messages for outline tool calls."""
     msgs = state.get("messages", [])
-    # If there are tool message results from write_outline_structure or
-    # modify_outline_structure, assume outline changed.
-    for m in msgs:
+    for m in msgs[prev_count:]:
         name = getattr(m, "name", "")
         if name in ("_write_outline_structure", "_modify_outline_structure",
                      "_generate_outline_content", "_modify_outline_section"):
@@ -427,9 +426,9 @@ def _has_outline_changed(state: dict) -> bool:
     return False
 
 
-def _has_presentation_changed(state: dict) -> bool:
+def _has_presentation_changed(state: dict, prev_count: int) -> bool:
     msgs = state.get("messages", [])
-    for m in msgs:
+    for m in msgs[prev_count:]:
         name = getattr(m, "name", "")
         if name in ("_slides_content", "_ppt_style", "_rearrange_presentation_slides"):
             return True

@@ -129,6 +129,7 @@ class PresentationBrief(BaseModel):
     user_id: int
     conversation_id: int
     outline_id: int | None = None
+    title: str | None = None
     status: str
     slide_count: int | None = None
     version: int = 0
@@ -141,6 +142,7 @@ class PresentationBrief(BaseModel):
 
 class PresentationDetail(PresentationBrief):
     style_id: int | None = None
+    style_name: str | None = None
 
 
 class PresentationSlideDetail(BaseModel):
@@ -166,19 +168,6 @@ class PresentationSlidesResponse(BaseModel):
 class SnapshotBrief(BaseModel):
     id: int
     version: int
-    created_at: datetime
-
-    model_config = {"from_attributes": True}
-
-
-class SnapshotDetail(BaseModel):
-    id: int
-    presentation_id: int
-    user_id: int
-    conversation_id: int
-    version: int
-    outline_json: dict
-    presentation_json: dict
     created_at: datetime
 
     model_config = {"from_attributes": True}

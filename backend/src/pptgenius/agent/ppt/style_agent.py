@@ -222,10 +222,14 @@ async def run_style_agent(
     except RuntimeError:
         pass
 
-    result = await agent.ainvoke(
-        {"messages": [HumanMessage(content=user_prompt)]},
-        config={"recursion_limit": 30},
-    )
+    try:
+        result = await agent.ainvoke(
+            {"messages": [HumanMessage(content=user_prompt)]},
+            config={"recursion_limit": 30},
+        )
+    except Exception:
+        _log.warning("style_agent crashed")
+        _log.debug("style_agent crash detail", exc_info=True)
 
     # Retry if set_presentation_style wasn't called
     if not _was_called[0]:
@@ -236,13 +240,17 @@ async def run_style_agent(
             system_prompt="你必须立即调用 _set_presentation_style 提交风格选择。直接选择最合适的样式并提交。",
             middleware=mws,
         )
-        await retry_agent.ainvoke(
-            {"messages": [
-                HumanMessage(content=user_prompt),
-                HumanMessage(content="请立即调用 _set_presentation_style 提交。不要再浏览或搜索。"),
-            ]},
-            config={"recursion_limit": 10},
-        )
+        try:
+            await retry_agent.ainvoke(
+                {"messages": [
+                    HumanMessage(content=user_prompt),
+                    HumanMessage(content="请立即调用 _set_presentation_style 提交。不要再浏览或搜索。"),
+                ]},
+                config={"recursion_limit": 10},
+            )
+        except Exception:
+            _log.warning("style_agent retry crashed")
+            _log.debug("style_agent retry crash detail", exc_info=True)
         _was_called[0] = True
 
     style_id = _style_id[0]

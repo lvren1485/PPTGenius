@@ -123,11 +123,16 @@ def _build_style_section(data: dict) -> str:
         parts.append(f"图表色: {', '.join(chart_colors[:6])}")
     fonts = data.get("fonts", {})
     if fonts:
+        def _fs(key: str) -> str:
+            v = fonts.get(key, "?")
+            if isinstance(v, dict):
+                return str(v.get("size", "?"))
+            return str(v) if v != "?" else "?"
         parts.append(
-            f"字体: h1({fonts.get('h1',{}).get('size','?')}pt) "
-            f"h2({fonts.get('h2',{}).get('size','?')}pt) "
-            f"body({fonts.get('body',{}).get('size','?')}pt) "
-            f"最小: {fonts.get('min_size','?')}pt"
+            f"字体: h1({_fs('h1')}pt) "
+            f"h2({_fs('h2')}pt) "
+            f"body({_fs('body')}pt) "
+            f"最小: {_fs('min_size')}pt"
         )
 
     # Background (full JSON, not summarized)

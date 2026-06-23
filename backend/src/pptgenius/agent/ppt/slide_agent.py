@@ -156,10 +156,14 @@ async def run_slide_agent(
     except RuntimeError:
         pass
 
-    result = await agent.ainvoke(
-        {"messages": [HumanMessage(content=user_prompt)]},
-        config={"recursion_limit": 100},
-    )
+    try:
+        result = await agent.ainvoke(
+            {"messages": [HumanMessage(content=user_prompt)]},
+            config={"recursion_limit": 100},
+        )
+    except Exception:
+        _log.warning("slide_agent crashed slide=%d", slide_index)
+        _log.debug("slide_agent crash detail", exc_info=True)
 
     # ── retry if no elements submitted ────────────────────────────────
 
@@ -171,14 +175,18 @@ async def run_slide_agent(
             system_prompt="你必须立即提交 slide 的完整设计。直接调用 submit_background、submit_element 和 submit_notes。不要再搜索或查阅任何资料。",
             middleware=mws,
         )
-        await retry_agent.ainvoke(
-            {"messages": [
-                SystemMessage(content=system_prompt),
-                HumanMessage(content=user_prompt),
-                HumanMessage(content="请立即提交完整设计。调用 submit_background、submit_element（多次）、submit_notes。"),
-            ]},
-            config={"recursion_limit": 30},
-        )
+        try:
+            await retry_agent.ainvoke(
+                {"messages": [
+                    SystemMessage(content=system_prompt),
+                    HumanMessage(content=user_prompt),
+                    HumanMessage(content="请立即提交完整设计。调用 submit_background、submit_element（多次）、submit_notes。"),
+                ]},
+                config={"recursion_limit": 30},
+            )
+        except Exception:
+            _log.warning("slide_agent retry crashed slide=%d", slide_index)
+            _log.debug("slide_agent retry crash detail", exc_info=True)
 
     _log.info("slide %d done: %d elements, notes=%d chars, bg=%s",
               slide_index, len(_buffer["elements"]),
