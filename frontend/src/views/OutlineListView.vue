@@ -51,17 +51,17 @@ onMounted(async () => {
 <style scoped>
 .lp { max-width: 860px; margin: 0 auto; padding: 40px 24px; }
 .lp-title { font-size: 22px; margin-bottom: 6px; }
-.lp-sub { color: #909399; font-size: 14px; margin-bottom: 28px; }
+.lp-sub { color: var(--text-secondary); font-size: 15px; margin-bottom: 28px; }
 .loading, .empty { text-align: center; padding: 60px 0; color: #909399; }
-.cards { display: flex; flex-direction: column; gap: 14px; }
+.cards { display: flex; flex-direction: column; gap: 10px; }
 .card {
-  background: var(--bg-card); padding: 20px 24px; border-radius: var(--radius); cursor: pointer;
+  background: var(--bg-card); padding: 22px 28px; border-radius: var(--radius); cursor: pointer;
   display: flex; align-items: center; justify-content: space-between;
   border: 1px solid var(--border); transition: box-shadow .2s, border-color .2s;
 }
 .card:hover { box-shadow: var(--shadow-md); border-color: var(--primary-border); }
 .card-body { display: flex; flex-direction: column; gap: 8px; }
-.card-title { font-size: 15px; }
-.card-meta { display: flex; align-items: center; gap: 12px; font-size: 13px; color: #909399; }
-.card-date { font-size: 13px; color: #c0c4cc; white-space: nowrap; }
+.card-title { font-size: 16px; }
+.card-meta { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--text-secondary); }
+.card-date { font-size: 14px; color: var(--text-muted); white-space: nowrap; }
 </style>

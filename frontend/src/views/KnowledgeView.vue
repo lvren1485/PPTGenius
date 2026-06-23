@@ -60,7 +60,7 @@ function formatSize(b: number | null) {
 
     <el-skeleton :loading="loading" :count="4" animated />
     <EmptyState v-if="!loading && files.length === 0" description="暂无文件，前往对话页面上传" />
-    <el-table v-if="!loading && files.length > 0" :data="files" stripe>
+    <el-table v-if="!loading && files.length > 0" :data="files" stripe style="width:100%">
       <el-table-column prop="filename" label="文件名" min-width="180" />
       <el-table-column prop="file_type" label="类型" width="65" />
       <el-table-column label="大小" width="100">
@@ -94,7 +94,7 @@ function formatSize(b: number | null) {
 
 <style scoped>
 .knowledge-page {
-  max-width: 900px;
+  max-width: 1000px;
   margin: 0 auto;
   padding: 24px;
 }

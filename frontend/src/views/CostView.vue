@@ -67,7 +67,7 @@ function goChat(cid: number) {
 
       <!-- By Date -->
       <h3 class="section-title">按日期</h3>
-      <el-table v-if="byDate.length" :data="byDate" stripe size="small" style="width:fit-content">
+      <el-table v-if="byDate.length" :data="byDate" stripe style="width:100%">
         <el-table-column prop="date" label="日期" width="200" />
         <el-table-column prop="cost" label="费用" width="200">
           <template #default="{ row }">¥{{ Number(row.cost).toFixed(4) }}</template>
@@ -78,7 +78,7 @@ function goChat(cid: number) {
 
       <!-- By Conversation -->
       <h3 class="section-title">按会话</h3>
-      <el-table v-if="byConv.length" :data="byConv" stripe size="small" style="width:100%">
+      <el-table v-if="byConv.length" :data="byConv" stripe style="width:100%">
         <el-table-column prop="title" label="标题" min-width="200">
           <template #default="{ row }">
             <el-button link type="primary" @click="goChat(row.conversation_id)">
@@ -118,8 +118,8 @@ function goChat(cid: number) {
   margin-bottom: 32px;
 }
 .section-title {
-  font-size: 16px;
-  margin: 24px 0 12px;
-  color: #606266;
+  font-size: 17px;
+  margin: 28px 0 14px;
+  color: var(--text);
 }
 </style>

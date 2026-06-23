@@ -68,16 +68,16 @@ function fmtSize(b: number | null) {
 .lp-title { font-size: 22px; margin-bottom: 6px; }
 .lp-sub { color: #909399; font-size: 14px; margin-bottom: 28px; }
 .loading, .empty { text-align: center; padding: 60px 0; color: #909399; }
-.cards { display: flex; flex-direction: column; gap: 14px; }
+.cards { display: flex; flex-direction: column; gap: 10px; }
 .card {
-  background: var(--bg-card); padding: 20px 24px; border-radius: var(--radius); cursor: pointer;
+  background: var(--bg-card); padding: 22px 28px; border-radius: var(--radius); cursor: pointer;
   display: flex; align-items: center; justify-content: space-between;
   border: 1px solid #ebeef5; transition: box-shadow .2s, border-color .2s;
 }
 .card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); border-color: #c6e2ff; }
 .card-body { display: flex; flex-direction: column; gap: 8px; }
-.card-title { font-size: 15px; }
-.card-meta { display: flex; align-items: center; gap: 12px; font-size: 13px; color: #909399; }
+.card-title { font-size: 16px; }
+.card-meta { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--text-secondary); }
 .card-right { display: flex; align-items: center; gap: 16px; }
-.card-date { font-size: 13px; color: #c0c4cc; white-space: nowrap; }
+.card-date { font-size: 14px; color: var(--text-muted); white-space: nowrap; }
 </style>

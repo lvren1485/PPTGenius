@@ -56,10 +56,17 @@ html.dark {
 
 body {
   font-family: 'Inter', 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: 15px;
   background: var(--bg);
   color: var(--text);
   transition: background .3s, color .3s;
 }
+
+/* Unified table sizing */
+.el-table { font-size: 14px; }
+.el-table th.el-table__cell { font-size: 13px; padding: 14px 0; }
+.el-table td.el-table__cell { padding: 12px 0; }
+.el-descriptions { font-size: 14px; }
 
 #app {
   min-height: 100vh;
@@ -103,7 +110,13 @@ html.dark .el-tag--info { background: var(--bg-hover); color: var(--text-seconda
 
 /* Dark mode: table stripes */
 html.dark .el-table { --el-table-bg-color: var(--bg-card); --el-table-tr-bg-color: var(--bg-card); --el-table-header-bg-color: var(--bg-sidebar); --el-table-border-color: var(--border); --el-table-text-color: var(--text); --el-table-row-hover-bg-color: var(--bg-hover); }
-html.dark .el-table--striped .el-table__body tr.el-table__row--striped td { background: var(--bg-sidebar); }
+html.dark .el-table__body tr { background: var(--bg-card); }
+html.dark .el-table__body tr:hover > td { background: var(--bg-hover) !important; }
+html.dark .el-table--striped .el-table__body tr.el-table__row--striped:hover > td { background: var(--bg-hover) !important; }
+html.dark .el-table--striped .el-table__body tr.el-table__row--striped td,
+html.dark .el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell { background: #1a2235; }
+html.dark .el-table--striped .el-table__body tr.el-table__row--striped:hover > td,
+html.dark .el-table--striped .el-table__body tr.el-table__row--striped:hover > td.el-table__cell { background: var(--bg-hover) !important; }
 html.dark .el-table th.el-table__cell { background: var(--bg-sidebar); color: var(--text-secondary); }
 
 /* Dark mode: dialog */
