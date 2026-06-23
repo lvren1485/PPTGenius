@@ -52,11 +52,6 @@ const router = createRouter({
       component: () => import('../views/CostView.vue'),
     },
     {
-      path: '/snapshot/:id',
-      name: 'SnapshotDetail',
-      component: () => import('../views/SnapshotDetail.vue'),
-    },
-    {
       path: '/knowledge',
       name: 'Knowledge',
       component: () => import('../views/KnowledgeView.vue'),

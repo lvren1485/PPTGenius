@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
 import { Download, Document } from '@element-plus/icons-vue'
 import { marked } from 'marked'
 import api from '../../api/client'
+import PptPreview from './PptPreview.vue'
 
 const props = defineProps<{
   docType: string
@@ -11,12 +11,13 @@ const props = defineProps<{
   content: string
 }>()
 
-const router = useRouter()
 const dialogVisible = ref(false)
 const mkHtml = ref('')
 const mkSource = ref('')
 const mkFilename = ref('')
 const loading = ref(false)
+const pptPreviewVisible = ref(false)
+const pptPreviewSnapId = ref(0)
 
 const title = computed(() => props.metadata.title || props.content || '')
 const version = computed(() => props.metadata.version)
@@ -31,7 +32,7 @@ const isOutline = computed(() => props.docType === 'outline')
 
 async function openDialog() {
   if (!isOutline.value) {
-    if (snapId.value > 0) router.push(`/snapshot/${snapId.value}`)
+    if (snapId.value > 0) { pptPreviewSnapId.value = snapId.value; pptPreviewVisible.value = true }
     return
   }
   if (!mkSource.value) await fetchMarkdown()
@@ -62,26 +63,6 @@ function downloadMarkdown() {
   URL.revokeObjectURL(url)
 }
 
-async function downloadPptx() {
-  if (!snapId.value) return
-  try {
-    const { data } = await api.get(`/export/presentation/${snapId.value}/content`)
-    if (data.code === 0) {
-      const byteChars = atob(data.data.content)
-      const byteNums = new Array(byteChars.length)
-      for (let i = 0; i < byteChars.length; i++) byteNums[i] = byteChars.charCodeAt(i)
-      const blob = new Blob([new Uint8Array(byteNums)], {
-        type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = data.data.filename || `presentation_${snapId.value}.pptx`
-      a.click()
-      URL.revokeObjectURL(url)
-    }
-  } catch { /* ignore */ }
-}
 </script>
 
 <template>
@@ -105,15 +86,14 @@ async function downloadPptx() {
         </el-button>
       </template>
       <template v-else>
-        <el-button size="small" text type="primary" @click.stop="router.push(`/snapshot/${snapId}`)">
-          查看详情
-        </el-button>
-        <el-button size="small" text :icon="Download" @click.stop="downloadPptx">
-          下载 PPTX
+        <el-button size="small" text type="primary" @click.stop="pptPreviewSnapId = snapId; pptPreviewVisible = true">
+          预览 PPT
         </el-button>
       </template>
     </div>
   </div>
+
+  <PptPreview :snap-id="pptPreviewSnapId" :visible="pptPreviewVisible" @close="pptPreviewVisible = false" />
 
   <!-- Outline preview dialog -->
   <el-dialog

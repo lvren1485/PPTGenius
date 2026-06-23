@@ -1,4 +1,4 @@
-"""Snapshot read-only endpoints."""
+"""Snapshot list-only endpoints."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pptgenius.infrastructure.db import Database
 
 from .deps import get_db
-from .schemas import ApiResponse, SnapshotBrief, SnapshotDetail
+from .schemas import ApiResponse, SnapshotBrief
 
 router = APIRouter(prefix="/api", tags=["snapshots"])
 
@@ -25,14 +25,3 @@ async def list_snapshots(
         "presentation_id": pres_id,
         "snapshots": [SnapshotBrief.model_validate(s) for s in snaps],
     })
-
-
-@router.get("/snapshots/{snap_id}")
-async def get_snapshot(
-    snap_id: int,
-    db: Database = Depends(get_db),
-) -> ApiResponse[SnapshotDetail]:
-    snap = await db.get_snapshot(snap_id)
-    if snap is None:
-        raise HTTPException(404, {"code": 40001, "message": "snapshot not found"})
-    return ApiResponse(data=SnapshotDetail.model_validate(snap))

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
@@ -8,13 +9,14 @@ import { useAuthStore } from '../stores/auth'
 interface Ppt {
   id: number; outline_id: number | null; status: string
   version: number; outline_version: number
-  slide_count: number | null; file_size: number | null; created_at: string | null
+  slide_count: number | null; created_at: string | null
 }
 
 const router = useRouter()
 const auth = useAuthStore()
 const ppts = ref<Ppt[]>([])
 const loading = ref(true)
+const downloadingId = ref(0)
 
 onMounted(async () => {
   try {
@@ -23,15 +25,27 @@ onMounted(async () => {
   } finally { loading.value = false }
 })
 
-function download(id: number, e: Event) {
+async function download(id: number, e: Event) {
   e.stopPropagation()
-  window.open('/api/ppt/' + id + '/download', '_blank')
-}
-
-function fmtSize(b: number | null) {
-  if (!b) return ''
-  if (b < 1024) return `${b} B`
-  return `${(b / 1024).toFixed(1)} KB`
+  downloadingId.value = id
+  try {
+    const { data } = await api.get(`/ppt/${id}/snapshots`)
+    const snaps = data.data?.snapshots || []
+    if (snaps.length === 0) { ElMessage.warning('暂无快照可下载'); return }
+    const latest = snaps.reduce((a: any, b: any) => a.version > b.version ? a : b)
+    const resp = await api.get(`/export/presentation/${latest.id}/content`)
+    if (resp.data.code === 0) {
+      const byteChars = atob(resp.data.data.content)
+      const byteNums = new Array(byteChars.length)
+      for (let i = 0; i < byteChars.length; i++) byteNums[i] = byteChars.charCodeAt(i)
+      const blob = new Blob([new Uint8Array(byteNums)], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = resp.data.data.filename || `ppt_${id}.pptx`; a.click()
+      URL.revokeObjectURL(url)
+    }
+  } catch { ElMessage.error('下载失败') }
+  finally { downloadingId.value = 0 }
 }
 </script>
 
@@ -51,12 +65,11 @@ function fmtSize(b: number | null) {
             <el-tag size="small" :type="p.status === 'completed' ? 'success' : 'warning'">{{ p.status }}</el-tag>
             <span>v{{ p.version }}</span>
             <span>{{ p.slide_count ?? 0 }} 页</span>
-            <span>{{ fmtSize(p.file_size) }}</span>
           </div>
         </div>
         <div class="card-right">
           <span class="card-date">{{ p.created_at ? new Date(p.created_at).toLocaleDateString('zh-CN') : '' }}</span>
-          <el-button :icon="Download" size="small" circle @click="download(p.id, $event)" />
+          <el-button :icon="Download" size="small" circle :loading="downloadingId === p.id" @click="download(p.id, $event)" />
         </div>
       </div>
     </div>
