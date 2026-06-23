@@ -31,8 +31,10 @@ async def create_message(
     estimated_cost: float | None = None,
     metadata_json: dict | None = None,
     token_cost_json: dict | None = None,
-    created_at: float | None = _time.time(),
+    created_at: float | None = None,
 ) -> Message:
+    if created_at is None:
+        created_at = _time.time()
     from datetime import datetime as _dt
     idx = await _get_next_idx(db, conversation_id)
     kwargs = dict(

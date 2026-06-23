@@ -255,3 +255,41 @@ async def replace_presentation_slides(
         )
         new.append(slide)
     return new
+
+
+async def reindex_presentation_slides(
+    db: AsyncSession, pres_id: int, id_to_index: dict[int, int]
+) -> bool:
+    """Set slide_index for multiple slides. Two-pass to avoid unique-key conflicts."""
+    if not id_to_index:
+        return True
+    from sqlalchemy import case, update as _up
+    ids = list(id_to_index.keys())
+    # Pass 1: set to unique negative temp values
+    neg_whens = [(PresentationSlide.id == sid, -sid) for sid in ids]
+    await db.execute(
+        _up(PresentationSlide)
+        .where(PresentationSlide.id.in_(ids))
+        .values(slide_index=case(*neg_whens, else_=PresentationSlide.slide_index))
+    )
+    await db.commit()
+    # Pass 2: set to final indices
+    pos_whens = [(PresentationSlide.id == sid, idx) for sid, idx in id_to_index.items()]
+    await db.execute(
+        _up(PresentationSlide)
+        .where(PresentationSlide.id.in_(ids))
+        .values(slide_index=case(*pos_whens, else_=PresentationSlide.slide_index))
+    )
+    await db.commit()
+    return True
+
+
+async def set_presentation_slide_count(
+    db: AsyncSession, pres_id: int, count: int
+) -> bool:
+    pres = await db.get(Presentation, pres_id)
+    if pres is None or pres.status == "deleted":
+        return False
+    pres.slide_count = count
+    await db.commit()
+    return True

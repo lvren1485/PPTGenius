@@ -29,7 +29,7 @@ _DEFAULT_Z_ORDER = {
     "picture": 30,
     "chart":   40,
     "table":   50,
-    "shape":   60,
+    "shape":   20,
     "textbox": 70,
 }
 

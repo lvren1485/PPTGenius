@@ -412,23 +412,27 @@ def make_rearrange_presentation_slides(db: Database, conversation_id: int) -> Ca
         pres_by_outline = {s.outline_slide_id: s for s in all_pres if s.outline_slide_id}
 
         created = 0
+        id_to_index: dict[int, int] = {}
         for idx, oslide in enumerate(outline_slides, start=1):
             ps = pres_by_outline.get(oslide.id)
             if ps is None:
-                await db.create_presentation_slide(
+                new_ps = await db.create_presentation_slide(
                     presentation_id=pres.id,
-                    slide_index=idx,
+                    slide_index=-oslide.id,  # temp: unique negative, will be reindexed
                     layout_name=oslide.layout_type or "content",
                     outline_slide_id=oslide.id,
                     style_id=pres.style_id,
                 )
+                id_to_index[new_ps.id] = idx
                 created += 1
             else:
-                ps.slide_index = idx
-        if created:
-            await db.db.commit()
+                id_to_index[ps.id] = idx
 
-        pres.version = 0
+        # Batch reindex to avoid unique-key conflicts
+        await db.reindex_presentation_slides(pres.id, id_to_index)
+
+        await db.increment_presentation_version(pres.id)
+        await db.set_presentation_slide_count(pres.id, len(outline_slides))
         return f"重排完成: 删除 {deleted}, 新建 {created}"
 
     return tool(_rearrange_presentation_slides)

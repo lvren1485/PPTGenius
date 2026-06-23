@@ -51,9 +51,10 @@ const groups = computed(() => {
   return result
 })
 
+const SUB_TOOL_LIMIT = 30
+
 // Flatten sub-agent children into call/result pairs
 function childPairs(children: ToolMsg[]) {
-  // Handle parallel calls: match each result to first unmatched call with same tool name
   const pending: { call: ToolMsg | null; result: ToolMsg | null }[] = []
   for (const m of children) {
     if (m.role === 'tool_call') {
@@ -61,16 +62,14 @@ function childPairs(children: ToolMsg[]) {
     } else if (m.role === 'tool_result') {
       const name = m.metadata_json?.tool_name || ''
       const idx = pending.findIndex(p => !p.result && p.call?.metadata_json?.tool_name === name)
-      if (idx >= 0) {
-        pending[idx].result = m
-      } else {
-        // Orphan result — still show it
-        pending.push({ call: null, result: m })
-      }
+      if (idx >= 0) { pending[idx].result = m }
+      else { pending.push({ call: null, result: m }) }
     }
   }
   return pending
 }
+function limitedPairs(children: ToolMsg[]) { return childPairs(children).slice(0, SUB_TOOL_LIMIT) }
+function totalPairs(children: ToolMsg[]) { return childPairs(children).length }
 
 const summary = computed(() => {
   const names = groups.value.map(g => ctypeLabel(g.call.content_type || ''))
@@ -113,8 +112,10 @@ function toolNameLabel(name: string): string {
     search_knowledge: '搜索知识库', search_web: '网络搜索',
     fetch_web: '抓取网页', read_file: '读取文件',
     write_slide: '写入页面', pending_slides: '查看进度',
-    submit_element: '提交元素', submit_notes: '提交备注',
-    submit_background: '提交背景', delete_element: '删除元素',
+    _submit_element: '提交元素', _submit_notes: '提交备注',
+    _submit_background: '提交背景',
+    _get_style: '查看样式', _save_style: '保存样式',
+    _set_presentation_style: '应用样式',
   }
   return map[name] || name
 }
@@ -155,21 +156,21 @@ function truncate(s: string, max: number = 80): string {
           <div v-if="g.children.length > 0" class="sub-wrap">
             <div class="sub-header" @click="toggleSub(gi)">
               <el-icon :class="{ rotated: !subExpand[gi] }"><CaretBottom /></el-icon>
-              <span class="sub-summary">子工具 · {{ childPairs(g.children).length }} 步</span>
+              <span class="sub-summary">子工具 · {{ totalPairs(g.children) }} 步{{ totalPairs(g.children) > SUB_TOOL_LIMIT ? `（仅展示前${SUB_TOOL_LIMIT}条）` : '' }}</span>
               <span v-if="!g.result && thinking && gi === groups.length - 1"
                 class="thinking-dots"><i>.</i><i>.</i><i>.</i></span>
             </div>
             <div v-show="subExpand[gi]" class="sub-body">
-              <div v-for="(p, i) in childPairs(g.children)" :key="i" class="sub-step">
+              <div v-for="(p, i) in limitedPairs(g.children)" :key="i" class="sub-step">
                 <div class="tool-step-header">
                   <span class="step-num sub-num">{{ i + 1 }}</span>
                   <el-tag v-if="p.call" size="small">{{ toolNameLabel(p.call.metadata_json?.tool_name || '') }}</el-tag>
                   <el-tag v-else size="small" type="info">结果</el-tag>
-                  <span v-if="!p.result && thinking && gi === groups.length - 1 && i === childPairs(g.children).length - 1"
+                  <span v-if="!p.result && thinking && gi === groups.length - 1 && i === limitedPairs(g.children).length - 1"
                     class="thinking-dots"><i>.</i><i>.</i><i>.</i></span>
                 </div>
                 <div v-if="p.result" class="tool-result sub-result">{{ truncate(p.result.content, 60) }}</div>
-                <div v-else-if="thinking && gi === groups.length - 1 && i === childPairs(g.children).length - 1"
+                <div v-else-if="thinking && gi === groups.length - 1 && i === limitedPairs(g.children).length - 1"
                   class="tool-result thinking-line" />
               </div>
             </div>

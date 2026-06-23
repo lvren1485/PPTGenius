@@ -117,6 +117,8 @@ class Database:
     async def soft_delete_presentation_slide(self, *a, **kw): return await self._call(ppt_repo.soft_delete_presentation_slide, *a, **kw)
     async def delete_presentation_slide(self, *a, **kw): return await self._call(ppt_repo.delete_presentation_slide, *a, **kw)
     async def replace_presentation_slides(self, *a, **kw): return await self._call(ppt_repo.replace_presentation_slides, *a, **kw)
+    async def reindex_presentation_slides(self, *a, **kw): return await self._call(ppt_repo.reindex_presentation_slides, *a, **kw)
+    async def set_presentation_slide_count(self, *a, **kw): return await self._call(ppt_repo.set_presentation_slide_count, *a, **kw)
 
     # ─── style ───
     async def create_style(self, *a, **kw): return await self._call(style_repo.create_style, *a, **kw)

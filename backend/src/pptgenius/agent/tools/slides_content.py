@@ -258,6 +258,7 @@ def make_slides_content(db: Database, conversation_id: int) -> Callable:
         ])
 
         await db.update_presentation_status(pres_id, "completed")
+        await db.set_presentation_slide_count(pres_id, len(outline_slides))
 
         failed = sum(1 for r in results if not r.get("elements") and not r.get("background"))
         return f"{len(results) - failed}/{len(results)} 完成" + (f", {failed} 失败" if failed else "")
@@ -313,6 +314,9 @@ def make_modify_slides_content(db: Database, conversation_id: int) -> Callable:
         ])
 
         failed = sum(1 for r in results if not r.get("elements") and not r.get("background"))
+
+        all_slides = await db.get_slides_by_outline_id(outline_id)
+        await db.set_presentation_slide_count(pres_id, len(all_slides))
         return f"已修改 {len(results) - failed}/{len(results)} 页" + (f", {failed} 失败" if failed else "")
 
     return tool(_modify_slides_content)

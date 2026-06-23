@@ -70,24 +70,24 @@
     {{
       "type": "shape",
       "shape_type": "rectangle",
-      "position": {{"left": 0, "top": 0, "width": 13.333, "height": 0.08}},
+      "position": {{"left": 0, "top": 0, "width": 13.333, "height": 0.08, "z_order": 20}},
       "fill": {{"type": "solid", "color": "5c6bc0"}}
     }},
     {{
       "type": "shape",
       "shape_type": "rectangle",
-      "position": {{"left": 0, "top": 6.8, "width": 13.333, "height": 0.7}},
+      "position": {{"left": 0, "top": 6.8, "width": 13.333, "height": 0.7, "z_order": 10}},
       "fill": {{"type": "solid", "color": "1a237e"}}
     }},
     {{
       "type": "shape",
       "shape_type": "rounded_rectangle",
-      "position": {{"left": 0.8, "top": 2.0, "width": 0.12, "height": 3.5}},
+      "position": {{"left": 0.8, "top": 2.0, "width": 0.12, "height": 3.5, "z_order": 20}},
       "fill": {{"type": "solid", "color": "5c6bc0"}}
     }},
     {{
       "type": "textbox",
-      "position": {{"left": 1.2, "top": 1.8, "width": 11.0, "height": 1.5}},
+      "position": {{"left": 1.2, "top": 1.8, "width": 11.0, "height": 1.5, "z_order": 80}},
       "content": [
         {{
           "paragraph": {{
@@ -101,7 +101,7 @@
     }},
     {{
       "type": "textbox",
-      "position": {{"left": 1.2, "top": 3.4, "width": 10.5, "height": 0.8}},
+      "position": {{"left": 1.2, "top": 3.4, "width": 10.5, "height": 0.8, "z_order": 70}},
       "content": [
         {{
           "paragraph": {{
@@ -115,7 +115,7 @@
     }},
     {{
       "type": "textbox",
-      "position": {{"left": 1.2, "top": 5.0, "width": 5.0, "height": 0.6}},
+      "position": {{"left": 1.2, "top": 5.0, "width": 5.0, "height": 0.6, "z_order": 70}},
       "content": [
         {{
           "paragraph": {{
@@ -129,7 +129,7 @@
     }},
     {{
       "type": "picture",
-      "position": {{"left": 0.4, "top": 0.4, "width": 0.6, "height": 0.6}},
+      "position": {{"left": 0.4, "top": 0.4, "width": 0.6, "height": 0.6, "z_order": 30}},
       "name": "cpu",
       "color": "5c6bc0",
       "fit": "aspect"
@@ -146,6 +146,19 @@
 - SVG 尺寸不限，但装饰性图标不宜过大，因为svg缺乏细节，过大反而显得粗糙
 - 页面留白合理，不要过度拥挤（建议 6-15 个元素）
 - 背景渐变色比纯色更有质感
+- **每个元素的 position 必须设置 z_order**，按以下标准：
+
+| z_order | 用途 |
+|---------|------|
+| 0 | 背景填充（由 submit_background 处理，元素不需要） |
+| 10 | 底部色块、背景装饰条 |
+| 20 | 装饰形状（分隔线、强调边框、卡片背景） |
+| 30 | 图片、图标 |
+| 40 | 图表 |
+| 50 | 表格 |
+| 70 | 正文文本框 |
+| 80 | 标题文本框 |
+| 90 | 页码 |
 
 ## 提交工具
 
@@ -176,7 +189,7 @@
 - style_density 决定装饰量：minimal=1-2个装饰 / moderate=2-4个 / elaborate=4-6个
 
 ### Step 3: 精细规划
-- 元素空间关系：谁在上谁在下，z_order 是否合理
+- **为每个元素确定 z_order**：参考上方的 z_order 标准表，装饰形状=20、图片=30、图表=40、正文=70、标题=80。从底层到上层逐个检查，确保下层不被上层遮挡
 - 颜色分配：哪些用 primary 强调，哪些用 text 正文，哪些用 border 分隔
 - 字号分配：标题 h1/h2，正文 body(16pt)，辅助 caption(14pt)
 

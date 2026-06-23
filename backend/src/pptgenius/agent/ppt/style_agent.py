@@ -59,6 +59,7 @@ async def run_style_agent(
             user_id=conv.user_id,
             conversation_id=conversation_id,
             outline_id=outline_id,
+            outline_version=outline.version,
         )
     presentation_id = pres.id
 

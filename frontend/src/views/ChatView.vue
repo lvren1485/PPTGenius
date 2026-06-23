@@ -160,7 +160,6 @@ function handleSseEvent(evt: { event: string; data: Record<string, any> }) {
         metadata_json: { tool_name: d.tool, args: d.args || {} },
         estimated_cost: null, created_at: new Date().toISOString(),
       })
-      scrollBottom()
       break
     case 'tool_end':
       messages.value.push({
@@ -170,7 +169,6 @@ function handleSseEvent(evt: { event: string; data: Record<string, any> }) {
         metadata_json: { tool_name: d.tool, result_len: d.result_len },
         estimated_cost: null, created_at: new Date().toISOString(),
       })
-      scrollBottom()
       break
     case 'tool_error':
       messages.value.push({
@@ -180,7 +178,6 @@ function handleSseEvent(evt: { event: string; data: Record<string, any> }) {
         metadata_json: { tool_name: d.tool, error: d.error },
         estimated_cost: null, created_at: new Date().toISOString(),
       })
-      scrollBottom()
       break
     case 'document':
       messages.value.push({
