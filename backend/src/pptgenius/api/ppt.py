@@ -42,7 +42,16 @@ async def list_presentations(
         items = await db.list_presentations_by_conversation(conversation_id)
     else:
         items = await db.list_presentations_by_user(user_id, offset=(page - 1) * page_size, limit=page_size)
-    pres_list = [PresentationBrief(**_orm_to_dict(p)) for p in items]
+    # Resolve outline titles
+    pres_list = []
+    for p in items:
+        d = _orm_to_dict(p)
+        if p.outline_id:
+            outline = await db.get_outline(p.outline_id)
+            d["title"] = outline.title if outline else None
+        else:
+            d["title"] = None
+        pres_list.append(PresentationBrief(**d))
     return ApiResponse(data=PaginatedData(items=pres_list, total=len(pres_list), page=page, page_size=page_size))
 
 

@@ -7,13 +7,11 @@ import api from '../api/client'
 import EmptyState from '../components/common/EmptyState.vue'
 import PptPreview from '../components/chat/PptPreview.vue'
 
-interface PptSlide { id: number; slide_index: number; layout_name: string; status: string; agent_outputs: Record<string, any> | null }
 interface SnapItem { id: number; version: number; created_at: string }
 
 const route = useRoute(); const router = useRouter()
 const pptId = Number(route.params.id)
 const pres = ref<any>(null)
-const slides = ref<PptSlide[]>([])
 const loading = ref(true)
 const snaps = ref<SnapItem[]>([])
 const snapsLoading = ref(false)
@@ -23,9 +21,8 @@ const previewTitle = ref('')
 
 onMounted(async () => {
   try {
-    const [p, s] = await Promise.all([api.get(`/ppt/${pptId}`), api.get(`/ppt/${pptId}/slides`)])
-    if (p.data.code === 0) pres.value = p.data.data
-    if (s.data.code === 0) slides.value = s.data.data.slides || []
+    const { data } = await api.get(`/ppt/${pptId}`)
+    if (data.code === 0) pres.value = data.data
   } catch { ElMessage.error('加载 PPT 失败') }
   finally { loading.value = false }
   loadSnapshots()
@@ -44,7 +41,6 @@ function openPreview(snapId: number, ver: number) {
   previewVisible.value = true
 }
 
-const statusLabel: Record<string, string> = { completed: '已完成', pending: '待生成', failed: '失败' }
 </script>
 
 <template>
@@ -53,9 +49,9 @@ const statusLabel: Record<string, string> = { completed: '已完成', pending: '
       <el-button text @click="router.back()">← 返回</el-button>
       <h2 v-if="pres">PPT 预览</h2>
       <div v-if="pres" class="pp-meta">
-        <el-descriptions :column="3" size="small" border>
-          <el-descriptions-item label="状态"><el-tag :type="pres.status==='completed'?'success':'warning'" size="small">{{ pres.status }}</el-tag></el-descriptions-item>
-          <el-descriptions-item label="页数">{{ pres.slide_count || slides.length }}</el-descriptions-item>
+        <el-descriptions :column="2" border>
+          <el-descriptions-item label="状态"><el-tag :type="pres.status==='completed'?'success':'warning'">{{ pres.status }}</el-tag></el-descriptions-item>
+          <el-descriptions-item label="页数">{{ pres.slide_count || 0 }}</el-descriptions-item>
           <el-descriptions-item label="版本">v{{ pres.version }}</el-descriptions-item>
           <el-descriptions-item label="大纲版本">v{{ pres.outline_version }}</el-descriptions-item>
           <el-descriptions-item label="样式">{{ pres.style_name || ('#'+pres.style_id) || '默认' }}</el-descriptions-item>
@@ -78,18 +74,6 @@ const statusLabel: Record<string, string> = { completed: '已完成', pending: '
       </div>
     </div>
 
-    <h3 class="section-title">幻灯片</h3>
-    <el-skeleton :loading="loading" :count="4" animated />
-    <EmptyState v-if="!loading && slides.length===0" description="暂无 slide 数据" />
-    <div v-if="!loading && slides.length>0" class="ps-list">
-      <el-card v-for="s in slides" :key="s.id" class="ps-item" shadow="hover">
-        <div class="ps-header">
-          <span class="ps-num">Slide {{ s.slide_index+1 }}</span>
-          <span>{{ s.layout_name }}</span>
-          <el-tag :type="s.status==='completed'?'success':s.status==='failed'?'danger':'info'" size="small">{{ statusLabel[s.status] || s.status }}</el-tag>
-        </div>
-      </el-card>
-    </div>
   </div>
 
   <PptPreview :snap-id="previewSnapId" :visible="previewVisible" @close="previewVisible = false" />
@@ -106,7 +90,4 @@ const statusLabel: Record<string, string> = { completed: '已完成', pending: '
 .snap-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.06); }
 .snap-ver { font-weight: 600; color: var(--success); font-size: 14px; }
 .snap-time { font-size: 13px; color: var(--text-secondary); }
-.ps-list { display: flex; flex-direction: column; gap: 10px; }
-.ps-header { display: flex; align-items: center; gap: 10px; }
-.ps-num { font-weight: 700; color: var(--primary); min-width: 80px; }
 </style>
