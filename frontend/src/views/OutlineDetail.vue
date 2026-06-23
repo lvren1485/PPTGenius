@@ -179,7 +179,7 @@ function formatDate(d: string) { return new Date(d).toLocaleString('zh-CN') }
 .snap-cards { display: flex; flex-wrap: wrap; gap: 10px; }
 .snap-card {
   display: flex; align-items: center; gap: 10px;
-  padding: 12px 18px; background: #ecf5ff; border: 1px solid #d9ecff;
+  padding: 12px 18px; background: var(--primary-bg); border: 1px solid var(--primary-border);
   border-radius: 10px; cursor: pointer; transition: box-shadow .15s;
 }
 .snap-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.06); }
@@ -198,15 +198,15 @@ function formatDate(d: string) { return new Date(d).toLocaleString('zh-CN') }
 
 <style>
 .dlg-mk-body {
-  font-size: 16px; line-height: 1.9; color: #303133;
+  font-size: 16px; line-height: 1.9; color: var(--text);
   max-height: 70vh; overflow-y: auto; padding: 0 8px;
 }
 .dlg-mk-body h1 { font-size: 26px; margin: 0 0 16px; }
-.dlg-mk-body h2 { font-size: 20px; margin: 24px 0 12px; border-bottom: 1px solid #e4e7ed; padding-bottom: 8px; position: sticky; top: 0; background: #fff; z-index: 2; }
-.dlg-mk-body h3 { font-size: 17px; margin: 18px 0 8px; position: sticky; top: 0; background: #fff; z-index: 1; }
+.dlg-mk-body h2 { font-size: 20px; margin: 24px 0 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; position: sticky; top: 0; background: var(--bg-card); z-index: 2; }
+.dlg-mk-body h3 { font-size: 17px; margin: 18px 0 8px; position: sticky; top: 0; background: var(--bg-card); z-index: 1; }
 .dlg-mk-body ul, .dlg-mk-body ol { padding-left: 24px; margin: 8px 0; }
 .dlg-mk-body li { margin-bottom: 6px; }
 .dlg-mk-body p { margin: 8px 0; }
-.dlg-mk-body strong { color: #409eff; }
-.dlg-mk-body em { color: #909399; }
+.dlg-mk-body strong { color: var(--primary); }
+.dlg-mk-body em { color: var(--text-muted); }
 </style>

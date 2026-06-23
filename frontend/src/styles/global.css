@@ -83,5 +83,43 @@ html.dark {
   --el-fill-color-blank: var(--bg-card);
   --el-fill-color: var(--bg-hover);
   --el-fill-color-light: var(--bg-sidebar);
+  --el-color-primary: var(--primary);
+  --el-color-primary-light-3: var(--primary-light);
+  --el-color-primary-light-9: var(--primary-bg);
+  --el-color-success: var(--success);
+  --el-color-warning: var(--warning);
+  --el-color-danger: var(--danger);
+  --el-disabled-bg-color: var(--bg-hover);
   color-scheme: dark;
 }
+
+/* Dark mode: tag overrides */
+html.dark .el-tag { border-color: transparent; }
+html.dark .el-tag--primary { background: var(--primary-bg); color: var(--primary-light); }
+html.dark .el-tag--success { background: var(--success-bg); color: var(--success); }
+html.dark .el-tag--warning { background: rgba(245,158,11,.15); color: var(--warning); }
+html.dark .el-tag--danger { background: var(--danger-bg); color: var(--danger); }
+html.dark .el-tag--info { background: var(--bg-hover); color: var(--text-secondary); }
+
+/* Dark mode: table stripes */
+html.dark .el-table { --el-table-bg-color: var(--bg-card); --el-table-tr-bg-color: var(--bg-card); --el-table-header-bg-color: var(--bg-sidebar); --el-table-border-color: var(--border); --el-table-text-color: var(--text); --el-table-row-hover-bg-color: var(--bg-hover); }
+html.dark .el-table--striped .el-table__body tr.el-table__row--striped td { background: var(--bg-sidebar); }
+html.dark .el-table th.el-table__cell { background: var(--bg-sidebar); color: var(--text-secondary); }
+
+/* Dark mode: dialog */
+html.dark .el-dialog { --el-dialog-bg-color: var(--bg-card); --el-dialog-title-font-size: 17px; }
+html.dark .el-dialog__header { border-bottom: 1px solid var(--border); }
+html.dark .el-dialog__footer { border-top: 1px solid var(--border); }
+
+/* Dark mode: descriptions */
+html.dark .el-descriptions { --el-descriptions-table-bg: var(--bg-card); }
+html.dark .el-descriptions__label { background: var(--bg-sidebar); color: var(--text-secondary); }
+html.dark .el-descriptions__content { color: var(--text); }
+
+/* Dark mode: card */
+html.dark .el-card { --el-card-bg-color: var(--bg-card); border-color: var(--border); }
+
+/* Dark mode: radio button */
+html.dark .el-radio-button__inner { background: var(--bg-card); border-color: var(--border); color: var(--text-secondary); }
+html.dark .el-radio-button__inner:hover { color: var(--primary); }
+html.dark .el-radio-button.is-active .el-radio-button__inner { background: var(--primary); border-color: var(--primary); color: #fff; }

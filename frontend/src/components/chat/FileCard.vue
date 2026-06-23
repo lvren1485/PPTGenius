@@ -32,7 +32,7 @@ function formatTime(d: string) {
 
 <style scoped>
 .file-card {
-  background: #f0f9eb;
+  background: var(--success-bg);
   border: 1px solid #e1f3d8;
   border-radius: 8px;
   padding: 12px 16px;
@@ -56,7 +56,7 @@ function formatTime(d: string) {
   color: #606266;
   margin-top: 8px;
   padding: 8px;
-  background: #fff;
+  background: var(--bg-card);
   border-radius: 4px;
   max-height: 120px;
   overflow: hidden;

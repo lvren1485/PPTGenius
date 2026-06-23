@@ -137,17 +137,17 @@ async function downloadPptx() {
   max-width: 460px; cursor: pointer; transition: box-shadow .15s;
 }
 .doc-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,.06); }
-.outline { background: #ecf5ff; border: 1px solid #d9ecff; }
-.ppt { background: #f0f9eb; border: 1px solid #e1f3d8; }
+.outline { background: var(--primary-bg); border: 1px solid var(--primary-border); }
+.ppt { background: var(--success-bg); border: 1px solid var(--success-border); }
 .doc-header { display: flex; align-items: center; gap: 8px; }
 .doc-title {
   font-weight: 600; font-size: 14px; flex: 1;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.outline .doc-title { color: #409eff; }
-.ppt .doc-title { color: #67c23a; }
+.outline .doc-title { color: var(--primary); }
+.ppt .doc-title { color: var(--success); }
 .card-loading { opacity: .85; }
-.card-loader { margin-top: 8px; height: 4px; border-radius: 2px; overflow: hidden; background: #e4e7ed; }
+.card-loader { margin-top: 8px; height: 4px; border-radius: 2px; overflow: hidden; background: var(--border); }
 .loader-bar { height: 100%; width: 30%; border-radius: 2px; background: #409eff; animation: loaderSlide 1s infinite ease-in-out; }
 @keyframes loaderSlide {
   0% { margin-left: -30%; }
@@ -158,15 +158,15 @@ async function downloadPptx() {
 
 <style>
 .dlg-mk-body {
-  font-size: 16px; line-height: 1.9; color: #303133;
+  font-size: 16px; line-height: 1.9; color: var(--text);
   max-height: 70vh; overflow-y: auto; padding: 0 8px;
 }
 .dlg-mk-body h1 { font-size: 26px; margin: 0 0 16px; }
-.dlg-mk-body h2 { font-size: 20px; margin: 24px 0 12px; border-bottom: 1px solid #e4e7ed; padding-bottom: 8px; position: sticky; top: 0; background: #fff; z-index: 2; }
-.dlg-mk-body h3 { font-size: 17px; margin: 18px 0 8px; position: sticky; top: 0; background: #fff; z-index: 1; }
+.dlg-mk-body h2 { font-size: 20px; margin: 24px 0 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; position: sticky; top: 0; background: var(--bg-card); z-index: 2; }
+.dlg-mk-body h3 { font-size: 17px; margin: 18px 0 8px; position: sticky; top: 0; background: var(--bg-card); z-index: 1; }
 .dlg-mk-body ul, .dlg-mk-body ol { padding-left: 24px; margin: 8px 0; }
 .dlg-mk-body li { margin-bottom: 6px; }
 .dlg-mk-body p { margin: 8px 0; }
-.dlg-mk-body strong { color: #409eff; }
-.dlg-mk-body em { color: #909399; }
+.dlg-mk-body strong { color: var(--primary); }
+.dlg-mk-body em { color: var(--text-muted); }
 </style>

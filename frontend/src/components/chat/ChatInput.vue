@@ -212,7 +212,7 @@ function onDrop(e: DragEvent) {
   font-size: 15px;
   border-radius: 12px;
   padding: 10px 16px;
-  background: #fff;
+  background: var(--bg-card);
   min-height: 40px;
 }
 .input-row :deep(.el-textarea) {

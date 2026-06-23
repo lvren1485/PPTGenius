@@ -193,7 +193,7 @@ function download() { window.open(`/api/ppt/${pptId}/download`, '_blank') }
 .snap-cards { display: flex; flex-wrap: wrap; gap: 10px; }
 .snap-card {
   display: flex; align-items: center; gap: 10px;
-  padding: 12px 18px; background: #f0f9eb; border: 1px solid #e1f3d8;
+  padding: 12px 18px; background: var(--success-bg); border: 1px solid var(--success-border);
   border-radius: 10px; cursor: pointer; transition: box-shadow .15s;
 }
 .snap-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.06); }

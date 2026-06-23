@@ -70,7 +70,7 @@ function fmtSize(b: number | null) {
 .loading, .empty { text-align: center; padding: 60px 0; color: #909399; }
 .cards { display: flex; flex-direction: column; gap: 14px; }
 .card {
-  background: #fff; padding: 20px 24px; border-radius: 10px; cursor: pointer;
+  background: var(--bg-card); padding: 20px 24px; border-radius: var(--radius); cursor: pointer;
   display: flex; align-items: center; justify-content: space-between;
   border: 1px solid #ebeef5; transition: box-shadow .2s, border-color .2s;
 }

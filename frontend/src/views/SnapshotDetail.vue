@@ -198,7 +198,7 @@ function formatDate(d: string) {
 .snap-actions { display: flex; gap: 12px; margin-bottom: 24px; }
 
 .mk-preview { margin-bottom: 24px; border: 1px solid #e4e7ed; border-radius: 8px; overflow: hidden; }
-.mk-preview-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #f5f7fa; border-bottom: 1px solid #e4e7ed; }
+.mk-preview-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--bg-hover); border-bottom: 1px solid var(--border); }
 .mk-preview-header h3 { margin: 0; font-size: 15px; }
 .mk-body { padding: 20px 24px; max-height: 600px; overflow-y: auto; line-height: 1.8; }
 .mk-body :deep(h1) { font-size: 22px; }

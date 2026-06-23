@@ -60,7 +60,7 @@ const progressText = computed(() => {
 
 <style scoped>
 .sse-status {
-  background: #ecf5ff;
+  background: var(--primary-bg);
   border-top: 1px solid #d9ecff;
   padding: 10px 24px;
   flex-shrink: 0;

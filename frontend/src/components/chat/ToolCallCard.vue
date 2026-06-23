@@ -183,39 +183,39 @@ function truncate(s: string, max: number = 80): string {
 <style scoped>
 .tool-card {
   margin-bottom: 12px; border: 1px solid #e4e7ed; border-radius: 8px;
-  background: #f5f7fa; max-width: 80%; align-self: flex-start; font-size: 13px;
+  background: var(--bg-card); max-width: 80%; align-self: flex-start; font-size: 13px; box-shadow: var(--shadow);
 }
 .tool-header {
   display: flex; align-items: center; gap: 8px;
   padding: 8px 12px; cursor: pointer; user-select: none;
 }
-.tool-header:hover { background: #ebeef5; border-radius: 8px; }
-.tool-header .el-icon { transition: transform .2s; font-size: 12px; color: #909399; }
+.tool-header:hover { background: var(--bg-hover); border-radius: 8px; }
+.tool-header .el-icon { transition: transform .2s; font-size: 12px; color: var(--text-muted); }
 .tool-header .el-icon.rotated { transform: rotate(-90deg); }
-.tool-summary { flex: 1; color: #606266; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tool-count { color: #c0c4cc; font-size: 12px; flex-shrink: 0; }
-.tool-body { border-top: 1px solid #e4e7ed; padding: 8px 12px; }
-.tool-group + .tool-group { border-top: 1px dashed #e4e7ed; padding-top: 8px; margin-top: 4px; }
+.tool-summary { flex: 1; color: var(--text-secondary); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tool-count { color: var(--text-muted); font-size: 12px; flex-shrink: 0; }
+.tool-body { border-top: 1px solid var(--border); padding: 8px 12px; }
+.tool-group + .tool-group { border-top: 1px dashed var(--border); padding-top: 8px; margin-top: 4px; }
 .master-step { padding: 4px 0; }
 .tool-step-header { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
-.step-num { font-weight: 600; color: #409eff; min-width: 18px; }
-.sub-num { color: #909399; font-size: 12px; min-width: 16px; }
-.step-ctype { font-size: 12px; color: #c0c4cc; }
-.tool-result { font-size: 12px; color: #909399; padding: 4px 8px; background: #fff; border-radius: 4px; line-height: 1.5; max-height: 60px; overflow: hidden; }
-.thinking-line { height: 20px; background: linear-gradient(90deg, #ecf5ff, #d9ecff, #ecf5ff); background-size: 200% 100%; animation: shimmer 1.5s infinite; padding: 0; }
-.thinking-dots i { font-style: normal; font-weight: 700; color: #409eff; animation: dotBounce 1.4s infinite; }
+.step-num { font-weight: 600; color: var(--primary); min-width: 18px; }
+.sub-num { color: var(--text-muted); font-size: 12px; min-width: 16px; }
+.step-ctype { font-size: 12px; color: var(--text-muted); }
+.tool-result { font-size: 12px; color: var(--text-secondary); padding: 4px 8px; background: var(--bg-hover); border-radius: 4px; line-height: 1.5; max-height: 60px; overflow: hidden; }
+.thinking-line { height: 20px; background: linear-gradient(90deg, var(--primary-bg), var(--primary-border), var(--primary-bg)); background-size: 200% 100%; animation: shimmer 1.5s infinite; padding: 0; }
+.thinking-dots i { font-style: normal; font-weight: 700; color: var(--primary); animation: dotBounce 1.4s infinite; }
 .thinking-dots i:nth-child(2) { animation-delay: .2s; }
 .thinking-dots i:nth-child(3) { animation-delay: .4s; }
 
-.sub-wrap { margin: 4px 0 0 18px; border: 1px solid #e4e7ed; border-radius: 6px; background: #fafbfc; }
+.sub-wrap { margin: 4px 0 0 18px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); }
 .sub-header { display: flex; align-items: center; gap: 6px; padding: 4px 10px; cursor: pointer; user-select: none; }
-.sub-header:hover { background: #f0f2f5; border-radius: 6px; }
-.sub-header .el-icon { transition: transform .2s; font-size: 11px; color: #c0c4cc; }
+.sub-header:hover { background: var(--bg-hover); border-radius: 6px; }
+.sub-header .el-icon { transition: transform .2s; font-size: 11px; color: var(--text-muted); }
 .sub-header .el-icon.rotated { transform: rotate(-90deg); }
-.sub-summary { font-size: 12px; color: #909399; flex: 1; }
-.sub-body { border-top: 1px solid #ebeef5; padding: 4px 10px; }
+.sub-summary { font-size: 12px; color: var(--text-muted); flex: 1; }
+.sub-body { border-top: 1px solid var(--border-light); padding: 4px 10px; }
 .sub-step { padding: 3px 0; }
-.sub-step + .sub-step { border-top: 1px dotted #ebeef5; }
+.sub-step + .sub-step { border-top: 1px dotted var(--border-light); }
 .sub-result { font-size: 11px; }
 
 @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }

@@ -146,7 +146,7 @@ function goToChat() {
   padding: 40px 24px;
 }
 .launcher-card {
-  background: #fff;
+  background: var(--bg-card);
   border-radius: 12px;
   padding: 32px;
   margin-bottom: 32px;
@@ -180,7 +180,7 @@ function goToChat() {
   gap: 8px;
 }
 .conv-item {
-  background: #fff;
+  background: var(--bg-card);
   border-radius: 8px;
   padding: 16px 20px;
   cursor: pointer;
