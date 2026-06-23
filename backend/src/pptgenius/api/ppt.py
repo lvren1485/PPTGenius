@@ -57,18 +57,11 @@ async def get_presentation(
 
     data = _orm_to_dict(pres)
 
-    # Resolve template / color_scheme names
-    if pres.template_id:
-        tpl = await db.get_template(pres.template_id)
-        data["template_name"] = tpl.label if tpl else None
+    if pres.style_id:
+        st = await db.get_style(pres.style_id)
+        data["style_name"] = st.label if st else None
     else:
-        data["template_name"] = None
-
-    if pres.color_scheme_id:
-        cs = await db.get_color_scheme(pres.color_scheme_id)
-        data["color_scheme_name"] = cs.label if cs else None
-    else:
-        data["color_scheme_name"] = None
+        data["style_name"] = None
 
     return ApiResponse(data=PresentationDetail(**data))
 

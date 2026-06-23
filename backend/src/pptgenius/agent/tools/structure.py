@@ -333,7 +333,7 @@ def make_modify_outline_structure(db: Database, conversation_id: int) -> Callabl
                 _id_to_pos = {s.id: i for i, s in enumerate(slide_list)}
 
         # ── Reindex: bulk UPDATE with CASE WHEN to avoid unique-key conflicts ──
-        id_to_index = {s.id: i for i, s in enumerate(slide_list)}
+        id_to_index = {s.id: i for i, s in enumerate(slide_list, 1)}
         await db.reindex_outline_slides(outline_id, id_to_index)
 
         # ── Update slide_count ──
