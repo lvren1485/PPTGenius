@@ -108,6 +108,15 @@ async def init_db() -> None:
     await seed(_get_engine())
 
 
+async def dispose_engine() -> None:
+    """Dispose the SQLAlchemy engine, closing all connections in the pool."""
+    global _engine, _sessionmaker
+    if _engine is not None:
+        await _engine.dispose()
+        _engine = None
+    _sessionmaker = None
+
+
 _session_manager: "SessionManager | None" = None
 
 

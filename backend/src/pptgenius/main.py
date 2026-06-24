@@ -29,6 +29,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     _log.info("startup complete")
     yield
     _log.info("PPTGenius shutting down")
+    from pptgenius.infrastructure.db import dispose_engine
+    await dispose_engine()
 
 
 # -- app ---------------------------------------------------------------------
@@ -66,7 +68,14 @@ app = create_app()
 def main() -> None:
     import uvicorn
 
-    uvicorn.run("pptgenius.main:app", host="0.0.0.0", port=8000, reload=True)
+    config = uvicorn.Config(
+        "pptgenius.main:app", host="0.0.0.0", port=8000, reload=True,
+    )
+    server = uvicorn.Server(config)
+    try:
+        server.run()
+    except KeyboardInterrupt:
+        server.should_exit = True
 
 
 if __name__ == "__main__":
