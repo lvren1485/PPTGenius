@@ -181,6 +181,33 @@ def make_get_outline_slide(db: Database, conversation_id: int) -> Callable:
     return tool(_get_outline_slide)
 
 
+def make_get_pending_slides(db: Database, conversation_id: int) -> Callable:
+    """Return a tool to list slides that still need content generation."""
+
+    async def _get_pending_slides() -> list[dict]:
+        """List slides whose status is not 'completed', grouped by section.
+
+        Use this to check if any slides still need content after generate_outline_content.
+        """
+        conv = await db.get_conversation(conversation_id)
+        if conv is None or conv.current_outline_id is None:
+            return {"error": "没有选中大纲"}
+        outline_id = conv.current_outline_id
+        slides = await db.get_slides_by_outline_id(outline_id)
+        pending = [
+            {
+                "id": s.id, "slide_index": s.slide_index,
+                "title": s.title, "layout_type": s.layout_type,
+                "section_id": s.section_id, "status": s.status,
+            }
+            for s in slides
+            if s.status != "completed" and s.status != "deleted"
+        ]
+        return {"total": len(slides), "pending": len(pending), "slides": pending}
+
+    return tool(_get_pending_slides)
+
+
 def make_get_presentation(db: Database, conversation_id: int) -> Callable:
     """Return a tool to read the presentation state for the current outline."""
 

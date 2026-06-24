@@ -24,6 +24,7 @@ _TOOL_CTYPE: dict[str, str] = {
     "_switch_outline":           "switch_outline",
     "_get_outline":              "get_outline",
     "_get_outline_slide":        "get_slide",
+    "_get_pending_slides":       "get_pending",
     "_get_presentation":         "get_pres",
     "_get_knowledge_files":      "get_kfiles",
     "_search_styles":            "search_styles",
@@ -33,7 +34,6 @@ _TOOL_CTYPE: dict[str, str] = {
     "_rearrange_presentation_slides": "rearr_pres",
     "_generate_outline_content": "gen_content",
     "_modify_outline_section":   "mod_section",
-    "_outline_evaluate":         "evaluate",
     "_explore_knowledge":        "explore",
     "_ppt_style":                 "ppt_style",
     "_slides_content":            "slides_content",
@@ -41,17 +41,17 @@ _TOOL_CTYPE: dict[str, str] = {
 }
 
 # Tools that spawn a sub-agent (have their own LLM + TokenCountingMiddleware)
-_SUB_AGENT_TOOLS: set[str] = {"gen_content", "mod_section", "evaluate", "explore", "ppt_style", "slides_content", "mod_slides"}
+_SUB_AGENT_TOOLS: set[str] = {"gen_content", "mod_section", "explore", "ppt_style", "slides_content", "mod_slides"}
 
 from pptgenius.infrastructure.llm import create_llm
 from .tools.explore_knowledge import make_explore_knowledge
-from .tools.outline_evaluate import make_outline_evaluate
 from .tools.outline_section import make_generate_outline_content, make_modify_outline_section
 from .tools.perception import (
     make_get_conversation_status,
     make_get_knowledge_files,
     make_get_outline,
     make_get_outline_slide,
+    make_get_pending_slides,
     make_get_presentation,
     make_search_styles,
     make_switch_outline,
@@ -120,6 +120,7 @@ def _assemble_tools(db: Database, conversation_id: int) -> list:
         make_switch_outline(db, conversation_id),
         make_get_outline(db, conversation_id),
         make_get_outline_slide(db, conversation_id),
+        make_get_pending_slides(db, conversation_id),
         make_get_presentation(db, conversation_id),
         make_get_knowledge_files(db, conversation_id),
         make_search_styles(db, conversation_id),
@@ -131,7 +132,6 @@ def _assemble_tools(db: Database, conversation_id: int) -> list:
         # Outline content 
         make_generate_outline_content(db, conversation_id),
         make_modify_outline_section(db, conversation_id),
-        make_outline_evaluate(db, conversation_id),
         make_explore_knowledge(db, conversation_id),
         # Presentation content
         make_ppt_style(db, conversation_id),
