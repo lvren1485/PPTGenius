@@ -21,6 +21,12 @@ const props = defineProps<{ items: ToolMsg[]; thinking?: boolean }>()
 
 const expanded = ref(false)
 
+// Sub-agent tools that happen to start with _ — must NOT be treated as master
+const SUB_TOOL_UNDERSCORE = new Set([
+  '_get_style', '_save_style', '_set_presentation_style',
+  '_submit_element', '_submit_notes', '_submit_background',
+])
+
 // Group: master tools (name starts with _) contain sub-agent tools as children
 const groups = computed(() => {
   const result: ToolGroup[] = []
@@ -28,7 +34,7 @@ const groups = computed(() => {
 
   for (const m of props.items) {
     const name = m.metadata_json?.tool_name || ''
-    const isMaster = name.startsWith('_')
+    const isMaster = name.startsWith('_') && !SUB_TOOL_UNDERSCORE.has(name)
 
     if (isMaster && m.role === 'tool_call') {
       if (current) result.push(current)
@@ -94,6 +100,9 @@ function ctypeLabel(ctype: string): string {
     mod_section: '修改大纲章节', evaluate: '评估大纲',
     explore: '探索知识库', ppt_style: '选择样式',
     slides_content: '生成幻灯片', mod_slides: '修改幻灯片',
+    get_style: '查看样式', save_style: '保存样式',
+    set_pres_style: '应用样式', submit_elem: '提交元素',
+    submit_notes: '提交备注', submit_bg: '提交背景',
   }
   return map[ctype] || ctype
 }
