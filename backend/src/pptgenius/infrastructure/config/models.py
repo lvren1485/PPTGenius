@@ -9,20 +9,17 @@ class WorkspaceConfig(BaseModel):
 
 
 class RAGConfig(BaseModel):
-    algorithm: str = "bm25"
     top_k: int = 5
-    supported_formats: list[str] = [".txt", ".pdf", ".docx", ".csv", ".xlsx"]
 
 
 class OutlineAgentConfig(BaseModel):
-    max_iterations: int = 5
-    evaluation_threshold: float = 0.7
     generator_max_retries: int = 3
 
 
 class CacheConfig(BaseModel):
     trim_max_tokens: int = 8000
     enable_node_cache: bool = True
+    summarize_threshold: float = 0.7
 
 
 class AgentConfig(BaseModel):

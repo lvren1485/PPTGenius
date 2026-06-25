@@ -18,18 +18,16 @@ async def get_config() -> ApiResponse[ConfigData]:
     cfg = get_settings()
     return ApiResponse(data=ConfigData(
         rag={
-            "algorithm": cfg.rag.algorithm,
             "top_k": cfg.rag.top_k,
-            "supported_formats": cfg.rag.supported_formats,
         },
         agent={
             "outline": {
-                "max_iterations": cfg.agent.outline.max_iterations,
-                "evaluation_threshold": cfg.agent.outline.evaluation_threshold,
+                "generator_max_retries": cfg.agent.outline.generator_max_retries,
             },
             "cache": {
                 "trim_max_tokens": cfg.agent.cache.trim_max_tokens,
                 "enable_node_cache": cfg.agent.cache.enable_node_cache,
+                "summarize_threshold": cfg.agent.cache.summarize_threshold,
             },
         },
         llm={

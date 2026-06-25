@@ -7,6 +7,7 @@ import uuid
 
 from langchain.agents import create_agent
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from pptgenius.infrastructure.config import get_settings
 from pptgenius.infrastructure.config.settings import RESOURCES_DIR
 from pptgenius.infrastructure.db.database import Database
 from pptgenius.infrastructure.utils import TokenCounter, get_logger
@@ -16,7 +17,7 @@ from .common.sse_context import get_sse_writer
 
 _log = get_logger("pptgenius.agent.master")
 
-_SUMMARIZE_THRESHOLD = 0.7
+_SUMMARIZE_THRESHOLD = get_settings().agent.cache.summarize_threshold
 
 # tool_name → content_type (≤32 chars, VARCHAR limit)
 _TOOL_CTYPE: dict[str, str] = {

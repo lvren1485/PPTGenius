@@ -7,18 +7,15 @@ workspace:
   knowledge_dir: "knowledge"
 
 rag:
-  algorithm: "bm25"
   top_k: 5
-  supported_formats: [".txt", ".pdf", ".docx", ".csv", ".xlsx"]
 
 agent:
   outline:
-    max_iterations: 5
-    evaluation_threshold: 0.7
     generator_max_retries: 3
   cache:
     trim_max_tokens: 900000
     enable_node_cache: true
+    summarize_threshold: 0.7
 
 llm:
   provider: "deepseek"
