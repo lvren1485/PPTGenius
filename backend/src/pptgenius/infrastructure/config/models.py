@@ -1,17 +1,11 @@
 from pydantic import BaseModel
 
 
-class AppConfig(BaseModel):
-    name: str = "PPTGenius"
-    version: str = "0.1.0"
-
-
 class WorkspaceConfig(BaseModel):
     root: str = "./data/workspace"
     input_dir: str = "input"
     output_dir: str = "output"
     knowledge_dir: str = "knowledge"
-    logs_dir: str = "logs"
 
 
 class RAGConfig(BaseModel):
@@ -21,17 +15,9 @@ class RAGConfig(BaseModel):
 
 
 class OutlineAgentConfig(BaseModel):
-    mode: str = "mix"  # max_iteration | pass_score | mix
     max_iterations: int = 5
-    pass_score: float = 8.0  # 0-10, used by pass_score / mix modes
     evaluation_threshold: float = 0.7
     generator_max_retries: int = 3
-
-
-class PPTAgentConfig(BaseModel):
-    mode: str = "super_freedom"  # super_freedom
-    max_retries_per_slide: int = 3
-    slide_timeout_seconds: int = 120
 
 
 class CacheConfig(BaseModel):
@@ -41,7 +27,6 @@ class CacheConfig(BaseModel):
 
 class AgentConfig(BaseModel):
     outline: OutlineAgentConfig = OutlineAgentConfig()
-    ppt: PPTAgentConfig = PPTAgentConfig()
     cache: CacheConfig = CacheConfig()
 
 
@@ -55,7 +40,6 @@ class LLMConfig(BaseModel):
 
 
 class DBConfig(BaseModel):
-    type: str = "mysql"
     url: str = "mysql+asyncmy://root:root@localhost:3306/pptgenius"
 
 
@@ -74,16 +58,10 @@ class WebSearchConfig(BaseModel):
     engine: str = "duckduckgo"
     max_results: int = 5
     timeout: int = 15
-    # API keys for paid engines go in config.local.yaml
-    bing_api_key: str = ""
-    google_api_key: str = ""
-    google_cx: str = ""
-    tavily_api_key: str = ""
     searxng_base_url: str = ""
 
 
 class Settings(BaseModel):
-    app: AppConfig = AppConfig()
     workspace: WorkspaceConfig = WorkspaceConfig()
     rag: RAGConfig = RAGConfig()
     agent: AgentConfig = AgentConfig()
