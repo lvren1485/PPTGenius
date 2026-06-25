@@ -3,8 +3,8 @@
   "LineStyle": {
     "description": "形状/文本框的边框线。color=null 表示无线条(透明边框)。",
     "fields": {
-      "color": "线条颜色。string, hex 无#。null=无线条。例如: '333333'(深灰)",
-      "width_pt": "线条宽度。float, 单位pt(磅)。例如: 1.5 表示1.5pt宽",
+      "color": "线条颜色。string, 6位hex不含#。null=无线条。例如: '333333'(深灰)",
+      "width_pt": "线条宽度。float >0, 单位pt(磅)。例如: 1.5 表示1.5pt宽",
       "dash": "虚线样式。'solid'(实线)|'dash'(虚线)|'dot'(点线)|'dash_dot'(点划线)。不填默认实线"
     }
   },

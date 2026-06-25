@@ -17,9 +17,9 @@
     "cols": "列数。int, 必须>0。例如: 3",
     "col_widths": "列宽数组。float[], 长度=cols, 单位英寸。可选。例如: [2.5, 3.5, 4.0]",
     "cells": "单元格内容数组。每个元素: {\"row\":0,\"col\":0,\"text\":\"内容\",\"font\":字体(可选)}",
-    "merges": "合并单元格数组。可选。每个元素: {\"from_row\":0,\"from_col\":0,\"to_row\":0,\"to_col\":2}",
-    "header": "表头行样式。可选。{\"row\":0,\"fill\":\"1a73e8\",\"font_color\":\"ffffff\",\"font_bold\":true,\"font_size\":14}",
-    "style": "全局表格样式。可选。{\"border_color\":\"dadce0\",\"border_width_pt\":0.5,\"stripe_even\":\"f8f9fa\",\"stripe_odd\":\"ffffff\"}"
+    "merges": "合并单元格数组。可选。每个元素: {\"from_row\":0,\"from_col\":0,\"to_row\":0,\"to_col\":2}, to必须>=from",
+    "header": "表头行样式。可选。{\"row\":0,\"fill\":\"1a73e8\",\"font_color\":\"ffffff\",\"font_bold\":true,\"font_size\":14}, fill和font_color均为6位hex不含#",
+    "style": "全局表格样式。可选。{\"border_color\":\"dadce0\",\"border_width_pt\":0.5,\"stripe_even\":\"f8f9fa\",\"stripe_odd\":\"ffffff\"}, 所有颜色字段均为6位hex不含#。border_width_pt必须>0"
   },
   "CellSpec_fields": {
     "row": "行号, 0-based(第一行=0)。int, 必须>=0且<rows",

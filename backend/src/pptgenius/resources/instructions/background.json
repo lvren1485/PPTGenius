@@ -8,9 +8,9 @@
   "usage": "在每页 slide 的 JSON 中添加 'background' 字段(与 'layout'、'elements' 同级)。不是 element。",
   "fields": {
     "type": "背景类型。'solid'(纯色)|'gradient'(渐变)|'image'(图片)。默认 'solid'",
-    "color": "背景色或图片路径。string。type=solid时: hex颜色无# (如 'e8f0fe')。type=image时: 文件路径 (如 'images/bg.png')",
-    "gradient_angle": "渐变角度。float。0=左→右 90=下→上 135=左上→右下。仅 type='gradient' 有效",
-    "gradient_stops": "渐变停止点。[{position: 0.0-1.0, color: hex}]。仅 type='gradient' 有效"
+    "color": "背景色或图片路径。string。type=solid时: 6位hex不含# (如 'e8f0fe')。type=image时: 文件路径 (如 'images/bg.png')",
+    "gradient_angle": "渐变角度。float, 0-360, 0=左→右 90=下→上 135=左上→右下。仅 type='gradient' 有效",
+    "gradient_stops": "渐变停止点。[{position: 0.0-1.0, color: 6位hex}]。仅 type='gradient' 有效"
   },
   "examples": {
     "solid_light_blue": { "type": "solid", "color": "e8f0fe" },

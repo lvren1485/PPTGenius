@@ -20,19 +20,19 @@
   "FontShadow": {
     "description": "文字外阴影。不填=无阴影。",
     "fields": {
-      "blur_pt": "模糊半径。float, 单位pt。默认 3.0。越大越模糊",
-      "offset_pt": "阴影偏移距离。float, 单位pt。默认 1.5",
+      "blur_pt": "模糊半径。float >=0, 单位pt。默认 3.0。越大越模糊",
+      "offset_pt": "阴影偏移距离。float >=0, 单位pt。默认 1.5",
       "angle_deg": "阴影角度。float, 0=右侧 90=上方 180=左侧 270=下方。默认 315(右下)",
-      "color": "阴影颜色。string, hex 无#。默认 '000000'(黑色)",
-      "alpha_pct": "阴影透明度。float, 0=完全透明 100=完全不透明。默认 40(40%不透明=60%透明)"
+      "color": "阴影颜色。string, 6位hex不含#。默认 '000000'(黑色)",
+      "alpha_pct": "阴影透明度。float, 0-100, 0=完全透明 100=完全不透明。默认 40"
     }
   },
   "FontGlow": {
     "description": "文字发光效果。不填=无发光。",
     "fields": {
-      "radius_pt": "发光半径。float, 单位pt。默认 8.0。越大光晕越扩散",
-      "color": "发光颜色。string, hex 无#。默认 '1a73e8'(蓝色)",
-      "alpha_pct": "发光透明度。float, 0=透明 100=不透明。默认 60"
+      "radius_pt": "发光半径。float >=0, 单位pt。默认 8.0。越大光晕越扩散",
+      "color": "发光颜色。string, 6位hex不含#。默认 '1a73e8'(蓝色)",
+      "alpha_pct": "发光透明度。float, 0-100, 0=透明 100=不透明。默认 60"
     }
   },
   "example": {

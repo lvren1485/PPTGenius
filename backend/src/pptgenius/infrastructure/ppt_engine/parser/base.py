@@ -53,18 +53,43 @@ class FontSpec(BaseModel):
         return h
 
 
+def _validate_hex(v: str | None) -> str | None:
+    """Shared hex color validator. Accepts optional # prefix."""
+    if v is None:
+        return v
+    h = v.lstrip("#")
+    if len(h) != 6:
+        raise ValueError(f"color must be 6-digit hex, got '{v}'")
+    int(h, 16)
+    return h
+
+
 class FontShadow(BaseModel):
-    blur_pt: float = 3.0
-    offset_pt: float = 1.5
+    blur_pt: float = Field(default=3.0, ge=0)
+    offset_pt: float = Field(default=1.5, ge=0)
     angle_deg: float = 315.0
     color: str = "000000"
-    alpha_pct: float = 40.0
+    alpha_pct: float = Field(default=40.0, ge=0, le=100)
+
+    @field_validator("color")
+    @classmethod
+    def _check_color(cls, v: str) -> str:
+        if v is None:
+            return v
+        return _validate_hex(v)
 
 
 class FontGlow(BaseModel):
-    radius_pt: float = 8.0
+    radius_pt: float = Field(default=8.0, ge=0)
     color: str = "1a73e8"
-    alpha_pct: float = 60.0
+    alpha_pct: float = Field(default=60.0, ge=0, le=100)
+
+    @field_validator("color")
+    @classmethod
+    def _check_color(cls, v: str) -> str:
+        if v is None:
+            return v
+        return _validate_hex(v)
 
 
 class RunSpec(BaseModel):
@@ -75,8 +100,8 @@ class RunSpec(BaseModel):
 class ParagraphSpec(BaseModel):
     alignment: Literal["left", "center", "right", "justify"] = "left"
     level: int = Field(default=0, ge=0, le=8)
-    space_before_pt: int | None = None
-    space_after_pt: int | None = None
+    space_before_pt: int | None = Field(default=None, ge=0)
+    space_after_pt: int | None = Field(default=None, ge=0)
     runs: list[RunSpec] = []
 
 
@@ -128,17 +153,48 @@ class LineStyle(BaseModel):
     width_pt: float = 1.0
     dash: Literal["solid", "dash", "dot", "dash_dot"] | None = None
 
+    @field_validator("color")
+    @classmethod
+    def _check_hex(cls, v: str | None) -> str | None:
+        if v is None or v == "none":
+            return v
+        h = v.lstrip("#")
+        if len(h) != 6:
+            raise ValueError(f"color must be 6-digit hex, got '{v}'")
+        int(h, 16)
+        return h
+
 
 class FillStyle(BaseModel):
     type: Literal["solid", "gradient", "no_fill", "picture"] = "solid"
     color: str | None = None  # for solid
-    gradient_angle: float | None = None  # for gradient (0=left→right)
+    gradient_angle: float | None = Field(default=None, ge=0, le=360)
     gradient_stops: list[GradientStop] | None = None  # extra stops
+
+    @field_validator("color")
+    @classmethod
+    def _check_hex(cls, v: str | None) -> str | None:
+        if v is None or v == "none":
+            return v
+        h = v.lstrip("#")
+        if len(h) != 6:
+            raise ValueError(f"color must be 6-digit hex, got '{v}'")
+        int(h, 16)
+        return h
 
 
 class GradientStop(BaseModel):
     position: float = Field(ge=0.0, le=1.0)
     color: str
+
+    @field_validator("color")
+    @classmethod
+    def _check_hex(cls, v: str) -> str:
+        h = v.lstrip("#")
+        if len(h) != 6:
+            raise ValueError(f"color must be 6-digit hex, got '{v}'")
+        int(h, 16)
+        return h
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -156,13 +212,13 @@ class TextboxElement(BaseModel):
 
 class ChartSeries(BaseModel):
     name: str
-    values: list[float]
+    values: list[float] = Field(min_length=1)
 
 
 class ChartData(BaseModel):
     """Category chart data (column/bar/line/pie/doughnut/area/radar)."""
     categories: list[str] = []
-    series: list[ChartSeries]
+    series: list[ChartSeries] = Field(min_length=1)
 
     @field_validator("series")
     @classmethod
@@ -187,12 +243,12 @@ class XyPoint(BaseModel):
 
 class XySeries(BaseModel):
     name: str
-    points: list[XyPoint]
+    points: list[XyPoint] = Field(min_length=1)
 
 
 class XyChartData(BaseModel):
     """XY/scatter chart data. Each series has its own (x,y) points."""
-    series: list[XySeries]
+    series: list[XySeries] = Field(min_length=1)
 
 
 class BubblePoint(BaseModel):
@@ -233,8 +289,24 @@ class ChartStyle(BaseModel):
     series_colors: list[str] | None = None  # hex per series
     chart_area_fill: str | None = None  # hex or 'none'
     plot_area_fill: str | None = None
-    title_font_size: int | None = None
-    axis_font_size: int | None = None
+    title_font_size: int | None = Field(default=None, ge=8)
+    axis_font_size: int | None = Field(default=None, ge=8)
+
+    @field_validator("series_colors")
+    @classmethod
+    def _check_series_colors(cls, v: list[str] | None) -> list[str] | None:
+        if v is not None:
+            for i, c in enumerate(v):
+                if c != "none":
+                    _validate_hex(c)
+        return v
+
+    @field_validator("chart_area_fill", "plot_area_fill")
+    @classmethod
+    def _check_fill_colors(cls, v: str | None) -> str | None:
+        if v is not None and v != "none":
+            _validate_hex(v)
+        return v
 
 
 class ChartElement(BaseModel):
@@ -269,8 +341,18 @@ class CellSpec(BaseModel):
 
 
 class MergeSpec(BaseModel):
-    from_row: int; from_col: int  # noqa: E701
-    to_row: int; to_col: int      # noqa: E701
+    from_row: int = Field(ge=0)
+    from_col: int = Field(ge=0)
+    to_row: int = Field(ge=0)
+    to_col: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def _check_bounds(self) -> "MergeSpec":
+        if self.to_row < self.from_row:
+            raise ValueError(f"to_row ({self.to_row}) < from_row ({self.from_row})")
+        if self.to_col < self.from_col:
+            raise ValueError(f"to_col ({self.to_col}) < from_col ({self.from_col})")
+        return self
 
 
 class TableHeader(BaseModel):
@@ -278,14 +360,26 @@ class TableHeader(BaseModel):
     fill: str
     font_color: str = "ffffff"
     font_bold: bool = True
-    font_size: int = 14
+    font_size: int = Field(default=14, ge=8)
+
+    @field_validator("fill", "font_color")
+    @classmethod
+    def _check_colors(cls, v: str) -> str:
+        return _validate_hex(v)
 
 
 class TableStyle(BaseModel):
     border_color: str = "e0e0e0"
-    border_width_pt: float = 0.5
+    border_width_pt: float = Field(default=0.5, gt=0)
     stripe_even: str | None = None  # hex
     stripe_odd: str | None = None
+
+    @field_validator("border_color", "stripe_even", "stripe_odd")
+    @classmethod
+    def _check_colors(cls, v: str | None) -> str | None:
+        if v is not None:
+            _validate_hex(v)
+        return v
 
 
 class TableElement(BaseModel):
@@ -368,8 +462,19 @@ class SlideBackground(BaseModel):
     """Slide background definition."""
     type: Literal["solid", "gradient", "image"] = "solid"
     color: str | None = None  # hex for solid, file path for image
-    gradient_angle: float | None = None
+    gradient_angle: float | None = Field(default=None, ge=0, le=360)
     gradient_stops: list[GradientStop] | None = None
+
+    @field_validator("color")
+    @classmethod
+    def _check_hex(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        h = v.lstrip("#")
+        if len(h) != 6:
+            raise ValueError(f"color must be 6-digit hex, got '{v}'")
+        int(h, 16)
+        return h
 
 
 class SlideSpec(BaseModel):
@@ -385,8 +490,8 @@ class SlideSpec(BaseModel):
 class MetaSpec(BaseModel):
     template_name: str | None = None
     color_scheme_name: str | None = None
-    slide_width: float = 13.333
-    slide_height: float = 7.5
+    slide_width: float = Field(default=13.333, gt=0)
+    slide_height: float = Field(default=7.5, gt=0)
     language: str = "zh"
 
 
