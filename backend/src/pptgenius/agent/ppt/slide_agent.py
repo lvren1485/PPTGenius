@@ -1,7 +1,7 @@
 """Slide Agent — generates one slide's full visual design.  Pure memory, no DB.
 
-Three-tool model: submit_element (add/overwrite/delete), submit_notes (append),
-submit_background (set).  Returns a result dict — caller writes to DB.
+Part-based model: submit_plan (define regions) → submit_background → submit_element
+×N per part → check_parts (verify + complete).  Notes auto-generated from plan.
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from __future__ import annotations
 import secrets
 
 from langchain.agents import create_agent
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
 from pptgenius.infrastructure.ppt_engine.validator import validate_elements
 from pptgenius.infrastructure.utils import get_logger
@@ -23,6 +23,8 @@ from .slide_prompts import build_system_prompt, build_user_prompt
 
 _log = get_logger("pptgenius.agent.ppt.slide_agent")
 
+_MAX_RETRIES = 3
+
 
 async def run_slide_agent(
     conversation_id: int,
@@ -33,8 +35,9 @@ async def run_slide_agent(
     *,
     existing_outputs: dict | None = None,
     pres_status: str | None = None,
+    plan: dict | None = None,
 ) -> dict:
-    """Generate one slide. Returns {slide_index, elements, notes, background}.
+    """Generate one slide. Returns {slide_index, elements, notes, background, plan}.
 
     Pure memory — no DB access.  Each element gets an auto-generated hex id.
 
@@ -46,28 +49,77 @@ async def run_slide_agent(
 
     # ── memory buffer (closure-captured mutable dict) ──
     _buffer: dict = {
-        "elements": {},   # {element_id: element_dict}
-        "notes": "",       # speaker notes (append-only)
-        "background": {},  # slide background
+        "plan": plan,            # pre-populated from existing_outputs in modify mode
+        "elements": {},          # {element_id: {..., "_part": "标题区"}}
+        "background": {},        # slide background
     }
 
     # ── tools ──────────────────────────────────────────────────────────
+
+    async def _submit_plan(
+        design_concept: str,
+        parts: list[dict],
+    ) -> str:
+        """Define or update the slide's part-based layout plan.
+
+        First call creates the plan. Subsequent calls merge: matching part names
+        update description + reset status to pending; new names are appended.
+        Parts not listed in this call are preserved unchanged.
+
+        Args:
+            design_concept: 1-2 sentence visual concept. Leave empty to keep old value.
+            parts: [{name, description}, ...] — regions to create or modify.
+        """
+        if not parts:
+            return "错误: parts 不能为空。"
+
+        plan = _buffer["plan"]
+        if plan is None:
+            plan = {"design_concept": "", "parts": {}}
+            _buffer["plan"] = plan
+
+        if design_concept:
+            plan["design_concept"] = design_concept
+
+        modified = []
+        added = []
+        for p in parts:
+            name = p.get("name", "").strip()
+            desc = p.get("description", "").strip()
+            if not name or not desc:
+                return f"错误: 每个 part 必须有 name 和 description。收到: name={name!r}"
+            if name in plan["parts"]:
+                plan["parts"][name]["description"] = desc
+                plan["parts"][name]["status"] = "pending"
+                modified.append(name)
+            else:
+                plan["parts"][name] = {"description": desc, "status": "pending"}
+                added.append(name)
+
+        msg_parts = []
+        if added:
+            msg_parts.append(f"新增 {len(added)} 个: {', '.join(added)}")
+        if modified:
+            msg_parts.append(f"修改 {len(modified)} 个: {', '.join(modified)}")
+        return f"Plan 已更新 ({len(plan['parts'])} 个 part)。" + " ".join(msg_parts)
 
     async def _submit_element(
         element: dict | None = None,
         element_id: str = "",
         delete: bool = False,
+        part: str = "",
     ) -> str:
         """Add, overwrite, or delete a slide element.
 
-        ADD: omit element_id (or pass ""), provide element dict.
-        OVERWRITE: provide both element_id and element dict.
+        ADD: omit element_id (or pass ""), provide element dict + part name.
+        OVERWRITE: provide both element_id, element dict, and optional part.
         DELETE: provide element_id and set delete=true (element can be omitted).
 
         Args:
             element: The element dict (type, position, fill, etc). Omit for DELETE.
             element_id: 8-char hex id. Empty = new element. Non-empty = modify/delete existing.
             delete: Set to true to remove this element from the slide.
+            part: Which plan part this element belongs to (e.g. "标题区").
         """
         if delete:
             if element_id and element_id in _buffer["elements"]:
@@ -77,6 +129,10 @@ async def run_slide_agent(
 
         if not element:
             return "错误: 非删除操作必须提供 element。"
+
+        # Attach part
+        if part:
+            element["_part"] = part
 
         # Validate
         result = validate_elements([element])
@@ -97,17 +153,54 @@ async def run_slide_agent(
             _buffer["elements"][eid] = element
             return f"已添加元素 {eid} (type={element.get('type')})"
 
-    async def _submit_notes(notes: str) -> str:
-        """Append speaker notes for this slide.  Call multiple times to accumulate.
+    async def _check_parts(part: str = "", complete: bool = False) -> str:
+        """View part progress, element details, or mark a part complete.
 
         Args:
-            notes: The speaker notes text to append.
+            part: Part name to inspect or complete. Empty = show all parts status.
+            complete: Set true to mark the specified part as done.
         """
-        if _buffer["notes"]:
-            _buffer["notes"] += "\n\n" + notes
-        else:
-            _buffer["notes"] = notes
-        return f"已追加 notes ({len(notes)} chars, 总计 {len(_buffer['notes'])} chars)"
+        plan = _buffer.get("plan")
+        if plan is None:
+            return "尚未提交 plan。请先调用 submit_plan。"
+
+        if complete:
+            if not part:
+                return "错误: complete=true 但未指定 part 名称。"
+            if part not in plan["parts"]:
+                return f"Part '{part}' 不存在。可用: {', '.join(plan['parts'].keys())}"
+            plan["parts"][part]["status"] = "complete"
+            return f"Part '{part}' 已标记为完成。"
+
+        if part:
+            # View specific part
+            if part not in plan["parts"]:
+                return f"Part '{part}' 不存在。可用: {', '.join(plan['parts'].keys())}"
+            info = plan["parts"][part]
+            items = [
+                f"**{part}** ({info['status']}): {info['description']}",
+                "元素列表:",
+            ]
+            for eid, el in _buffer["elements"].items():
+                if el.get("_part") == part:
+                    items.append(
+                        f"  - {eid}: type={el.get('type')}, "
+                        f"shape_type={el.get('shape_type', '-')}"
+                    )
+            return "\n".join(items)
+
+        # View all parts
+        lines = [f"## Plan 进度 ({len(plan['parts'])} 个 part)", ""]
+        for name, info in plan["parts"].items():
+            count = sum(
+                1 for el in _buffer["elements"].values()
+                if el.get("_part") == name
+            )
+            lines.append(
+                f"- **{name}**: [{info['status']}] {info['description'][:60]} "
+                f"({count} 个元素)"
+            )
+        return "\n".join(lines)
 
     async def _submit_background(background: dict) -> str:
         """Set the slide background. Overwrites any previous setting.
@@ -125,8 +218,9 @@ async def run_slide_agent(
         return f"已设置背景 (type={bg_type})"
 
     tools = [
+        tool(_submit_plan),
+        tool(_check_parts),
         tool(_submit_element),
-        tool(_submit_notes),
         tool(_submit_background),
         make_search_icons(),
         make_read_instruction(),
@@ -142,7 +236,8 @@ async def run_slide_agent(
     system_prompt = build_system_prompt()
     user_prompt = build_user_prompt(slide, style, template, query,
                                     existing_outputs=existing_outputs,
-                                    pres_status=pres_status)
+                                    pres_status=pres_status,
+                                    plan=plan)
 
     agent = create_agent(
         model=llm, tools=tools,
@@ -156,48 +251,85 @@ async def run_slide_agent(
     except RuntimeError:
         pass
 
-    try:
-        result = await agent.ainvoke(
-            {"messages": [HumanMessage(content=user_prompt)]},
-            config={"recursion_limit": 100},
-        )
-    except Exception:
-        _log.warning("slide_agent crashed slide=%d", slide_index)
-        _log.debug("slide_agent crash detail", exc_info=True)
+    # ── main invoke + retry loop ───────────────────────────────────────
 
-    # ── retry if no elements submitted ────────────────────────────────
+    from ..common.message_utils import prepare_retry_messages
 
-    if not _buffer["elements"] and not _buffer["background"]:
-        _log.warning("slide %d: no content submitted — retrying with submit-only agent", slide_index)
-        from ..common.message_utils import prepare_retry_messages
-        submit_tools = [tool(_submit_element), tool(_submit_notes), tool(_submit_background)]
-        retry_agent = create_agent(
-            model=llm, tools=submit_tools,
+    max_retries = _MAX_RETRIES
+    messages = [HumanMessage(content=user_prompt)]
+    result: dict | None = None
+
+    for attempt in range(max_retries + 1):
+        ag = agent if attempt == 0 else create_agent(
+            model=llm, tools=tools,
             system_prompt=system_prompt,
             middleware=mws,
         )
-        retry_messages = [HumanMessage(content=user_prompt)]
         try:
-            retry_messages = prepare_retry_messages(result["messages"])
-        except (NameError, KeyError):
-            pass
-        retry_messages.append(HumanMessage(content="请继续提交完整设计。调用 submit_background、submit_element（多次）、submit_notes。"))
-        try:
-            await retry_agent.ainvoke(
-                {"messages": retry_messages},
-                config={"recursion_limit": 30},
+            result = await ag.ainvoke(
+                {"messages": messages},
+                config={"recursion_limit": 100 if attempt == 0 else 50},
             )
         except Exception:
-            _log.warning("slide_agent retry crashed slide=%d", slide_index)
-            _log.debug("slide_agent retry crash detail", exc_info=True)
+            _log.warning("slide_agent crashed slide=%d attempt=%d",
+                        slide_index, attempt)
+            _log.debug("slide_agent crash detail", exc_info=True)
+            messages = prepare_retry_messages(result["messages"]) if result else messages
+            continue
 
-    _log.info("slide %d done: %d elements, notes=%d chars, bg=%s",
+        # Check: empty submission (old retry condition)
+        if not _buffer["elements"] and not _buffer["background"]:
+            _log.warning("slide %d: no content submitted — retrying", slide_index)
+
+        # Check: incomplete parts
+        plan = _buffer.get("plan")
+        incomplete = []
+        if plan:
+            incomplete = [
+                name for name, info in plan["parts"].items()
+                if info.get("status") != "complete"
+            ]
+
+        if not incomplete and _buffer["elements"]:
+            break  # Done
+
+        if attempt < max_retries:
+            messages = prepare_retry_messages(result["messages"])
+            if incomplete:
+                pending = "\n".join(
+                    f"  - {name}: {plan['parts'][name]['description'][:80]}"
+                    for name in incomplete
+                )
+                msg = (
+                    f"## 以下 part 尚未完成\n{pending}\n\n"
+                    f"请继续调用 submit_element（指定 part 参数）填充这些区域的元素，"
+                    f"完成后调用 check_parts(part='xxx', complete=True) 标记。"
+                )
+            else:
+                msg = "请继续提交完整设计。调用 submit_background、submit_element（多次）。"
+            messages.append(HumanMessage(content=msg))
+
+    # ── build notes from plan ──────────────────────────────────────────
+
+    plan = _buffer.get("plan")
+    if plan:
+        parts_lines = [
+            f"[{name}] {info['description']}"
+            for name, info in plan["parts"].items()
+        ]
+        notes = plan["design_concept"] + "\n\n" + "\n".join(parts_lines)
+    else:
+        notes = ""
+
+    _log.info("slide %d done: %d elements, %d parts, bg=%s",
               slide_index, len(_buffer["elements"]),
-              len(_buffer["notes"]), _buffer["background"].get("type", "none"))
+              len(plan["parts"]) if plan else 0,
+              _buffer["background"].get("type", "none"))
 
     return {
         "slide_index": slide_index,
         "elements": list(_buffer["elements"].values()),
-        "notes": _buffer["notes"],
+        "notes": notes,
         "background": _buffer["background"],
+        "plan": plan,
     }

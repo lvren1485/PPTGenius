@@ -12,10 +12,17 @@ has_image: {has_image}
 {color_scheme_section}
 {template_section}
 {neighbor_section}
+{status_section}
+{plan_section}
 ## 画布尺寸
 16:9 宽屏 = 13.333 × 7.5 inch。坐标系: 左上角为原点 (0,0)，left 从左到右增大，top 从上到下增大。
 
 假如outline中的内容装不下，挑选其中最重要，最契合主题的内容进行展示，或者对内容进行适当的精简和概括。
-请设计该页的完整视觉方案。先思考背景和布局，再逐步思考元素，这些只是思考内容，不需要输出元素。
 如果outline中要求添加图片、数据，但没有给出，则留出占位符即可。
-思考结束后，依次调用 submit_background → submit_element（多次）→ submit_notes 提交完整设计。无论如何都要提交，哪怕全是占位符。
+
+请按以下步骤设计该页的完整视觉方案：
+1. **submit_plan** — 划分页面区域（3-6 个 part），每个 part 描述设计意图
+2. **submit_background** — 设置背景
+3. 对每个 part：**submit_element**(part="xxx") ×N → **check_parts**(part="xxx") 检查 → **check_parts**(part="xxx", complete=true) 标记
+4. **check_parts()** — 确认所有 part 均为 complete
+**如果 plan 中已有内容（修改模式），基于已有 plan 修改或追加 part，不要完全覆盖。**

@@ -55,6 +55,7 @@ def build_user_prompt(
     *,
     existing_outputs: dict | None = None,
     pres_status: str | None = None,
+    plan: dict | None = None,
 ) -> str:
     """Build the user prompt for a single slide."""
     content_json = slide.get("content_json", {})
@@ -88,6 +89,8 @@ def build_user_prompt(
     if pres_status and pres_status in status_hints:
         status_section = f"## 页面状态\n{status_hints[pres_status]} (status={pres_status})"
 
+    plan_section = _build_plan_section(plan) if plan else ""
+
     template_text = _load_prompt("content_agent_user.md")
     return template_text.format(
         slide_title=slide.get("title", ""),
@@ -104,6 +107,7 @@ def build_user_prompt(
         template_section=template_section,
         neighbor_section=query_section,
         status_section=status_section,
+        plan_section=plan_section,
     )
 
 
@@ -172,6 +176,28 @@ def _build_template_section(template: dict) -> str:
             parts.append(f"固定元素: {len(fixed)} 个")
     parts.append("模板中的布局和元素仅供参考，你可以自由设计。")
     return "\n".join(parts)
+
+
+def _build_plan_section(plan: dict) -> str:
+    """Format the part-based plan for injection into the user prompt."""
+    if not plan or not plan.get("parts"):
+        return ""
+    parts = plan["parts"]
+    lines = [
+        "## 设计计划 (Plan)",
+        f"设计概念: {plan.get('design_concept', '')}",
+        "",
+        "| Part | 状态 | 描述 |",
+        "|------|------|------|",
+    ]
+    for name, info in parts.items():
+        status = info.get("status", "pending")
+        desc = info.get("description", "")[:80]
+        status_mark = "✓" if status == "complete" else "○"
+        lines.append(f"| {status_mark} {name} | {status} | {desc} |")
+    lines.append("")
+    lines.append("**修改 Plan**：重新调用 submit_plan，同名 part 会更新描述并重置为 pending，新名称会追加。")
+    return "\n".join(lines)
 
 
 def _j(obj) -> str:

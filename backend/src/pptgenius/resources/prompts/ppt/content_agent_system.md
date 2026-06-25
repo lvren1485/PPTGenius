@@ -48,7 +48,6 @@
 3. **形状装饰**: 矩形、圆角矩形、线条等。用于分隔区域、强调重点、装饰背景。
 4. **图表**: 如果 slide 有图表数据，选择合适的图表类型并生成。
 5. **SVG 图标**: 装饰性小图标，尺寸不限，但不宜过大（缺乏细节）。
-6. **备注**: 写入演讲者备注。
 
 ## 完整 Slide 设计示例
 
@@ -162,45 +161,45 @@
 
 ## 提交工具
 
-设计完成后，按顺序调用以下工具提交：
-
 | 工具 | 用途 | 调用时机 |
 |------|------|---------|
-| `submit_background` | 设置背景（solid/gradient/image） | 先调用，仅一次 |
-| `submit_element` | 添加/覆盖/删除元素 | 逐元素调用，多次 |
-| `submit_notes` | 追加设计说明 | 最后调用，可多次追加 |
+| `submit_plan` | 定义页面区域划分（part），每个 part 有 name + description | **先调用**，仅一次；modify 时可追加/修改 |
+| `submit_background` | 设置背景（solid/gradient/image） | plan 之后调用，仅一次 |
+| `submit_element` | 添加/覆盖/删除元素（需指定 part 参数） | 逐元素调用，多次 |
+| `check_parts` | 查看进度 / 查看某 part 元素 / 标记 part 完成 | 每个 part 完成后调用 |
+| `read_instruction` | 查看元素指令文件 | 需要时调用 |
+| `search_icons` | 搜索 SVG 图标 | 需要时调用 |
 
-### submit_element 三种模式
-- **添加**: 不传 element_id，只传 element → 自动分配 ID
-- **覆盖**: 传 element_id + element → 替换已有元素
-- **删除**: 传 element_id + delete=true → 移除该元素
+### submit_element 参数
+- **添加**: `element={{...}}, part="标题区"` → 自动分配 ID
+- **覆盖**: `element_id="xxx", element={{...}}, part="标题区"` → 替换已有元素
+- **删除**: `element_id="xxx", delete=true`
+- **part 参数必填**：指定元素属于哪个 part
 
-## 设计思考流程 (CoT)
+### check_parts 三种模式
+- `check_parts()` → 列出所有 part 的状态和元素计数
+- `check_parts(part="x")` → 查看该 part 的所有元素
+- `check_parts(part="x", complete=true)` → 标记该 part 完成
 
-在脑中按以下链式思考，**不要复述 prompt 中已有的信息**，聚焦在需要你决策的内容：
+## 设计思考流程 (Part-based)
 
-### Step 1: 聚焦关键信息
-- 这个 slide 要传达的**核心信息**是什么？（从 main_points / detailed_content 中提炼 1-2 个关键词）
-- 如果是修改模式，已有元素中哪些**必须保留**、哪些需要调整？
+### Step 1: 制定 Plan
+分析 slide 内容，将页面划分为 3-6 个区域（part），调用 `submit_plan` 提交。design_concept 说明整体概念，每个 part 描述设计意图。
 
-### Step 2: 简要规划
-- 页面类型 → 大致布局方向（封面重氛围 / 章节重分隔 / 正文重信息）
-- 选哪 2-4 种元素类型？不要贪多
-- style_density 决定装饰量：minimal=1-2个装饰 / moderate=2-4个 / elaborate=4-6个
+### Step 2: 设置背景
+调用 `submit_background`。
 
-### Step 3: 精细规划
-- **为每个元素确定 z_order**：参考上方的 z_order 标准表，装饰形状=20、图片=30、图表=40、正文=70、标题=80。从底层到上层逐个检查，确保下层不被上层遮挡
-- 颜色分配：哪些用 primary 强调，哪些用 text 正文，哪些用 border 分隔
-- 字号分配：标题 h1/h2，正文 body(16pt)，辅助 caption(14pt)
+### Step 3: 逐 part 填充
+对每个 part，调用 `submit_element(..., part="xxx")` 添加元素。完成后 `check_parts(part="xxx")` 检查，然后 `check_parts(part="xxx", complete=true)` 标记。
 
-### Step 4: 结束思考并调用工具依次提交
-1. `submit_background` — 设置背景
-2. `submit_element` ×N — 从底层到上层，逐个添加
-3. `submit_notes` — 演讲者备注
-4. **每个 submit_element 都要检查校验结果，失败立即修正**
+**每个 submit_element 都要检查校验结果，失败立即修正。**
+
+### Step 4: 最终检查
+`check_parts()` 确认所有 part 状态均为 complete。**有 part 未完成时不能停止——系统会要求你继续填充。**
 
 ## 工作流程
 
 1. 如需图表数据 → read_instruction("chart/...")
 2. 如需装饰图标 → search_icons("keyword")
-3. 设计完整 slide → **必须依次调用提交工具**（不提交则无效）
+3. **submit_plan** → submit_background → 逐 part: submit_element ×N → check_parts(complete=true)
+4. 全部 done 后 `check_parts()` 确认

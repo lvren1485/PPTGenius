@@ -154,6 +154,8 @@ async def _write_slide_content(
     existing_outputs = existing_ps.agent_outputs if existing_ps and existing_ps.agent_outputs else None
     pres_status = existing_ps.status if existing_ps else None
 
+    existing_plan = existing_outputs.get("plan") if existing_outputs else None
+
     # Map layout_type to template category, pass all 3 templates as catalog
     template_type = _LAYOUT_TYPE_MAP.get(sd["layout_type"], "content")
     matched_template = templates.get(template_type)
@@ -167,6 +169,7 @@ async def _write_slide_content(
         query=query,
         pres_status=pres_status,
         existing_outputs=existing_outputs,
+        plan=existing_plan,
     )
 
     # Ensure presentation_slide row exists
@@ -193,6 +196,7 @@ async def _write_slide_content(
         "background": result.get("background", {}),
         "elements": result.get("elements", []),
         "notes": final_notes,
+        "plan": result.get("plan", {}),
     }
     await db.set_slide_agent_output(
         presentation_id=pres_id,
