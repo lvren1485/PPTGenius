@@ -90,24 +90,7 @@ async function loadConversation() {
 }
 
 const sending = ref(false)
-const pendingAiIdx = ref(-1)
-
-function pushAiPlaceholder() {
-  if (pendingAiIdx.value >= 0) return
-  const idx = messages.value.length + 1
-  pendingAiIdx.value = idx
-  messages.value.push({
-    id: -1, idx, role: 'assistant', content: '...',
-    content_type: 'text', metadata_json: null,
-    estimated_cost: null, created_at: new Date().toISOString(),
-  })
-}
-
-function removeAiPlaceholder() {
-  if (pendingAiIdx.value < 0) return
-  messages.value = messages.value.filter(m => m.idx !== pendingAiIdx.value)
-  pendingAiIdx.value = -1
-}
+const aiReplied = ref(false)
 
 function isAtBottom(): boolean {
   const el = document.getElementById('msg-container')
@@ -138,7 +121,7 @@ async function sendMessage(text: string) {
       role: 'user', content: text, content_type: 'text',
       metadata_json: null, estimated_cost: null, created_at: new Date().toISOString(),
     })
-    pendingAiIdx.value = -1
+    aiReplied.value = false
     await nextTick()
     scrollBottom(true)
 
@@ -153,7 +136,6 @@ async function sendMessage(text: string) {
       ElMessage.error(e.message || '请求失败')
     } finally {
       thinking.value = false
-      removeAiPlaceholder()
     }
 
     await loadConversation()
@@ -166,21 +148,20 @@ async function sendMessage(text: string) {
 function handleStop() {
   if (convId.value > 0) cancelChat(convId.value).catch(() => {})
   thinking.value = false
+  aiReplied.value = true
 }
 
 function handleSseEvent(evt: { event: string; data: Record<string, any> }) {
   const d = evt.data
-  if (evt.event === 'error') { ElMessage.error(d.message || '执行出错'); removeAiPlaceholder(); return }
+  if (evt.event === 'error') { ElMessage.error(d.message || '执行出错'); return }
   if (evt.event === 'done') { thinking.value = false; return }
   if (evt.event !== 'message') return
 
   switch (d.type) {
     case 'master_start':
       thinking.value = true
-      pushAiPlaceholder()
       break
     case 'tool_start':
-      pushAiPlaceholder()
       messages.value.push({
         id: 0, idx: messages.value.length + 1,
         role: 'tool_call', content: toolCallContent(d.tool || '', d.args || {}),
@@ -220,7 +201,7 @@ function handleSseEvent(evt: { event: string; data: Record<string, any> }) {
       scrollBottom()
       break
     case 'master_reply':
-      removeAiPlaceholder()
+      aiReplied.value = true
       messages.value.push({
         id: 0, idx: messages.value.length + 1,
         role: 'assistant', content: d.reply || '',
@@ -230,7 +211,6 @@ function handleSseEvent(evt: { event: string; data: Record<string, any> }) {
       scrollBottom()
       break
     case 'master_done':
-      removeAiPlaceholder()
       thinking.value = false
       break
   }
@@ -265,12 +245,16 @@ function toolCtype(name: string): string {
     _ppt_style: 'ppt_style',
     _slides_content: 'slides_content',
     _modify_slides_content: 'mod_slides',
+    _get_pending_slides: 'pending_slides',
+    _get_pending_presentation_slides: 'pending_ppt_slides',
     _get_style: 'get_style',
     _save_style: 'save_style',
     _set_presentation_style: 'set_pres_style',
     _submit_element: 'submit_elem',
     _submit_notes: 'submit_notes',
     _submit_background: 'submit_bg',
+    _submit_plan: 'submit_plan',
+    _check_parts: 'check_parts',
   }
   return map[name] || 'tool_call'
 }
@@ -396,6 +380,14 @@ function isToolBlock(item: MsgItem | ToolBlock): item is ToolBlock {
             :content="(msg as MsgItem).content"
           />
         </template>
+
+        <!-- AI loading bubble — appears below tool messages until master_reply -->
+        <div v-if="(thinking || sending) && !aiReplied" class="loading-bubble">
+          <div class="msg-role">AI</div>
+          <div class="msg-body">
+            <div class="loading-dots"><span /><span /><span /></div>
+          </div>
+        </div>
       </div>
 
       <ChatInput :sending="sending" @send="sendMessage" @stop="handleStop" @upload="handleUpload" />
@@ -427,5 +419,46 @@ function isToolBlock(item: MsgItem | ToolBlock): item is ToolBlock {
   padding: 24px;
   display: flex;
   flex-direction: column;
+}
+
+/* AI loading bubble — below tool messages */
+.loading-bubble {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 20px;
+  max-width: 80%;
+  align-self: flex-start;
+}
+.loading-bubble .msg-role {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.loading-bubble .msg-body {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 12px 24px;
+}
+.loading-dots {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 0;
+}
+.loading-dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  animation: bounce 1.4s ease-in-out infinite both;
+}
+.loading-dots span:nth-child(1) { animation-delay: 0s; }
+.loading-dots span:nth-child(2) { animation-delay: .2s; }
+.loading-dots span:nth-child(3) { animation-delay: .4s; }
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(.6); opacity: .4; }
+  40% { transform: scale(1); opacity: 1; }
 }
 </style>

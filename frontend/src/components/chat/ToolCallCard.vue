@@ -25,6 +25,7 @@ const expanded = ref(false)
 const SUB_TOOL_UNDERSCORE = new Set([
   '_get_style', '_save_style', '_set_presentation_style',
   '_submit_element', '_submit_notes', '_submit_background',
+  '_submit_plan', '_check_parts',
 ])
 
 // Group: master tools (name starts with _) contain sub-agent tools as children
@@ -103,6 +104,8 @@ function ctypeLabel(ctype: string): string {
     get_style: '查看样式', save_style: '保存样式',
     set_pres_style: '应用样式', submit_elem: '提交元素',
     submit_notes: '提交备注', submit_bg: '提交背景',
+    submit_plan: '提交计划', check_parts: '检查部件',
+    pending_slides: '查看进度', pending_ppt_slides: '查看PPT进度',
   }
   return map[ctype] || ctype
 }
@@ -111,6 +114,7 @@ function toolNameLabel(name: string): string {
   const map: Record<string, string> = {
     _get_conversation_status: '读取会话状态', _switch_outline: '切换大纲',
     _get_outline: '读取大纲', _get_outline_slide: '读取页面',
+    _get_pending_slides: '查看大纲进度', _get_pending_presentation_slides: '查看PPT进度',
     _get_presentation: '读取PPT', _get_knowledge_files: '读取知识文件',
     _search_styles: '搜索样式', _create_empty_outline: '创建空大纲',
     _write_outline_structure: '写入大纲结构', _modify_outline_structure: '修改大纲结构',
@@ -121,8 +125,11 @@ function toolNameLabel(name: string): string {
     search_knowledge: '搜索知识库', search_web: '网络搜索',
     fetch_web: '抓取网页', read_file: '读取文件',
     write_slide: '写入页面', pending_slides: '查看进度',
+    search_icons: '搜索图标', read_instruction: '读取说明',
+    read_chart_instruction: '读取图表说明',
     _submit_element: '提交元素', _submit_notes: '提交备注',
-    _submit_background: '提交背景',
+    _submit_background: '提交背景', _submit_plan: '提交计划',
+    _check_parts: '检查部件',
     _get_style: '查看样式', _save_style: '保存样式',
     _set_presentation_style: '应用样式',
   }
