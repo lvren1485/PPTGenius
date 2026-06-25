@@ -169,19 +169,22 @@ async def run_slide_agent(
 
     if not _buffer["elements"] and not _buffer["background"]:
         _log.warning("slide %d: no content submitted — retrying with submit-only agent", slide_index)
+        from ..common.message_utils import prepare_retry_messages
         submit_tools = [tool(_submit_element), tool(_submit_notes), tool(_submit_background)]
         retry_agent = create_agent(
             model=llm, tools=submit_tools,
-            system_prompt="你必须立即提交 slide 的完整设计。直接调用 submit_background、submit_element 和 submit_notes。不要再搜索或查阅任何资料。",
+            system_prompt=system_prompt,
             middleware=mws,
         )
+        retry_messages = [HumanMessage(content=user_prompt)]
+        try:
+            retry_messages = prepare_retry_messages(result["messages"])
+        except (NameError, KeyError):
+            pass
+        retry_messages.append(HumanMessage(content="请继续提交完整设计。调用 submit_background、submit_element（多次）、submit_notes。"))
         try:
             await retry_agent.ainvoke(
-                {"messages": [
-                    SystemMessage(content=system_prompt),
-                    HumanMessage(content=user_prompt),
-                    HumanMessage(content="请立即提交完整设计。调用 submit_background、submit_element（多次）、submit_notes。"),
-                ]},
+                {"messages": retry_messages},
                 config={"recursion_limit": 30},
             )
         except Exception:

@@ -236,12 +236,13 @@ async def run_outline_generator(
             break
 
         if attempt < max_retries:
+            from ..common.message_utils import prepare_retry_messages
             pending = await pending_slides.ainvoke({})
-            result["messages"].append(HumanMessage(content=(
+            messages = prepare_retry_messages(result["messages"])
+            messages.append(HumanMessage(content=(
                 f"## 当前进度\n{pending}\n\n"
                 f"请继续逐个调用 write_slide 完成剩余的幻灯片。"
             )))
-            messages = result["messages"]
 
     if len(_written) < sec_slides:
         _log.error("generator section=%d only %d/%d written after %d attempts",

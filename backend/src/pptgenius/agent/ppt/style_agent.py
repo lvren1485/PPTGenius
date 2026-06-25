@@ -232,27 +232,6 @@ async def run_style_agent(
         _log.warning("style_agent crashed")
         _log.debug("style_agent crash detail", exc_info=True)
 
-    # Retry if set_presentation_style wasn't called
-    if not _was_called[0]:
-        _log.warning("set_presentation_style not called — retrying")
-        retry_agent = create_agent(
-            model=llm,
-            tools=[tool(_set_presentation_style)],
-            system_prompt="你必须立即调用 _set_presentation_style 提交风格选择。直接选择最合适的样式并提交。",
-            middleware=mws,
-        )
-        try:
-            await retry_agent.ainvoke(
-                {"messages": [
-                    HumanMessage(content=user_prompt),
-                    HumanMessage(content="请立即调用 _set_presentation_style 提交。不要再浏览或搜索。"),
-                ]},
-                config={"recursion_limit": 10},
-            )
-        except Exception:
-            _log.warning("style_agent retry crashed")
-            _log.debug("style_agent retry crash detail", exc_info=True)
-        _was_called[0] = True
 
     style_id = _style_id[0]
     if style_id:
