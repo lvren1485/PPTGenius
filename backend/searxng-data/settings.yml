@@ -1,0 +1,38 @@
+# SearXNG configuration for PPTGenius local API access
+# Docs: https://docs.searxng.org/admin/settings/
+
+use_default_settings: true
+
+server:
+  secret_key: "pptgenius-local-dev-key-change-in-production"
+  bind_address: "0.0.0.0"
+  limiter: false
+  public_instance: false
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  formats:
+    - html
+    - json
+
+ui:
+  static_use_hash: true
+
+redis:
+  url: false
+
+outgoing:
+  request_timeout: 10.0
+  max_request_timeout: 15.0
+  useragent_suffix: ""
+
+# Disable all bot detection / rate limiting
+botdetection:
+  ip_limit:
+    link_token: false
+    enabled: false
+  ip_lists:
+    enabled: false
+  user_agent:
+    enabled: false
