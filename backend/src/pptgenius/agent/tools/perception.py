@@ -208,6 +208,40 @@ def make_get_pending_slides(db: Database, conversation_id: int) -> Callable:
     return tool(_get_pending_slides)
 
 
+def make_get_pending_presentation_slides(db: Database, conversation_id: int) -> Callable:
+    """Return a tool to list presentation slides that are not yet completed."""
+
+    async def _get_pending_presentation_slides() -> dict:
+        """List presentation slides whose status is not 'completed'.
+
+        Use this after slides_content to check if any slides failed to generate.
+        """
+        conv = await db.get_conversation(conversation_id)
+        if conv is None or conv.current_outline_id is None:
+            return {"error": "没有选中大纲"}
+        outline_id = conv.current_outline_id
+        pres_list = await db.list_presentations_by_conversation(conversation_id)
+        pres = next((p for p in pres_list
+                     if p.outline_id == outline_id and p.status != "deleted"), None)
+        if pres is None:
+            return {"error": "当前大纲没有关联的 presentation"}
+        slides = await db.get_slides_by_presentation_id(pres.id)
+        pending = []
+        for s in slides:
+            if s.status != "completed":
+                ao = s.agent_outputs or {}
+                elem_count = len(ao.get("elements", []))
+                has_bg = bool(ao.get("background"))
+                pending.append({
+                    "id": s.id, "slide_index": s.slide_index,
+                    "status": s.status, "elements": elem_count,
+                    "has_background": has_bg,
+                })
+        return {"total": len(slides), "pending": len(pending), "slides": pending}
+
+    return tool(_get_pending_presentation_slides)
+
+
 def make_get_presentation(db: Database, conversation_id: int) -> Callable:
     """Return a tool to read the presentation state for the current outline."""
 

@@ -69,16 +69,22 @@
 ```
 1. ppt_style(query?)  → **必须调用**，让 style agent 自主选择或创建样式并应用
 2. slides_content(query?)  → 紧跟其后，并行生成全部页面的视觉元素
-3. get_presentation()  → 查看结果
+3. get_pending_presentation_slides()  → 检查是否有未完成页
+4. get_presentation()  → 查看结果
 ```
-**场景 F 规则：步骤 1-2 连在一起做，不要在中间停下来询问用户。不要自己调 `search_styles` 或 `get_style` 来挑选样式——那是 style agent 的职责。`ppt_style` 会内部浏览、选择、创建样式并自动应用到 presentation，你只需要传可选的 query。**
+**场景 F 规则：步骤 1-2 连在一起做，不要在中间停下来询问用户。不要自己调 `search_styles` 或 `get_style` 来挑选样式——那是 style agent 的职责。**
 
 ### 场景 G：修改已有 PPT
 ```
-1. get_presentation()  → 查看当前 PPT 状态
+1. get_outline()  → 先获取 outline，找到要修改页的 slide id（outline_slide.id）
 2. 如需换样式 → ppt_style(query: "换为深色科技风")
-3. 如需改内容 → modify_slides_content(slide_ids, modify_instructions)
+3. 改内容 → modify_slides_content(
+     slide_ids=[需修改的 outline_slide.id, ...],
+     modify_instructions={slide_id: "具体修改指令", ...}
+   )
+4. get_pending_presentation_slides()  → 验证完成
 ```
+**场景 G 规则：`slide_ids` 是 outline_slide.id（不是 slide_index），需要从 get_outline 获取。`modify_instructions` 的 key 也是 outline_slide.id，value 描述具体要改什么。如果不确定 id，先调 get_outline 查看。**
 
 ### 场景 H：闲聊 / 非 PPT 请求
 简要介绍系统功能，引导用户描述 PPT 需求。

@@ -199,6 +199,7 @@ async def _write_slide_content(
         slide_index=idx,
         agent_outputs=agent_outputs,
     )
+    await db.update_slide_status(pres_id, idx, "completed")
 
     _log.debug("slide %d written: %d elements, bg=%s",
                idx, len(result.get("elements", [])),
