@@ -75,9 +75,8 @@ def _apply_paragraph(p, para_spec) -> None:
 def _apply_font(run, font_spec) -> None:
     """Apply run-level font formatting."""
     f = run.font
-    if font_spec.name:
-        f.name = font_spec.name
-        set_run_fonts(run, font_spec.name)
+    f.name = font_spec.name or "微软雅黑"
+    set_run_fonts(run, f.name)
     if font_spec.size:
         f.size = Pt(font_spec.size)
     if font_spec.bold is not None:

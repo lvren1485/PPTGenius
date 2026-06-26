@@ -214,6 +214,8 @@ def _check_table(el: TableElement, path: str, errors: list[dict]) -> None:
             errors.append({"path": f"{path}.cells[{ci}]", "error": f"row {cell.row} >= {el.rows}"})
         if cell.col >= el.cols:
             errors.append({"path": f"{path}.cells[{ci}]", "error": f"col {cell.col} >= {el.cols}"})
+    if el.header and el.header.row >= el.rows:
+        errors.append({"path": f"{path}.header.row", "error": f"header row {el.header.row} >= {el.rows}"})
     if el.merges:
         for mi, m in enumerate(el.merges):
             if m.from_row >= el.rows or m.to_row >= el.rows:

@@ -101,7 +101,9 @@ def _render_category(slide, el, left, top, width, height):
     chart = graphic_frame.chart
     if el.title:
         chart.has_title = True
-        chart.chart_title.text_frame.paragraphs[0].text = el.title
+        tf = chart.chart_title.text_frame
+        if tf.paragraphs:
+            tf.paragraphs[0].text = el.title
     return chart
 
 
@@ -119,7 +121,9 @@ def _render_scatter(slide, el, left, top, width, height):
     chart = graphic_frame.chart
     if el.title:
         chart.has_title = True
-        chart.chart_title.text_frame.paragraphs[0].text = el.title
+        tf = chart.chart_title.text_frame
+        if tf.paragraphs:
+            tf.paragraphs[0].text = el.title
     return chart
 
 
@@ -136,7 +140,9 @@ def _render_bubble(slide, el, left, top, width, height):
     chart = graphic_frame.chart
     if el.title:
         chart.has_title = True
-        chart.chart_title.text_frame.paragraphs[0].text = el.title
+        tf = chart.chart_title.text_frame
+        if tf.paragraphs:
+            tf.paragraphs[0].text = el.title
     return chart
 
 
@@ -164,14 +170,16 @@ def _apply_chart_style(chart, el: ChartElement) -> None:
         if el.chart_type.startswith("pie") or el.chart_type.startswith("doughnut"):
             series = chart.series[0]
             for i, c in enumerate(style.series_colors):
-                if i < len(series.points):
-                    series.points[i].format.fill.solid()
-                    series.points[i].format.fill.fore_color.rgb = RGBColor.from_string(c)
+                if c == "none" or i >= len(series.points):
+                    continue
+                series.points[i].format.fill.solid()
+                series.points[i].format.fill.fore_color.rgb = RGBColor.from_string(c)
         else:
             for i, c in enumerate(style.series_colors):
-                if i < len(chart.series):
-                    chart.series[i].format.fill.solid()
-                    chart.series[i].format.fill.fore_color.rgb = RGBColor.from_string(c)
+                if c == "none" or i >= len(chart.series):
+                    continue
+                chart.series[i].format.fill.solid()
+                chart.series[i].format.fill.fore_color.rgb = RGBColor.from_string(c)
 
     # Chart area / plot area background
     if style.chart_area_fill:
@@ -187,11 +195,15 @@ def _apply_chart_style(chart, el: ChartElement) -> None:
 
     # Font sizes
     if style.title_font_size and chart.has_title:
-        p = chart.chart_title.text_frame.paragraphs[0]
-        if p.runs:
-            p.runs[0].font.size = Pt(style.title_font_size)
+        tf = chart.chart_title.text_frame
+        if tf.paragraphs and tf.paragraphs[0].runs:
+            tf.paragraphs[0].runs[0].font.size = Pt(style.title_font_size)
     if style.axis_font_size:
-        if hasattr(chart, "category_axis"):
+        try:
             chart.category_axis.tick_labels.font.size = Pt(style.axis_font_size)
-        if hasattr(chart, "value_axis"):
+        except ValueError:
+            pass
+        try:
             chart.value_axis.tick_labels.font.size = Pt(style.axis_font_size)
+        except ValueError:
+            pass

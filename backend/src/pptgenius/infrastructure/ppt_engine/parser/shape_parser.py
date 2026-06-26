@@ -22,6 +22,8 @@ def render_shape(slide, el: ShapeElement) -> None:
     height = Inches(el.position.height) if el.position.height else Inches(1.0)
 
     mso_shape = resolve_shape(el.shape_type)
+    if mso_shape is None:
+        raise ValueError(f"unknown shape_type '{el.shape_type}'")
     shape = slide.shapes.add_shape(mso_shape, left, top, width, height)
 
     # Fill
@@ -79,7 +81,7 @@ def _apply_paragraph(p, para_spec) -> None:
             from pptx.dml.color import RGBColor
             f = run.font
             s = run_spec.font
-            if s.name: f.name = s.name; set_run_fonts(run, s.name)
+            f.name = s.name or "微软雅黑"; set_run_fonts(run, f.name)
             if s.size: f.size = Pt(s.size)
             if s.bold is not None: f.bold = s.bold
             if s.color: f.color.rgb = RGBColor.from_string(s.color)

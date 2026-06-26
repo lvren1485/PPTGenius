@@ -169,17 +169,11 @@ def _apply_slide_background(slide, bg) -> None:
             fill.gradient_angle = bg.gradient_angle
         if bg.gradient_stops:
             from .parser.styles import add_gradient_stop
-            # Replace default stops with custom ones
+            stops = fill.gradient_stops
             for i, gs in enumerate(bg.gradient_stops):
-                if i < 2:
-                    # Modify existing stops
-                    stops = fill.gradient_stops
-                    if i == 0:
-                        stops[0].color.rgb = RGBColor.from_string(gs.color)
-                    elif i == 1:
-                        stops[1].color.rgb = RGBColor.from_string(gs.color)
+                if i < len(stops):
+                    stops[i].color.rgb = RGBColor.from_string(gs.color)
                 else:
-                    # Add extra stops via lxml
                     _shape = type("obj", (), {"fill": fill})()
                     add_gradient_stop(_shape, gs.position, gs.color.lstrip("#"))
     elif bg.type == "image" and bg.color:
