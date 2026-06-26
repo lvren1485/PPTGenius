@@ -40,30 +40,22 @@ def _strip_comments(stmt: str) -> str:
     return "\n".join(lines).strip()
 
 
-def _extract_db_name(url: str) -> str:
-    """Extract database name from a SQLAlchemy URL."""
-    # e.g. mysql+asyncmy://root:pass@localhost:3306/pptgenius → pptgenius
-    m = re.search(r"/([^/?]+)(?:\?|$)", url)
-    return m.group(1) if m else ""
-
-
 async def create_tables():
     """Execute schema.sql — idempotent, skips pre-existing tables without warnings."""
     engine = _get_engine()
-    settings = get_settings()
-    db_name = _extract_db_name(settings.db.url)
+    cfg = get_settings().db
 
     # --- 1. check database exists -------------------------------------------
-    server_url = settings.db.url.rsplit("/", 1)[0] + "/mysql"
+    server_url = f"{cfg.type}+asyncmy://{cfg.username}:{cfg.password}@{cfg.host}:{cfg.port}/mysql"
     server_engine = create_async_engine(server_url, echo=False)
     try:
         async with server_engine.begin() as conn:
             result = await conn.execute(
                 text("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = :name"),
-                {"name": db_name},
+                {"name": cfg.database},
             )
             if result.fetchone() is None:
-                _log.error("database '%s' does not exist — please create it first", db_name)
+                _log.error("database '%s' does not exist — please create it first", cfg.database)
                 return
     finally:
         await server_engine.dispose()

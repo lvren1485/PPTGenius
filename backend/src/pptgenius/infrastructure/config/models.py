@@ -37,7 +37,17 @@ class LLMConfig(BaseModel):
 
 
 class DBConfig(BaseModel):
-    url: str = "mysql+asyncmy://root:root@localhost:3306/pptgenius"
+    type: str = Field(default="mysql", description="仅支持: mysql")
+    host: str = Field(default="localhost")
+    port: int = Field(default=3306)
+    username: str = Field(default="root")
+    password: str = Field(default="")
+    database: str = Field(default="pptgenius")
+
+    @property
+    def url(self) -> str:
+        """Assemble SQLAlchemy connection URL from individual fields."""
+        return f"{self.type}+asyncmy://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
 
 
 class LogConfig(BaseModel):

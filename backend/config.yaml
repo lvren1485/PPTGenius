@@ -27,7 +27,12 @@ llm:
   max_tokens: 80000
 
 db:
-  url: "mysql+asyncmy://{username}:{password}@localhost:3306/pptgenius"
+  type: "mysql"               # 仅支持: mysql
+  host: "localhost"
+  port: 3306
+  username: "root"
+  password: ""                 # 在 config.local.yaml 中填写真实密码
+  database: "pptgenius"
 
 log:
   level: "INFO"                       # 仅支持: DEBUG | INFO | WARNING | ERROR | CRITICAL
