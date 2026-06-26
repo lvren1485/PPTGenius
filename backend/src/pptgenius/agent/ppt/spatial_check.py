@@ -30,18 +30,52 @@ def _overlap_pct(a: dict, b: dict) -> int:
 
 # ── per-element checks ────────────────────────────────────────────────
 
+def _check_aspect_ratio(
+    w: float, h: float, el_type: str,
+    *, rows: int = 0, cols: int = 0,
+    label: str = "",
+) -> list[str]:
+    """Check aspect ratio only (not minimum size).  Shared by element + plan checks.
+
+    ``label`` is prepended for plan-level output (e.g. the part name).
+    """
+    prefix = f"{label}: " if label else ""
+    warnings: list[str] = []
+
+    if el_type == "table":
+        if rows > 0 and h / rows < 0.25:
+            warnings.append(f"{prefix}表格每行仅 {h/rows:.2f}\"，可能无法阅读")
+        if cols > 0 and w / cols < 0.6:
+            warnings.append(f"{prefix}表格每列仅 {w/cols:.2f}\"，可能过窄")
+        if h > 0 and (w / h > 5.0):
+            warnings.append(f"{prefix}表格宽高比 {w/h:.1f}:1，过于扁平")
+        if h > 0 and (w / h < 0.3):
+            warnings.append(f"{prefix}表格宽高比 {w/h:.1f}:1，过于细长")
+    elif el_type == "chart":
+        if h > 0 and (w / h > 3.5):
+            warnings.append(f"{prefix}图表宽高比 {w/h:.1f}:1，过于扁平")
+        if h > 0 and (w / h < 0.5):
+            warnings.append(f"{prefix}图表宽高比 {w/h:.1f}:1，过于细长")
+    elif el_type == "picture":
+        if h > 0 and (w / h > 5.0):
+            warnings.append(f"{prefix}图片宽高比 {w/h:.1f}:1，过于扁平")
+        if h > 0 and (w / h < 0.2):
+            warnings.append(f"{prefix}图片宽高比 {w/h:.1f}:1，过于细长")
+
+    return warnings
+
+
 def _check_min_size(element: dict) -> list[str]:
-    """Return warnings if element is unreasonably small for its type."""
+    """Return warnings if element is unreasonably small / bad aspect ratio."""
     pos = element.get("position", {})
     w = pos.get("width", 0)
     h = pos.get("height") or 0
     el_type = element.get("type", "")
     warnings: list[str] = []
 
+    # Element-level minimum sizes
     if el_type == "table":
-        rows = element.get("rows", 1)
-        if rows > 0 and h / rows < 0.25:
-            warnings.append(f"表格每行仅 {h/rows:.2f}\"，可能无法阅读，建议增大 height 或减少 rows")
+        pass  # row/col handled by aspect ratio check
     elif el_type == "chart":
         if w < 1.5 or h < 1.5:
             warnings.append("图表尺寸过小（建议 ≥1.5×1.5 英寸），增大 width/height")
@@ -63,6 +97,13 @@ def _check_min_size(element: dict) -> list[str]:
         warnings.append(f"元素宽度仅 {w:.2f}\"，可能过小")
     if h < 0.2:
         warnings.append(f"元素高度仅 {h:.2f}\"，可能过小")
+
+    # Aspect ratio (shared)
+    warnings.extend(_check_aspect_ratio(
+        w, h, el_type,
+        rows=element.get("rows", 0),
+        cols=element.get("cols", 0),
+    ))
 
     return warnings
 
@@ -179,16 +220,21 @@ def check_plan_bounds(parts: dict) -> list[str]:
         if b.get("left", 0) + w > 13.333 or b.get("top", 0) + h > 7.5:
             pw.append(f"'{name}' 超出画布范围")
 
-    # type minimum size
+    # type-specific size + ratio (shared with _check_min_size)
     for name, info in parts_wb:
         b = info["bounds"]
         w, h = b.get("width", 0), b.get("height", 0)
+        # Plan-level minimums — more conservative than element-level because bounds are estimates
         if info.get("has_chart") and (w < 2.0 or h < 2.0):
-            pw.append(f"'{name}': 图表需要 ≥2×2 英寸，当前 {w:.1f}×{h:.1f}")
+            pw.append(f"{name}: 图表建议 ≥2×2 英寸，当前 {w:.1f}×{h:.1f}")
         if info.get("has_table") and (w < 3.0 or h < 1.5):
-            pw.append(f"'{name}': 表格需要 ≥3×1.5 英寸，当前 {w:.1f}×{h:.1f}")
+            pw.append(f"{name}: 表格建议 ≥3×1.5 英寸，当前 {w:.1f}×{h:.1f}")
         if info.get("has_image") and (w < 0.5 or h < 0.5):
-            pw.append(f"'{name}': 图片需要 ≥0.5×0.5 英寸，当前 {w:.1f}×{h:.1f}")
+            pw.append(f"{name}: 图片建议 ≥0.5×0.5 英寸，当前 {w:.1f}×{h:.1f}")
+        # Aspect ratio checks (shared)
+        for el_type, flag in [("chart", "has_chart"), ("table", "has_table"), ("picture", "has_image")]:
+            if info.get(flag):
+                pw.extend(_check_aspect_ratio(w, h, el_type, label=name))
 
     # total area
     total = sum(

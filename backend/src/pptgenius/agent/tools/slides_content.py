@@ -89,6 +89,7 @@ def _resolve_slide_data(slide) -> dict:
         "has_image": slide.has_image or False,
         "notes": slide.notes or "",
         "citations": slide.citations or [],
+        "section_id": slide.section_id,
     }
 
 
@@ -143,10 +144,19 @@ async def _write_slide_content(
     known_files: dict[int, dict],
     query: str | None,
     pres_id: int,
+    *,
+    section_info: dict[int, dict] | None = None,
 ) -> dict:
     """Generate and persist ONE slide.  Returns the agent result dict."""
 
     sd = _resolve_slide_data(outline_slide)
+
+    # Inject section index / title for section-type slides
+    if sd["layout_type"] == "section" and sd["section_id"] and section_info:
+        sec = section_info.get(sd["section_id"])
+        if sec:
+            sd["section_index"] = sec["section_index"]
+            sd["section_title"] = sec["section_title"]
 
     # Read existing agent outputs (for modify mode awareness)
     existing = await db.get_slides_by_presentation_id(pres_id)
@@ -242,6 +252,13 @@ def make_slides_content(db: Database, conversation_id: int) -> Callable:
         if not outline_slides:
             return "错误：大纲没有 slide。"
 
+        # Build section_id → {section_index, section_title} map
+        sections = await db.get_sections_by_outline_id(outline_id)
+        section_info: dict[int, dict] = {
+            s.id: {"section_index": s.section_index, "section_title": s.title}
+            for s in sections
+        }
+
         _log.info("slides_content: generating %d slides", len(outline_slides))
         push_sentinel(conversation_id)
 
@@ -258,6 +275,7 @@ def make_slides_content(db: Database, conversation_id: int) -> Callable:
                     else query
                 ),
                 pres_id=pres_id,
+                section_info=section_info,
             )
             for sl in outline_slides
         ])
@@ -298,6 +316,12 @@ def make_modify_slides_content(db: Database, conversation_id: int) -> Callable:
         if not targets:
             return f"错误：未找到指定的 slide ID: {slide_ids}"
 
+        sections = await db.get_sections_by_outline_id(outline_id)
+        section_info = {
+            s.id: {"section_index": s.section_index, "section_title": s.title}
+            for s in sections
+        }
+
         _log.info("modify_slides_content: regenerating %d slides", len(targets))
         push_sentinel(conversation_id)
 
@@ -314,6 +338,7 @@ def make_modify_slides_content(db: Database, conversation_id: int) -> Callable:
                     else query
                 ),
                 pres_id=pres_id,
+                section_info=section_info,
             )
             for sl in targets
         ])

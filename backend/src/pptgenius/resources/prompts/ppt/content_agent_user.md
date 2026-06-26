@@ -13,6 +13,7 @@ has_image: {has_image}
 {template_section}
 {neighbor_section}
 {status_section}
+{section_info}
 {plan_section}
 ## 画布尺寸
 16:9 宽屏 = 13.333 × 7.5 inch。坐标系: 左上角为原点 (0,0)，left 从左到右增大，top 从上到下增大。

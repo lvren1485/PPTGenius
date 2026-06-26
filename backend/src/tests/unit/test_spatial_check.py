@@ -98,7 +98,32 @@ class TestCheckElementMinSize:
     def test_chart_ok(self):
         el = _make_el("chart", _make_pos(0, 0, 3.0, 2.5))
         result = check_element(el, _make_buffer())
-        assert "图表尺寸过小" not in result
+        assert "图表" not in result
+
+    def test_chart_too_flat(self):
+        el = _make_el("chart", _make_pos(0, 0, 8.0, 1.0))
+        result = check_element(el, _make_buffer())
+        assert "扁平" in result
+
+    def test_chart_too_tall(self):
+        el = _make_el("chart", _make_pos(0, 0, 1.0, 5.0))
+        result = check_element(el, _make_buffer())
+        assert "细长" in result
+
+    def test_table_too_flat(self):
+        el = _make_el("table", _make_pos(0, 0, 10.0, 0.5), rows=3)
+        result = check_element(el, _make_buffer())
+        assert "扁平" in result
+
+    def test_table_narrow_columns(self):
+        el = _make_el("table", _make_pos(0, 0, 2.0, 3.0), rows=3, cols=6)
+        result = check_element(el, _make_buffer())
+        assert "过窄" in result
+
+    def test_picture_too_flat(self):
+        el = _make_el("picture", _make_pos(0, 0, 10.0, 1.0))
+        result = check_element(el, _make_buffer())
+        assert "扁平" in result
 
     def test_picture_too_small(self):
         el = _make_el("picture", _make_pos(0, 0, 0.2, 0.2))
@@ -210,21 +235,21 @@ class TestCheckPlanBounds:
             "图表": {"bounds": {"left": 0, "top": 1, "width": 1, "height": 1}, "has_chart": True},
         }
         result = check_plan_bounds(parts)
-        assert any("图表需要" in w for w in result)
+        assert any("图表" in w for w in result)
 
     def test_table_too_small_for_part(self):
         parts = {
             "表格": {"bounds": {"left": 0, "top": 1, "width": 2, "height": 1}, "has_table": True},
         }
         result = check_plan_bounds(parts)
-        assert any("表格需要" in w for w in result)
+        assert any("表格" in w for w in result)
 
     def test_image_too_small_for_part(self):
         parts = {
             "图标": {"bounds": {"left": 0, "top": 0, "width": 0.3, "height": 0.3}, "has_image": True},
         }
         result = check_plan_bounds(parts)
-        assert any("图片需要" in w for w in result)
+        assert any("图片" in w for w in result)
 
     def test_total_area_warning(self):
         """Four large parts → exceeds 75% canvas."""
@@ -233,6 +258,13 @@ class TestCheckPlanBounds:
             parts[name] = {"bounds": {"left": 0, "top": i * 2, "width": 12, "height": 2.0}}
         result = check_plan_bounds(parts)
         assert any("总面积" in w for w in result)
+
+    def test_plan_chart_too_flat(self):
+        parts = {
+            "图表区": {"bounds": {"left": 1, "top": 2, "width": 8, "height": 1}, "has_chart": True},
+        }
+        result = check_plan_bounds(parts)
+        assert any("扁平" in w for w in result)
 
     def test_mixed_with_and_without_bounds(self):
         """Parts without bounds should be ignored."""

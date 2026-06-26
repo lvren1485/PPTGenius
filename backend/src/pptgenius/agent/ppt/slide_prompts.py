@@ -91,6 +91,15 @@ def build_user_prompt(
 
     plan_section = _build_plan_section(plan) if plan else ""
 
+    # Section info — for section-type slides, tell the agent which section this is
+    section_info = ""
+    sec_idx = slide.get("section_index")
+    sec_title = slide.get("section_title")
+    if sec_idx is not None:
+        section_info = f"## 章节信息\n这是第 **{sec_idx}** 节"
+        if sec_title:
+            section_info += f"：{sec_title}"
+
     template_text = _load_prompt("content_agent_user.md")
     return template_text.format(
         slide_title=slide.get("title", ""),
@@ -108,6 +117,7 @@ def build_user_prompt(
         neighbor_section=query_section,
         status_section=status_section,
         plan_section=plan_section,
+        section_info=section_info,
     )
 
 
