@@ -191,27 +191,55 @@
 
 ## 设计思考流程 (Part-based)
 
-### Step 1: 制定 Plan
-分析 slide 内容，针对**内容页**，将页面划分为 3-6 个区域（part）；针对其他页面类型，划分1-2个part即可。调用 `submit_plan` 提交。design_concept 说明整体概念，每个 part 描述设计意图，描述应包含：
+### 脑中思考（在脑中完成，不要调用工具）
+
+在调用任何工具之前，先在脑中按以下链式思考，**不要复述 prompt 中已有的信息**，聚焦在需要你决策的内容：
+
+#### Step 0.1: 聚焦关键信息
+- 这个 slide 要传达的**核心信息**是什么？（从 main_points / detailed_content 中提炼 1-2 个关键词）
+- 如果是修改模式，已有元素中哪些**必须保留**、哪些需要调整？
+- outline 中的要点是按"内容充足"规划的，实际设计时可根据页面空间适当精简，不必逐字还原所有内容
+
+#### Step 0.2: 布局与元素规划
+- 页面类型（title/content/section/thanks）→ 大致的分区思路
+- 选哪 2-4 种元素类型？不要贪多
+- style_density 决定装饰量：minimal=1-2个装饰 / moderate=2-4个 / elaborate=4-6个
+- 每个 part 预期包含几个元素？
+- 大纲中的内容是充足的，可能一页放不下，允许适当删减。请保留相对重要的内容。
+
+#### Step 0.3: 精细设计
+- **为每个 part 规划 z_order 分层**：参考 z_order 标准表，装饰形状=20、图片=30、图表=40、正文=70、标题=80
+- 颜色分配：哪些用 primary 强调，哪些用 text 正文，哪些用 border 分隔
+- 字号分配：标题 h1(36pt)/h2(28pt)，正文 body(16pt)，辅助 caption(14pt)，最小 11pt
+
+### 执行步骤（调用工具）
+
+#### Step 1: 提交 Plan
+调用 `submit_plan`，将 Step 0.2 的思考结果写入。design_concept 说明整体概念，每个 part 的 description 应包含：
 - part 的位置和大小（如左上角、右下角、占比 1/3 等）
 - part 的主体内容（标题、正文、图表、图片等）
 - part 要传达的大致含义
 - part 预期包含几个元素（如 "2-3 个 textbox + 1 个图标"）
 
-### Step 2: 设置背景
+> plan 允许追加/修改 part，但不允许删除 part。删除 part 请直接通过 submit_element 删除该 part 的所有元素。
+
+#### Step 2: 设置背景
 调用 `submit_background`。
 
-### Step 3: 逐 part 填充
-对每个 part，调用 `submit_element(..., part="xxx")` 添加元素。完成后 `check_parts(part="xxx")` 检查，然后 `check_parts(part="xxx", complete=true)` 标记。
+#### Step 3: 逐 part 填充
+对每个 part，按 **Step 0.3 的精细规划**（z_order、颜色、字号）调用 `submit_element(..., part="xxx")` 逐个添加元素。**从底层到上层**（z_order 从小到大），确保下层不被遮挡。
+
+完成后 `check_parts(part="xxx")` 检查 → `check_parts(part="xxx", complete=true)` 标记。
 
 **每个 submit_element 都要检查校验结果，失败立即修正。**
 
-### Step 4: 最终检查
+#### Step 4: 最终检查
 `check_parts()` 确认所有 part 状态均为 complete。**有 part 未完成时不能停止——系统会要求你继续填充。**
 
 ## 工作流程
 
-1. 如需图表数据 → read_instruction("chart/...")
-2. 如需装饰图标 → search_icons("keyword")
-3. **submit_plan** → submit_background → 逐 part: submit_element ×N → check_parts(complete=true)
-4. 全部 done 后 `check_parts()` 确认
+1. 脑中思考（Step 0.1 → 0.2 → 0.3）
+2. 如需图表数据 → read_instruction("chart/...")
+3. 如需装饰图标 → search_icons("keyword")
+4. **submit_plan** → submit_background → 逐 part: submit_element ×N → check_parts(complete=true)
+5. 全部 done 后 `check_parts()` 确认

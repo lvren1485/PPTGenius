@@ -163,19 +163,24 @@ def _build_template_section(template: dict) -> str:
     if not template:
         return ""
 
-    parts = ["## 布局模板（参考，不必严格遵循）"]
-    if template:
-        name = template.get("name", "")
-        label = template.get("label", "")
-        parts.append(f"模板: {name} ({label})")
-        containers = template.get("containers", [])
-        if containers:
-            parts.append(f"容器区域: {', '.join(c['id'] for c in containers)}")
-        fixed = template.get("fixed_elements", [])
-        if fixed:
-            parts.append(f"固定元素: {len(fixed)} 个")
-    parts.append("模板中的布局和元素仅供参考，你可以自由设计。")
-    return "\n".join(parts)
+    lines = [
+        "## 布局模板参考坐标（仅供参考，你可以自由设计）",
+        f"模板类型: {template.get('type', '')} — {template.get('description', '')}",
+        "",
+        "| id | 类型 | left | top | width | height | 说明 |",
+        "|----|------|------|-----|-------|--------|------|",
+    ]
+    for el in template.get("elements", []):
+        pos = el.get("position", {})
+        lines.append(
+            f"| {el.get('id', '-')} | {el.get('type', '-')} "
+            f"| {pos.get('left', '-')} | {pos.get('top', '-')} "
+            f"| {pos.get('width', '-')} | {pos.get('height', '-')} "
+            f"| {el.get('remark', '-')} |"
+        )
+    lines.append("")
+    lines.append("模板仅供参考，你可以自由设计。")
+    return "\n".join(lines)
 
 
 def _build_plan_section(plan: dict) -> str:

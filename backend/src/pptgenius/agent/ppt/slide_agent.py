@@ -25,6 +25,9 @@ _log = get_logger("pptgenius.agent.ppt.slide_agent")
 
 _MAX_RETRIES = 3
 
+from .spatial_check import check_element as _check_spatial
+from .spatial_check import check_plan_bounds as _check_plan_bounds
+
 
 async def run_slide_agent(
     conversation_id: int,
@@ -68,7 +71,12 @@ async def run_slide_agent(
 
         Args:
             design_concept: 1-2 sentence visual concept. Leave empty to keep old value.
-            parts: [{name, description}, ...] — regions to create or modify.
+            parts: [{name, description, bounds?, has_chart?, has_table?, has_image?}, ...]
+                Each part has required name+description and optional spatial/type metadata:
+                - bounds: {left, top, width, height} — estimated region (inches)
+                - has_chart: bool — part will contain a chart (needs ≥2×2")
+                - has_table: bool — part will contain a table (needs ≥3×1.5")
+                - has_image: bool — part will contain an image (needs ≥0.5×0.5")
         """
         if not parts:
             return "错误: parts 不能为空。"
@@ -89,11 +97,20 @@ async def run_slide_agent(
             if not name or not desc:
                 return f"错误: 每个 part 必须有 name 和 description。收到: name={name!r}"
             if name in plan["parts"]:
-                plan["parts"][name]["description"] = desc
-                plan["parts"][name]["status"] = "pending"
+                entry = plan["parts"][name]
+                entry["description"] = desc
+                entry["status"] = "pending"
+                # optional spatial / type metadata
+                for k in ("bounds", "has_chart", "has_table", "has_image"):
+                    if k in p:
+                        entry[k] = p[k]
                 modified.append(name)
             else:
-                plan["parts"][name] = {"description": desc, "status": "pending"}
+                entry = {"description": desc, "status": "pending"}
+                for k in ("bounds", "has_chart", "has_table", "has_image"):
+                    if k in p:
+                        entry[k] = p[k]
+                plan["parts"][name] = entry
                 added.append(name)
 
         msg_parts = []
@@ -101,7 +118,13 @@ async def run_slide_agent(
             msg_parts.append(f"新增 {len(added)} 个: {', '.join(added)}")
         if modified:
             msg_parts.append(f"修改 {len(modified)} 个: {', '.join(modified)}")
-        return f"Plan 已更新 ({len(plan['parts'])} 个 part)。" + " ".join(msg_parts)
+
+        # C1/C2: bounds-aware spatial pre-check
+        pw = _check_plan_bounds(plan["parts"])
+        result = f"Plan 已更新 ({len(plan['parts'])} 个 part)。" + " ".join(msg_parts)
+        if pw:
+            result += "\n⚠ 空间规划:\n" + "\n".join(f"  - {w}" for w in pw)
+        return result
 
     async def _submit_element(
         element: dict | None = None,
@@ -145,13 +168,20 @@ async def run_slide_agent(
                 f"请根据错误修正后重新提交。"
             )
 
+        # Spatial check (warning only, never blocks)
+        spatial_note = _check_spatial(element, _buffer)
+
         if element_id and element_id in _buffer["elements"]:
             _buffer["elements"][element_id] = element
-            return f"已覆盖元素 {element_id} (type={element.get('type')})"
+            msg = f"已覆盖元素 {element_id} (type={element.get('type')})"
         else:
             eid = element_id or secrets.token_hex(4)
             _buffer["elements"][eid] = element
-            return f"已添加元素 {eid} (type={element.get('type')})"
+            msg = f"已添加元素 {eid} (type={element.get('type')})"
+
+        if spatial_note:
+            msg += "\n" + spatial_note
+        return msg
 
     async def _check_parts(part: str = "", complete: bool = False) -> str:
         """View part progress, element details, or mark a part complete.
@@ -268,7 +298,7 @@ async def run_slide_agent(
         try:
             result = await ag.ainvoke(
                 {"messages": messages},
-                config={"recursion_limit": 100},
+                config={"recursion_limit": 200},
             )
         except Exception:
             _log.warning("slide_agent crashed slide=%d attempt=%d",
