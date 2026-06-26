@@ -173,8 +173,16 @@ def check_element(element: dict, buffer: dict) -> str:
         ex_pos = ex.get("position", {})
         ex_z = ex_pos.get("z_order", 50)
         if abs(new_z - ex_z) <= 10 and _rects_overlap(pos, ex_pos):
+            ex_type = ex.get("type", "")
             pct = _overlap_pct(pos, ex_pos)
-            warnings.append(f"与元素 {eid} (z={ex_z}) 重叠 {pct}%，建议调整位置或 z_order")
+            # Shape-shape overlap is often intentional (decorative layering)
+            if el_type == "shape" and ex_type == "shape":
+                warnings.append(
+                    f"ℹ 形状叠加: 与 {eid}（{ex.get('shape_type', '-')}）重叠 {pct}%。"
+                    f"如非设计意图，请调整位置或 z_order。"
+                )
+            else:
+                warnings.append(f"⚠ 与元素 {eid} (z={ex_z}) 重叠 {pct}%，建议调整位置或 z_order")
 
     # text overflow
     if el_type == "textbox":

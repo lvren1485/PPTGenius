@@ -1,5 +1,5 @@
 ## Slide 信息
-标题: {slide_title}
+标题: {slide_title}（第 {slide_index} 页）
 页面类型: {slide_layout_type}
 推荐格式: {recommended_format}
 has_chart: {has_chart}

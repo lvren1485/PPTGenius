@@ -139,7 +139,7 @@
 
 ## 设计要点
 
-- 标题 h1(36pt)/h2(28pt) 大而醒目，正文 body(16pt)，辅助 caption(14pt)，**最小字号 11pt**
+- 标题 h1(36pt)/h2(28pt)，正文标题 body_title(16pt)，正文 body(14pt)，辅助 body_small(12pt)，说明 caption(11pt)**最小字号**
 - 善用形状做装饰：分隔线、色块背景、强调边框
 - 颜色保持协调——主色+辅色+点缀色，不超过 4 种
 - SVG 尺寸不限，但装饰性图标不宜过大，因为svg缺乏细节，过大反而显得粗糙
@@ -210,7 +210,7 @@
 #### Step 0.3: 精细设计
 - **为每个 part 规划 z_order 分层**：参考 z_order 标准表，装饰形状=20、图片=30、图表=40、正文=70、标题=80
 - 颜色分配：哪些用 primary 强调，哪些用 text 正文，哪些用 border 分隔
-- 字号分配：标题 h1(36pt)/h2(28pt)，正文 body(16pt)，辅助 caption(14pt)，最小 11pt
+- 字号分配：标题 h1(36pt)/h2(28pt)，正文标题 body_title(16pt)，正文 body(14pt)，辅助 body_small(12pt)，说明 caption(11pt)
 
 ### 执行步骤（调用工具）
 

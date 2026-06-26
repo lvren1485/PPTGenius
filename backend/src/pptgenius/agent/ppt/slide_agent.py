@@ -27,6 +27,7 @@ _MAX_RETRIES = 3
 
 from .spatial_check import check_element as _check_spatial
 from .spatial_check import check_plan_bounds as _check_plan_bounds
+from .decor_check import check_decor as _check_decor_style
 
 
 async def run_slide_agent(
@@ -100,14 +101,13 @@ async def run_slide_agent(
                 entry = plan["parts"][name]
                 entry["description"] = desc
                 entry["status"] = "pending"
-                # optional spatial / type metadata
-                for k in ("bounds", "has_chart", "has_table", "has_image"):
+                for k in ("bounds", "has_chart", "has_table", "has_image", "decor_style"):
                     if k in p:
                         entry[k] = p[k]
                 modified.append(name)
             else:
                 entry = {"description": desc, "status": "pending"}
-                for k in ("bounds", "has_chart", "has_table", "has_image"):
+                for k in ("bounds", "has_chart", "has_table", "has_image", "decor_style"):
                     if k in p:
                         entry[k] = p[k]
                 plan["parts"][name] = entry
@@ -167,6 +167,11 @@ async def run_slide_agent(
                 f"校验失败 ({len(result.errors)} 个错误):\n{errors}\n"
                 f"请根据错误修正后重新提交。"
             )
+
+        # Decor style enforcement (emoji vs icon)
+        decor_note = _check_decor_style(element, _buffer, part)
+        if decor_note:
+            return decor_note  # hard reject — conflicting decor style
 
         # Spatial check (warning only, never blocks)
         spatial_note = _check_spatial(element, _buffer)

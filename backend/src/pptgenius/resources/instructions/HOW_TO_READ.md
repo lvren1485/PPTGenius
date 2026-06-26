@@ -177,3 +177,7 @@
 | `"values": [120]` 只有1个值 | values长度必须= categories 长度 |
 | pie 用了 2 个 series | pie 只能用 1 个 series |
 | `"position": {"x":1,"y":2}` | `"position": {"left":1,"top":2,"width":8,"height":5}` |
+
+## 注意事项
+1. 字体如果没有指定，默认使用 微软雅黑。
+2. 图表只有黑色字体，如果是深色背景，**必须**指定浅色背景。

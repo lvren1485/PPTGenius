@@ -103,6 +103,7 @@ def build_user_prompt(
     template_text = _load_prompt("content_agent_user.md")
     return template_text.format(
         slide_title=slide.get("title", ""),
+        slide_index=slide.get("slide_index", 0),
         slide_layout_type=slide.get("layout_type", "content"),
         recommended_format=fmt,
         has_chart=slide.get("has_chart", False),
@@ -145,8 +146,10 @@ def _build_style_section(data: dict) -> str:
         parts.append(
             f"字体: h1({_fs('h1')}pt) "
             f"h2({_fs('h2')}pt) "
+            f"body_title({_fs('body_title')}pt) "
             f"body({_fs('body')}pt) "
-            f"最小: {_fs('min_size')}pt"
+            f"body_small({_fs('body_small')}pt) "
+            f"caption({_fs('caption')}pt)"
         )
 
     # Background (full JSON, not summarized)
