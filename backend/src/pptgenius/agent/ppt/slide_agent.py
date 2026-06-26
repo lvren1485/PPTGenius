@@ -253,14 +253,14 @@ async def run_slide_agent(
 
     # ── main invoke + retry loop ───────────────────────────────────────
 
-    from ..common.message_utils import prepare_retry_messages
-
     max_retries = _MAX_RETRIES
     messages = [HumanMessage(content=user_prompt)]
     result: dict | None = None
 
     for attempt in range(max_retries + 1):
-        ag = agent if attempt == 0 else create_agent(
+        crashed = False
+        # Always fresh agent — avoids any stale state from prior attempts
+        ag = create_agent(
             model=llm, tools=tools,
             system_prompt=system_prompt,
             middleware=mws,
@@ -268,46 +268,66 @@ async def run_slide_agent(
         try:
             result = await ag.ainvoke(
                 {"messages": messages},
-                config={"recursion_limit": 100 if attempt == 0 else 50},
+                config={"recursion_limit": 100},
             )
         except Exception:
             _log.warning("slide_agent crashed slide=%d attempt=%d",
                         slide_index, attempt)
             _log.debug("slide_agent crash detail", exc_info=True)
-            messages = prepare_retry_messages(result["messages"]) if result else messages
-            continue
+            crashed = True
 
-        # Check: empty submission (old retry condition)
-        if not _buffer["elements"] and not _buffer["background"]:
-            _log.warning("slide %d: no content submitted — retrying", slide_index)
-
-        # Check: incomplete parts
-        plan = _buffer.get("plan")
-        incomplete = []
-        if plan:
+        # Check completion
+        current_plan = _buffer.get("plan")
+        incomplete: list[str] = []
+        if current_plan:
             incomplete = [
-                name for name, info in plan["parts"].items()
+                name for name, info in current_plan["parts"].items()
                 if info.get("status") != "complete"
             ]
+        has_content = bool(_buffer["elements"]) or bool(_buffer["background"])
 
-        if not incomplete and _buffer["elements"]:
-            break  # Done
+        if not incomplete and has_content:
+            break
 
-        if attempt < max_retries:
-            messages = prepare_retry_messages(result["messages"])
-            if incomplete:
-                pending = "\n".join(
-                    f"  - {name}: {plan['parts'][name]['description'][:80]}"
-                    for name in incomplete
-                )
-                msg = (
-                    f"## 以下 part 尚未完成\n{pending}\n\n"
-                    f"请继续调用 submit_element（指定 part 参数）填充这些区域的元素，"
-                    f"完成后调用 check_parts(part='xxx', complete=True) 标记。"
-                )
-            else:
-                msg = "请继续提交完整设计。调用 submit_background、submit_element（多次）。"
-            messages.append(HumanMessage(content=msg))
+        if attempt >= max_retries:
+            break
+
+        # ── retry: fresh conversation + state-aware prompt ─────────────
+
+        if crashed:
+            # Reset buffer — partial state from crashed run is unreliable
+            _buffer["plan"] = plan           # original from args (modify mode)
+            _buffer["elements"] = {}
+            _buffer["background"] = {}
+
+        cur = _buffer.get("plan")
+        num_el = len(_buffer["elements"])
+        bg_type = _buffer["background"].get("type", "") if _buffer["background"] else ""
+
+        if not crashed and cur and has_content:
+            # Valid buffer — tell LLM to inspect and continue
+            inc_names = [n for n, i in cur["parts"].items() if i.get("status") != "complete"]
+            retry_msg = (
+                f"## 重试 — 当前进度\n"
+                f"已有 plan（{len(cur['parts'])} 个 part）、{num_el} 个元素、"
+                f"背景类型={bg_type or '未设置'}。\n"
+                f"请先调用 check_parts() 查看状态，然后继续完成以下未完成的 part:\n"
+            )
+            for name in inc_names:
+                retry_msg += f"  - {name}: {cur['parts'][name]['description'][:80]}\n"
+            retry_msg += (
+                f"\n重要：不要重新调用 submit_plan（plan 已存在，重新调用会重置 part 状态）。"
+                f"直接调用 check_parts() 查看后，继续 submit_element 填充。"
+            )
+        else:
+            # Buffer reset or no plan — start fresh
+            retry_msg = (
+                f"## 重试\n"
+                f"上次调用失败，请重新开始设计。"
+                f"按步骤：submit_plan → submit_background → submit_element ×N → check_parts 标记完成。"
+            )
+
+        messages = [HumanMessage(content=user_prompt), HumanMessage(content=retry_msg)]
 
     # ── build notes from plan ──────────────────────────────────────────
 

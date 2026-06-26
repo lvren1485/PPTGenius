@@ -21,7 +21,7 @@ _EXPLORE_KB_LIMIT = 12
 _EXPLORE_WEB_LIMIT = 8
 _EXPLORE_FETCH_LIMIT = 6
 
-_OUTPUT_HINT = "\n\n信息已足够请直接输出 JSON 结构建议，不要继续搜索。"
+_LIMIT_HINT = "已达调用上限，请使用其他工具或基于已有信息输出结果。"
 
 
 async def _build_chunk_map(
@@ -70,7 +70,7 @@ def make_search_knowledge(
         Each result includes a chunk_id for citation.
         """
         if count[0] >= limit:
-            return f"搜索已达上限 ({limit}次)。请基于已有信息输出结构建议。"
+            return f"知识库搜索已达上限 ({limit}次)。{_LIMIT_HINT}"
         count[0] += 1
 
         await _ensure_map()
@@ -85,7 +85,7 @@ def make_search_knowledge(
             )
 
         if not results:
-            return "知识库中未找到相关文档。" + _OUTPUT_HINT
+            return "知识库中未找到相关文档。"
         items = []
         for r in results:
             chunk_text = r.get("chunk", r.get("text", ""))
@@ -95,7 +95,7 @@ def make_search_knowledge(
                 f"chunk_id={cid} file_id={fid}\n"
                 f"{chunk_text[:500]}"
             )
-        return "\n\n---\n".join(items) + _OUTPUT_HINT
+        return "\n\n---\n".join(items)
 
     return search_knowledge
 
@@ -109,22 +109,22 @@ def make_search_web(count: list[int], enabled: bool = True,
         Use this when the knowledge base doesn't have enough information.
         """
         if not enabled:
-            return "网络搜索已关闭。请使用知识库内容。" + _OUTPUT_HINT
+            return "网络搜索已关闭。"
         if count[0] >= limit:
-            return f"搜索已达上限 ({limit}次)。" + _OUTPUT_HINT
+            return f"网络搜索已达上限 ({limit}次)。{_LIMIT_HINT}"
         count[0] += 1
 
         try:
             results = await _web_search.search(query, max_results)
         except Exception as e:
             _log.warning("web search failed: %s", e)
-            return f"网络搜索失败: {e}。可尝试换关键词或直接使用知识库内容。" + _OUTPUT_HINT
+            return f"网络搜索失败: {e}。可尝试换关键词。"
         if not results:
-            return "未找到相关网络结果。" + _OUTPUT_HINT
+            return "未找到相关网络结果。"
         items = []
         for i, r in enumerate(results):
             items.append(f"{i+1}. **{r['title']}**\n   URL: {r['url']}\n   {r['snippet']}")
-        return "\n\n".join(items) + _OUTPUT_HINT
+        return "\n\n".join(items)
 
     return search_web
 
@@ -139,9 +139,9 @@ def make_fetch_web(db: Database, user_id: int, conv_id: int,
         Use after search_web to read a promising result.
         """
         if not enabled:
-            return "网络抓取已关闭。" + _OUTPUT_HINT
+            return "网络抓取已关闭。"
         if count[0] >= limit:
-            return f"抓取已达上限 ({limit}次)。" + _OUTPUT_HINT
+            return f"网页抓取已达上限 ({limit}次)。{_LIMIT_HINT}"
         count[0] += 1
         try:
             result = await _web_search.fetch_and_ingest(
@@ -149,7 +149,7 @@ def make_fetch_web(db: Database, user_id: int, conv_id: int,
             )
         except Exception as e:
             _log.warning("web fetch failed: %s — %s", url, e)
-            return f"网页抓取失败: {e}。请尝试其他搜索结果。" + _OUTPUT_HINT
+            return f"网页抓取失败: {e}。请尝试其他搜索结果。"
         if result.get("ingested"):
             file_id = result.get("knowledge_file_id")
             title = result.get("title", url)
@@ -161,8 +161,8 @@ def make_fetch_web(db: Database, user_id: int, conv_id: int,
             info = f"file_id={file_id}, title={title}"
             if summary:
                 info += f"\n摘要: {summary}"
-            return f"已抓取并入库。{info}" + _OUTPUT_HINT
-        return f"抓取失败。{result.get('title', 'N/A')}" + _OUTPUT_HINT
+            return f"已抓取并入库。{info}"
+        return f"抓取失败。{result.get('title', 'N/A')}"
 
     return fetch_web
 
@@ -172,7 +172,7 @@ def make_read_file(db: Database, count: list[int], fetched_ids: set[int]):
     async def read_file(file_id: int) -> str:
         """Read full content of a knowledge file. Max 3 per round."""
         if count[0] >= _READ_LIMIT:
-            return f"读取已达上限 ({_READ_LIMIT}次)。请基于已有信息输出结构建议。"
+            return f"文件读取已达上限 ({_READ_LIMIT}次)。{_LIMIT_HINT}"
         if file_id in fetched_ids:
             return f"already fetched (file_id={file_id})"
         count[0] += 1
@@ -181,6 +181,6 @@ def make_read_file(db: Database, count: list[int], fetched_ids: set[int]):
         if not chunks:
             return f"文件 {file_id} 没有内容。"
         parts = [c.chunk_text for c in sorted(chunks, key=lambda x: x.chunk_index)]
-        return "\n\n".join(parts)[:8000] + _OUTPUT_HINT
+        return "\n\n".join(parts)[:8000]
 
     return read_file

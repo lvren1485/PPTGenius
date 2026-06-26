@@ -59,6 +59,34 @@ def _patched_convert_message_to_dict(
     return message_dict
 
 
+# ── Diagnostic: log message structure on 400 ──
+
+def _install_diagnostic_hook():
+    """Wrap _agenerate to log message structure when 400 occurs."""
+    from pptgenius.infrastructure.utils import get_logger
+    _diag_log = get_logger("pptgenius.llm.diag")
+
+    _original_agenerate = _base.BaseChatOpenAI._agenerate
+
+    async def _diag_agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+        try:
+            return await _original_agenerate(self, messages, stop, run_manager, **kwargs)
+        except Exception as e:
+            if "400" in str(e) or "insufficient tool messages" in str(e):
+                roles = []
+                for m in messages:
+                    tc_count = len(m.tool_calls) if hasattr(m, "tool_calls") and m.tool_calls else 0
+                    tc_ids = [tc.get("id", "")[:8] for tc in (m.tool_calls or [])] if tc_count else []
+                    roles.append(f"{m.__class__.__name__}(tc={tc_count}{' ids='+','.join(tc_ids) if tc_ids else ''})")
+                _diag_log.warning(
+                    "400 diag: %d messages: %s",
+                    len(messages), " → ".join(roles[-8:])  # last 8
+                )
+            raise
+
+    _base.BaseChatOpenAI._agenerate = _diag_agenerate
+
+
 def _extract_reasoning(msg) -> str | None:
     """从 OpenAI SDK ChatCompletionMessage 中提取 reasoning_content。"""
     rc = getattr(msg, "reasoning_content", None)
@@ -79,6 +107,7 @@ def apply_deepseek_patch() -> bool:
 
     _base.BaseChatOpenAI._create_chat_result = _patched_create_chat_result
     _base._convert_message_to_dict = _patched_convert_message_to_dict
+    _install_diagnostic_hook()
     _patched = True
     return True
 

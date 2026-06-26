@@ -153,7 +153,7 @@ def _make_write_tools(db: Database, outline_id: int, section_id: int):
                 "status": st, "hint": hint,
             })
         if not pending:
-            return "所有幻灯片已写入。可以结束了。"
+            return "所有幻灯片已写入。请结束本次对话。"
         items = "\n".join(
             f"  - slide_index={p['slide_index']}: {p['title']} ({p['layout_type']}) "
             f"[{p['status']}] — {p['hint']}"
@@ -217,8 +217,10 @@ async def run_outline_generator(
 
     from pptgenius.infrastructure.config.settings import get_settings
     max_retries = get_settings().agent.outline.generator_max_retries
+    result = None
 
     for attempt in range(max_retries + 1):
+        crashed = False
         try:
             result = await agent.ainvoke(
                 {"messages": messages},
@@ -227,7 +229,7 @@ async def run_outline_generator(
         except Exception:
             _log.warning("generator crashed section=%d attempt=%d", section_id, attempt)
             _log.debug("generator crashed details", exc_info=True)
-            continue
+            crashed = True
 
         _log.info("generator section=%d attempt=%d written=%d/%d",
                   section_id, attempt, len(_written), sec_slides)
@@ -235,14 +237,16 @@ async def run_outline_generator(
         if len(_written) >= sec_slides:
             break
 
-        if attempt < max_retries:
-            from ..common.message_utils import prepare_retry_messages
-            pending = await pending_slides.ainvoke({})
-            messages = prepare_retry_messages(result["messages"])
-            messages.append(HumanMessage(content=(
-                f"## 当前进度\n{pending}\n\n"
-                f"请继续逐个调用 write_slide 完成剩余的幻灯片。"
-            )))
+        if attempt >= max_retries:
+            break
+
+        # Fresh conversation — never carry forward old history
+        pending = await pending_slides.ainvoke({})
+        retry_msg = (
+            f"## 当前进度\n{pending}\n\n"
+            f"请继续逐个调用 write_slide 完成剩余的幻灯片。"
+        )
+        messages = [HumanMessage(content=user_prompt), HumanMessage(content=retry_msg)]
 
     if len(_written) < sec_slides:
         _log.error("generator section=%d only %d/%d written after %d attempts",
