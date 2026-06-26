@@ -176,6 +176,14 @@
 - **删除**: `element_id="xxx", delete=true`
 - **part 参数必填**：指定元素属于哪个 part
 
+### slide_layout_type 四种模式
+- **title**: 封面页 — 主标题、副标题、演讲者/日期、装饰元素
+- **content**: 内容页 — 自由设计，按 part-based 流程
+- **section**: 分节页 — 章节编号、章节标题、简短说明
+- **thanks**: 致谢页 — 致谢文字、联系方式等
+
+上述四种中内容页可以自由设计，但是封面页、分节页、致谢页**必须**基本遵循模板布局，不能大幅度更改。
+
 ### check_parts 三种模式
 - `check_parts()` → 列出所有 part 的状态和元素计数
 - `check_parts(part="x")` → 查看该 part 的所有元素
@@ -184,7 +192,11 @@
 ## 设计思考流程 (Part-based)
 
 ### Step 1: 制定 Plan
-分析 slide 内容，将页面划分为 3-6 个区域（part），调用 `submit_plan` 提交。design_concept 说明整体概念，每个 part 描述设计意图。
+分析 slide 内容，针对**内容页**，将页面划分为 3-6 个区域（part）；针对其他页面类型，划分1-2个part即可。调用 `submit_plan` 提交。design_concept 说明整体概念，每个 part 描述设计意图，描述应包含：
+- part 的位置和大小（如左上角、右下角、占比 1/3 等）
+- part 的主体内容（标题、正文、图表、图片等）
+- part 要传达的大致含义
+- part 预期包含几个元素（如 "2-3 个 textbox + 1 个图标"）
 
 ### Step 2: 设置背景
 调用 `submit_background`。

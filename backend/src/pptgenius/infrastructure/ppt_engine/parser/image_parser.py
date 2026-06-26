@@ -34,8 +34,9 @@ def render_picture(slide, el: ImageElement, workspace_path: str = ".") -> None:
             img_path = os.path.join(workspace_path, img_path)
 
     if not os.path.exists(img_path):
-        logger.error("Image not found: %s", img_path)
-        raise FileNotFoundError(f"Image not found: {img_path}")
+        logger.warning("Image not found, inserting placeholder: %s", img_path)
+        _render_image_placeholder(slide, el, img_path)
+        return
 
     if img_path.lower().endswith(".svg"):
         img_path = _svg_to_png(img_path)
@@ -50,6 +51,46 @@ def render_picture(slide, el: ImageElement, workspace_path: str = ".") -> None:
         width = Inches(el.position.width)
         height = Inches(el.position.height) if el.position.height else width
         slide.shapes.add_picture(img_path, left, top, width, height)
+
+
+def _render_image_placeholder(slide, el: ImageElement, img_path: str) -> None:
+    """Insert a placeholder shape when the image file doesn't exist.
+
+    Creates a rounded rectangle with a border, containing the image filename
+    as text so the user can see what was supposed to be there.
+    """
+    from pptx.enum.text import PP_ALIGN
+    from pptx.util import Pt
+    from pptx.dml.color import RGBColor
+
+    left = Inches(el.position.left)
+    top = Inches(el.position.top)
+    width = Inches(el.position.width)
+    height = Inches(el.position.height) if el.position.height else width
+
+    shape = slide.shapes.add_shape(
+        5,  # MSO_SHAPE.ROUNDED_RECTANGLE
+        left, top, width, height,
+    )
+    shape.fill.solid()
+    shape.fill.fore_color.rgb = RGBColor(0xF5, 0xF5, 0xF5)
+    shape.line.color.rgb = RGBColor(0xC8, 0xC8, 0xC8)
+    shape.line.width = Pt(1)
+
+    tf = shape.text_frame
+    tf.word_wrap = True
+    p = tf.paragraphs[0]
+    p.alignment = PP_ALIGN.CENTER
+    run = p.add_run()
+    run.text = f"[图片]\n{os.path.basename(img_path)}"
+    run.font.size = Pt(11)
+    run.font.color.rgb = RGBColor(0x96, 0x96, 0x96)
+
+    from pptx.oxml.ns import qn
+    txBody = shape._element.txBody
+    bodyPr = txBody.find(qn('a:bodyPr'))
+    if bodyPr is not None:
+        bodyPr.set('anchor', 'ctr')
 
 
 def _svg_to_png(svg_path: str) -> str:
