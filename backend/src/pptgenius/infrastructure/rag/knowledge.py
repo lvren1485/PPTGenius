@@ -83,7 +83,10 @@ class KnowledgeService:
             return ""
 
         bm = BM25Manager(Path(":memory:"), persist=False)
-        bm.build([c.chunk_text for c in chunks])
+        bm.build(
+            [c.chunk_text for c in chunks],
+            meta=[{"chunk_id": c.id, "file_id": c.file_id} for c in chunks],
+        )
         self._indexes[scope] = bm
         _log.info("index built: %s (%d chunks, filter_web=%s)", scope, len(chunks), filter_web)
         return scope

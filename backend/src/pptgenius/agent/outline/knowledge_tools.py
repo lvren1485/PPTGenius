@@ -16,33 +16,11 @@ _knowledge = KnowledgeService()
 _KB_SEARCH_LIMIT = 9
 _WEB_SEARCH_LIMIT = 6
 _FETCH_LIMIT = 4
-_READ_LIMIT = 3
 _EXPLORE_KB_LIMIT = 12
-_EXPLORE_WEB_LIMIT = 8
-_EXPLORE_FETCH_LIMIT = 6
+_EXPLORE_WEB_LIMIT = 6
+_EXPLORE_FETCH_LIMIT = 10
 
 _LIMIT_HINT = "已达调用上限，请使用其他工具或基于已有信息输出结果。"
-
-
-async def _build_chunk_map(
-    db: Database,
-    user_id: int,
-    conversation_id: int,
-    rag_mode: str,
-    filter_web: bool = False,
-) -> dict[str, tuple[int, int]]:
-    """Return {chunk_text[:20]: (chunk_id, file_id)} for the active scope."""
-    if rag_mode == "conversation":
-        if filter_web:
-            chunks = await db.get_chunks_for_conversation_filter_web(conversation_id)
-        else:
-            chunks = await db.get_all_chunks_for_conversation(conversation_id)
-    else:
-        if filter_web:
-            chunks = await db.get_chunks_for_user_filter_web(user_id)
-        else:
-            chunks = await db.get_all_chunks_for_user(user_id)
-    return {c.chunk_text[:20]: (c.id, c.file_id) for c in chunks}
 
 
 def make_search_knowledge(
@@ -54,26 +32,16 @@ def make_search_knowledge(
     filter_web: bool = False,
     limit: int = _KB_SEARCH_LIMIT,
 ):
-    _chunk_map: dict[str, tuple[int, int]] | None = None
-
-    async def _ensure_map():
-        nonlocal _chunk_map
-        if _chunk_map is None:
-            _chunk_map = await _build_chunk_map(db, user_id, conversation_id,
-                                                 rag_mode, filter_web=filter_web)
-
     @tool
     async def search_knowledge(query: str, top_k: int = 5) -> str:
         """Search the user's personal knowledge base (BM25) for relevant documents.
 
         Use this first before searching the open web. Max 9 calls per round.
-        Each result includes a chunk_id for citation.
+        Each result includes chunk_id and file_id for citation.
         """
         if count[0] >= limit:
             return f"知识库搜索已达上限 ({limit}次)。{_LIMIT_HINT}"
         count[0] += 1
-
-        await _ensure_map()
 
         if rag_mode == "conversation":
             results = await _knowledge.search_by_conversation(
@@ -88,8 +56,9 @@ def make_search_knowledge(
             return "知识库中未找到相关文档。"
         items = []
         for r in results:
-            chunk_text = r.get("chunk", r.get("text", ""))
-            cid, fid = _chunk_map.get(chunk_text[:20], (None, None))
+            chunk_text = r.get("chunk", "")
+            cid = r.get("chunk_id")
+            fid = r.get("file_id")
             items.append(
                 f"[score={r.get('score', 0):.2f}] "
                 f"chunk_id={cid} file_id={fid}\n"
@@ -167,20 +136,33 @@ def make_fetch_web(db: Database, user_id: int, conv_id: int,
     return fetch_web
 
 
-def make_read_file(db: Database, count: list[int], fetched_ids: set[int]):
-    @tool
-    async def read_file(file_id: int) -> str:
-        """Read full content of a knowledge file. Max 3 per round."""
-        if count[0] >= _READ_LIMIT:
-            return f"文件读取已达上限 ({_READ_LIMIT}次)。{_LIMIT_HINT}"
-        if file_id in fetched_ids:
-            return f"already fetched (file_id={file_id})"
-        count[0] += 1
-        fetched_ids.add(file_id)
-        chunks = await db.list_chunks_by_file(file_id)
-        if not chunks:
-            return f"文件 {file_id} 没有内容。"
-        parts = [c.chunk_text for c in sorted(chunks, key=lambda x: x.chunk_index)]
-        return "\n\n".join(parts)[:8000]
+def make_rebuild_index(
+    db: Database,
+    user_id: int,
+    conversation_id: int,
+    rag_mode: str,
+    *,
+    filter_web: bool = False,
+):
+    """Create a tool that rebuilds the BM25 knowledge index.
 
-    return read_file
+    Call this after fetch_web adds new content so that subsequent
+    search_knowledge calls can find the newly ingested chunks.
+    """
+
+    @tool
+    async def rebuild_knowledge_index() -> str:
+        """Rebuild the BM25 search index to include newly added knowledge.
+
+        Call this after fetching web pages or uploading files to ensure
+        search_knowledge can find the latest content.
+        """
+        scope = await _knowledge.build_index(
+            db, user_id=user_id, rag_mode=rag_mode,
+            filter_web=filter_web, conversation_id=conversation_id,
+        )
+        if scope:
+            return f"知识库索引已重建 (scope={scope})"
+        return "知识库索引重建失败：无可用内容。"
+
+    return rebuild_knowledge_index

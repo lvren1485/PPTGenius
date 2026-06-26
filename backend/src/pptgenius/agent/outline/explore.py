@@ -24,6 +24,7 @@ from .knowledge_tools import (
     make_search_knowledge,
     make_search_web,
     make_fetch_web,
+    make_rebuild_index,
     _EXPLORE_KB_LIMIT,
     _EXPLORE_WEB_LIMIT,
     _EXPLORE_FETCH_LIMIT,
@@ -147,6 +148,9 @@ async def run_explore_agent(
         tools.append(make_search_web(web_count, limit=_EXPLORE_WEB_LIMIT))
         tools.append(make_fetch_web(db, user_id, conversation_id, fetch_count,
                                     agent_id=agent_id, limit=_EXPLORE_FETCH_LIMIT))
+        tools.append(make_rebuild_index(
+            db, user_id, conversation_id, rag_mode, filter_web=not web_enabled,
+        ))
     mws, _ = build_middlewares(conversation_id, agent_id)
     push_agent(conversation_id, agent_id)
 

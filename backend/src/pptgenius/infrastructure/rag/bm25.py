@@ -27,26 +27,35 @@ class BM25Manager:
         self.index_path = Path(index_path)
         self.persist = persist
         self._index: BM25Okapi | None = None
-        self._chunks: list[str] = []  # corpus, mirrors index order
+        self._chunks: list[str] = []   # corpus, mirrors index order
+        self._meta: list[dict] = []    # per-chunk metadata
 
     # -- build ---------------------------------------------------------------
 
-    def build(self, chunks: list[str]) -> None:
-        """Build a new index from *chunks* (replaces current)."""
+    def build(self, chunks: list[str], meta: list[dict] | None = None) -> None:
+        """Build a new index from *chunks* (replaces current).
+
+        If *meta* is provided, it must have the same length as *chunks*.
+        Each meta dict is attached to the corresponding chunk and returned
+        in search results.
+        """
         if not chunks:
             _log.warning("build called with empty chunk list — index cleared")
             self._index = None
             self._chunks = []
+            self._meta: list[dict] = []
             return
         tokenized = [self._tokenize(c) for c in chunks]
         self._index = BM25Okapi(tokenized)
         self._chunks = chunks
+        self._meta = meta if meta is not None else [{} for _ in chunks]
         _log.debug("index built: %d documents", len(chunks))
 
-    def add(self, chunks: list[str]) -> None:
+    def add(self, chunks: list[str], meta: list[dict] | None = None) -> None:
         """Rebuild index with current + new chunks."""
         all_chunks = self._chunks + chunks
-        self.build(all_chunks)
+        all_meta = self._meta + (meta if meta is not None else [{} for _ in chunks])
+        self.build(all_chunks, all_meta)
 
     def remove(self, predicate) -> int:
         """Remove chunks matching *predicate* (callable). Returns count removed."""
@@ -60,19 +69,21 @@ class BM25Manager:
     # -- query ---------------------------------------------------------------
 
     def search(self, query: str, top_k: int = 5) -> list[dict]:
-        """Return top-k results as ``[{chunk, score}, ...]``."""
+        """Return top-k results as ``[{chunk, score, ...meta}, ...]``."""
         if self._index is None:
             return []
         tokens = self._tokenize(query)
         scores = self._index.get_scores(tokens)
-        # Get top-k indices
         ranked = sorted(
             range(len(scores)), key=lambda i: scores[i], reverse=True
         )[:top_k]
-        return [
-            {"chunk": self._chunks[i], "score": round(float(scores[i]), 4)}
-            for i in ranked
-        ]
+        results: list[dict] = []
+        for i in ranked:
+            r = {"chunk": self._chunks[i], "score": round(float(scores[i]), 4)}
+            if i < len(self._meta):
+                r.update(self._meta[i])
+            results.append(r)
+        return results
 
     # -- persistence ---------------------------------------------------------
 
@@ -81,7 +92,7 @@ class BM25Manager:
         if not self.persist:
             return
         self.index_path.parent.mkdir(parents=True, exist_ok=True)
-        data = {"index": self._index, "chunks": self._chunks}
+        data = {"index": self._index, "chunks": self._chunks, "meta": self._meta}
         with open(self.index_path, "wb") as f:
             pickle.dump(data, f)
         _log.debug("index saved → %s (%d docs)", self.index_path, len(self._chunks))
@@ -97,6 +108,7 @@ class BM25Manager:
             data = pickle.load(f)
         self._index = data["index"]
         self._chunks = data["chunks"]
+        self._meta = data.get("meta", [{} for _ in self._chunks])
         _log.debug("index loaded ← %s (%d docs)", self.index_path, len(self._chunks))
         return True
 
