@@ -2,6 +2,7 @@
   "name": "minimal_dark",
   "label": "极简深色",
   "style_density": "minimal",
+  "text_density": "sparse",
   "colors": {
     "primary": "6366f1",
     "accent": "a78bfa",
@@ -17,9 +18,11 @@
     "h2": {"name": "微软雅黑", "size": 28, "bold": true, "color": "f1f5f9"},
     "h3": {"name": "微软雅黑", "size": 22, "bold": true, "color": "e2e8f0"},
     "h4": {"name": "微软雅黑", "size": 18, "bold": true, "color": "e2e8f0"},
-    "body": {"name": "微软雅黑", "size": 16, "bold": false, "color": "e2e8f0"},
-    "caption": {"name": "微软雅黑", "size": 14, "bold": false, "color": "64748b"},
-    "min_size": 14
+    "body_title": {"name": "微软雅黑", "size": 16, "bold": false, "color": "e2e8f0"},
+    "body": {"name": "微软雅黑", "size": 14, "bold": false, "color": "e2e8f0"},
+    "body_small": {"name": "微软雅黑", "size": 12, "bold": false, "color": "64748b"},
+    "caption": {"name": "微软雅黑", "size": 11, "bold": false, "color": "64748b"},
+    "min_size": 9
   },
   "decoration": {
     "title_accent_bar": true,

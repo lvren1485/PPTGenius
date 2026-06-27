@@ -118,8 +118,9 @@ async def _load_context(
                 "id": s.id, "name": s.name, "label": s.label,
                 "colors": s.colors_json,
                 "chart_colors": s.chart_colors_json,
-                "fonts": s.fonts_json,
+                "fonts": s.fonts_json or {},
                 "style_density": s.style_density,
+                "text_density": getattr(s, "text_density", None) or "moderate",
                 "background_json": s.background_json,
             }
 

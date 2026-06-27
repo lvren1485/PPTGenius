@@ -174,6 +174,7 @@ async def run_outline_generator(
     *,
     query: str | None = None,
     knowledge_mode: str = "auto",
+    language: str = "简体中文",
 ) -> str:
     """Fill content for one section's pre-created slides."""
     writer = get_sse_writer()
@@ -196,7 +197,7 @@ async def run_outline_generator(
     system_prompt = build_generator_system_prompt()
     user_prompt = await build_generator_user_prompt(
         db=db, outline_id=outline_id, section_id=section_id,
-        query=query, knowledge_mode=knowledge_mode,
+        query=query, knowledge_mode=knowledge_mode, language=language,
     )
     if knowledge_text:
         user_prompt = knowledge_text + "\n\n" + user_prompt

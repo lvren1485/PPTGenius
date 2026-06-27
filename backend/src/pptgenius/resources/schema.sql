@@ -114,6 +114,7 @@ CREATE TABLE IF NOT EXISTS styles (
     chart_colors_json JSON NOT NULL COMMENT '图表配色序列',
     fonts_json JSON NOT NULL COMMENT '{title, subtitle, body, caption}',
     style_density VARCHAR(16) DEFAULT 'moderate' COMMENT 'minimal|moderate|elaborate',
+    text_density VARCHAR(16) DEFAULT 'moderate' COMMENT 'sparse|moderate|dense',
     decoration_json JSON COMMENT '装饰开关 {title_accent_bar, section_divider_line, ...}',
     background_json JSON COMMENT '背景设置 {color, gradient, image}',
     is_active BOOLEAN DEFAULT TRUE,

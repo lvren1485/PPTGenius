@@ -12,6 +12,7 @@ async def create_style(
     chart_colors_json: dict,
     fonts_json: dict,
     style_density: str = "moderate",
+    text_density: str = "moderate",
     decoration_json: dict | None = None,
     background_json: dict | None = None,
 ) -> Style:
@@ -22,6 +23,7 @@ async def create_style(
         chart_colors_json=chart_colors_json,
         fonts_json=fonts_json,
         style_density=style_density,
+        text_density=text_density,
         decoration_json=decoration_json or {},
         background_json=background_json,
     )

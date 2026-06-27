@@ -28,6 +28,7 @@ async def build_generator_user_prompt(
     knowledge_mode: str = "auto",
     user_id: int = 0,
     conversation_id: int = 0,
+    language: str = "简体中文",
 ) -> str:
     """Build the generator user prompt: all-section summaries + current section full."""
 
@@ -77,7 +78,10 @@ async def build_generator_user_prompt(
         for sl in sec_slides:
             parts.append(_format_slide(sl))
 
-    # 3. Query
+    # 3. Language
+    parts.append(f"## 输出语言\n必须使用 **{language}** 撰写所有内容。")
+
+    # 4. Query
     if query:
         parts.append(f"## 用户说明\n{query}\n")
 

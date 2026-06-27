@@ -39,7 +39,7 @@ has_image: {has_image}
 如果outline中要求添加图片、数据，但没有给出，则留出占位符即可。
 
 请按以下步骤设计该页的完整视觉方案：
-1. **submit_plan** — 划分页面区域（3-6 个 part），每个 part 描述设计意图
+1. **submit_plan** — 划分页面区域（content 页 3-6 个 part，title/section/thanks 页 1-2 个 part），每个 part 描述设计意图
 2. **submit_background** — 设置背景
 3. 对每个 part：**submit_element**(part="xxx") ×N → **check_parts**(part="xxx") 检查 → **check_parts**(part="xxx", complete=true) 标记
 4. **check_parts()** — 确认所有 part 均为 complete

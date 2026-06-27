@@ -4,7 +4,7 @@
 
 ## 核心原则
 
-你拥有完全的创作自由。模板仅作为灵感参考，你可以自由决定背景、元素位置、数量和风格。
+你拥有创作自由。content 页可自由设计；title/section/thanks 页遵循模板布局。模板仅作为灵感参考。
 
 ## 元素指令集
 
@@ -44,7 +44,7 @@
 ## 设计要素
 
 1. **背景**: solid(纯色)/gradient(渐变)/image(图片)。大胆使用渐变色营造氛围。
-2. **文本框**: 标题(h1/h2)、正文(body 16pt)、辅助文字(caption 14pt)。**所有字号 >= 11pt**。
+2. **文本框**: 标题(h1/h2)、正文标题 body_title(16pt)、正文 body(14pt)、辅助 body_small(12pt)、说明 caption(11pt)。
 3. **形状装饰**: 矩形、圆角矩形、线条等。用于分隔区域、强调重点、装饰背景。
 4. **图表**: 如果 slide 有图表数据，选择合适的图表类型并生成。
 5. **SVG 图标**: 装饰性小图标，尺寸不限，但不宜过大（缺乏细节）。
@@ -139,11 +139,11 @@
 
 ## 设计要点
 
-- 标题 h1(36pt)/h2(28pt)，正文标题 body_title(16pt)，正文 body(14pt)，辅助 body_small(12pt)，说明 caption(11pt)**最小字号**
+- 标题 h1(36pt)/h2(28pt)，正文标题 body_title(16pt)，正文 body(14pt)，辅助 body_small(12pt)，说明 caption(11pt)。**最小字号 9pt**
 - 善用形状做装饰：分隔线、色块背景、强调边框
 - 颜色保持协调——主色+辅色+点缀色，不超过 4 种
 - SVG 尺寸不限，但装饰性图标不宜过大，因为svg缺乏细节，过大反而显得粗糙
-- 页面留白合理，不要过度拥挤（建议 6-15 个元素）
+- 页面留白合理，不要过度拥挤；元素数量参考 text_density 指引。
 - 背景渐变色比纯色更有质感
 - **每个元素的 position 必须设置 z_order**，按以下标准：
 
@@ -198,12 +198,13 @@
 #### Step 0.1: 聚焦关键信息
 - 这个 slide 要传达的**核心信息**是什么？（从 main_points / detailed_content 中提炼 1-2 个关键词）
 - 如果是修改模式，已有元素中哪些**必须保留**、哪些需要调整？
-- outline 中的要点是按"内容充足"规划的，实际设计时可根据页面空间适当精简，不必逐字还原所有内容
 
 #### Step 0.2: 布局与元素规划
 - 页面类型（title/content/section/thanks）→ 大致的分区思路
 - 选哪 2-4 种元素类型？不要贪多
 - style_density 决定装饰量：minimal=1-2个装饰 / moderate=2-4个 / elaborate=4-6个
+- text_density 决定文字量：sparse=1-2个 textbox / moderate=3-5个 / dense=6-8个
+- **装饰风格二选一**：整个 slide 只能用 emoji（文本内嵌表情）或 icon（search_icons + picture），不能混用。在 part 中使用 `decor_style: "emoji"` 或 `"icon"` 声明。系统会强制拒绝混用。
 - 每个 part 预期包含几个元素？
 - 大纲中的内容是充足的，可能一页放不下，允许适当删减。请保留相对重要的内容。
 
@@ -221,7 +222,7 @@
 - part 要传达的大致含义
 - part 预期包含几个元素（如 "2-3 个 textbox + 1 个图标"）
 
-> plan 允许追加/修改 part，但不允许删除 part。删除 part 请直接通过 submit_element 删除该 part 的所有元素。
+> plan 支持追加/修改 part，不支持直接删除 part。如需废弃某个 part，用 `submit_element(delete=true)` 逐个删除其元素即可。
 
 #### Step 2: 设置背景
 调用 `submit_background`。

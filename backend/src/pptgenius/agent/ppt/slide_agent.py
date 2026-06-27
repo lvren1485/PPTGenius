@@ -72,12 +72,13 @@ async def run_slide_agent(
 
         Args:
             design_concept: 1-2 sentence visual concept. Leave empty to keep old value.
-            parts: [{name, description, bounds?, has_chart?, has_table?, has_image?}, ...]
-                Each part has required name+description and optional spatial/type metadata:
+            parts: [{name, description, bounds?, has_chart?, has_table?, has_image?, decor_style?}, ...]
+                Each part has required name+description and optional metadata:
                 - bounds: {left, top, width, height} — estimated region (inches)
                 - has_chart: bool — part will contain a chart (needs ≥2×2")
                 - has_table: bool — part will contain a table (needs ≥3×1.5")
                 - has_image: bool — part will contain an image (needs ≥0.5×0.5")
+                - decor_style: "emoji" | "icon" — decorative element type for the whole slide
         """
         if not parts:
             return "错误: parts 不能为空。"
@@ -169,7 +170,7 @@ async def run_slide_agent(
             )
 
         # Decor style enforcement (emoji vs icon)
-        decor_note = _check_decor_style(element, _buffer, part)
+        decor_note = _check_decor_style(element, _buffer)
         if decor_note:
             return decor_note  # hard reject — conflicting decor style
 

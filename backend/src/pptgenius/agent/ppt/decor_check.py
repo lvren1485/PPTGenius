@@ -29,6 +29,8 @@ _EMOJI_RE = re.compile(
     u"⤴⤵"           # ↩ ↪
     u"〰〽"           # 〰 〽
     u"㊗㊙"           # ㊗ ㊙
+    "\U00002B00-\U00002BFF"   # Misc Symbols and Arrows (⭐ etc)
+    "\U00002300-\U000023FF"   # Misc Technical (⏏⌨ etc)
     "\U0001F000-\U0001F02F"   # Mahjong, Domino
     "\U0001F0A0-\U0001F0FF"   # Playing cards
     "\U0001F100-\U0001F1FF"   # Enclosed

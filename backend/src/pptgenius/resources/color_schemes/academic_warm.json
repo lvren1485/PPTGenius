@@ -2,6 +2,7 @@
   "name": "academic_warm",
   "label": "学术暖色",
   "style_density": "moderate",
+  "text_density": "dense",
   "colors": {
     "primary": "b45309",
     "accent": "d97706",
@@ -17,9 +18,11 @@
     "h2": {"name": "微软雅黑", "size": 28, "bold": true, "color": "b45309"},
     "h3": {"name": "微软雅黑", "size": 22, "bold": true, "color": "292524"},
     "h4": {"name": "微软雅黑", "size": 18, "bold": true, "color": "292524"},
-    "body": {"name": "微软雅黑", "size": 16, "bold": false, "color": "292524"},
-    "caption": {"name": "微软雅黑", "size": 14, "bold": false, "color": "78716c"},
-    "min_size": 14
+    "body_title": {"name": "微软雅黑", "size": 16, "bold": false, "color": "292524"},
+    "body": {"name": "微软雅黑", "size": 14, "bold": false, "color": "292524"},
+    "body_small": {"name": "微软雅黑", "size": 12, "bold": false, "color": "78716c"},
+    "caption": {"name": "微软雅黑", "size": 11, "bold": false, "color": "78716c"},
+    "min_size": 9
   },
   "decoration": {
     "title_accent_bar": true,

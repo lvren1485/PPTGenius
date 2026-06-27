@@ -108,7 +108,8 @@ def _check_min_size(element: dict) -> list[str]:
     return warnings
 
 
-def _check_text_overflow(element: dict, warnings: list[str]) -> None:
+def _check_text_overflow(element: dict, warnings: list[str],
+                        *, text_density: str = "moderate") -> None:
     """Rough estimate: will text fit inside the textbox?  Appends to warnings."""
     pos = element.get("position", {})
     w = pos.get("width", 0)
@@ -134,10 +135,11 @@ def _check_text_overflow(element: dict, warnings: list[str]) -> None:
     max_lines = (h * 72) / line_h
     capacity = chars_per_line * max_lines
 
-    if total_chars > capacity * 1.5:
+    threshold = {"sparse": 1.2, "moderate": 1.5, "dense": 2.0}.get(text_density, 1.5)
+    if total_chars > capacity * threshold:
         warnings.append(
             f"文字可能溢出: 约 {total_chars} 字符, 文本框容量约 {int(capacity)} 字符 "
-            f"(font={max_font_size}pt, box={w:.1f}×{h:.1f}\")"
+            f"(font={max_font_size}pt, box={w:.1f}×{h:.1f}\", density={text_density})"
         )
 
 
@@ -200,7 +202,11 @@ def check_element(element: dict, buffer: dict) -> str:
 
     if not warnings:
         return ""
-    return "\n".join(f"⚠ {w}" for w in warnings)
+    lines: list[str] = []
+    for w in warnings:
+        prefix = "" if w.startswith("ℹ") else "⚠ "
+        lines.append(f"{prefix}{w}")
+    return "\n".join(lines)
 
 
 def check_plan_bounds(parts: dict) -> list[str]:
@@ -221,11 +227,12 @@ def check_plan_bounds(parts: dict) -> list[str]:
             if _rects_overlap(a_info["bounds"], b_info["bounds"]):
                 pw.append(f"'{a_name}' 与 '{b_name}' 空间重叠，请调整 bounds")
 
-    # canvas overflow
+    # canvas overflow — skip decorative parts (shapes can bleed off canvas)
     for name, info in parts_wb:
         b = info["bounds"]
         w, h = b.get("width", 0), b.get("height", 0)
-        if b.get("left", 0) + w > 13.333 or b.get("top", 0) + h > 7.5:
+        is_decor = info.get("decor_style") is not None
+        if not is_decor and (b.get("left", 0) + w > 13.333 or b.get("top", 0) + h > 7.5):
             pw.append(f"'{name}' 超出画布范围")
 
     # type-specific size + ratio (shared with _check_min_size)

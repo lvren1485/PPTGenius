@@ -37,8 +37,8 @@ class FontSpec(BaseModel):
     @field_validator("size")
     @classmethod
     def _check_size(cls, v: int | None) -> int | None:
-        if v is not None and v < 11:
-            raise ValueError(f"Font size must be >= 11pt, got {v}")
+        if v is not None and v < 9:
+            raise ValueError(f"Font size must be >= 9pt, got {v}")
         return v
 
     @field_validator("color")

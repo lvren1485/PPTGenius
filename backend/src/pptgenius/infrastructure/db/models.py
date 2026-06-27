@@ -153,6 +153,7 @@ class Style(Base):
     chart_colors_json: Mapped[dict] = mapped_column(JSON, nullable=False)
     fonts_json: Mapped[dict] = mapped_column(JSON, nullable=False)
     style_density: Mapped[str | None] = mapped_column(String(16), default="moderate")
+    text_density: Mapped[str | None] = mapped_column(String(16), default="moderate")
     decoration_json: Mapped[dict | None] = mapped_column(JSON)
     background_json: Mapped[dict | None] = mapped_column(JSON)
     is_active: Mapped[bool | None] = mapped_column(Boolean, default=True)

@@ -39,6 +39,7 @@ async def seed(engine: AsyncEngine) -> None:
                             chart_colors_json=d.get("chart_colors", []),
                             fonts_json=d.get("fonts", {}),
                             style_density=d.get("style_density", "moderate"),
+                            text_density=d.get("text_density", "moderate"),
                             decoration_json=d.get("decoration", {}),
                             background_json=d.get("background_json"),
                         )

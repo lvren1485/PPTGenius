@@ -99,6 +99,7 @@ def make_generate_outline_content(db: Database, conversation_id: int) -> Callabl
 
     async def _generate_outline_content(
         query: str | None = None,
+        language: str = "简体中文",
     ) -> str:
         """Generate slide content for ALL sections at once.
 
@@ -107,6 +108,7 @@ def make_generate_outline_content(db: Database, conversation_id: int) -> Callabl
 
         Args:
             query: Optional user requirements or additional instructions.
+            language: Output language, e.g. "简体中文", "繁體中文", "English".
         """
         conv = await db.get_conversation(conversation_id)
         if conv is None or conv.current_outline_id is None:
@@ -127,7 +129,7 @@ def make_generate_outline_content(db: Database, conversation_id: int) -> Callabl
             gdb = sm.new_session()
             try:
                 return await run_outline_generator(
-                    gdb, conversation_id, section_id=sec.id, query=query,
+                    gdb, conversation_id, section_id=sec.id, query=query, language=language,
                 )
             finally:
                 await sm.close(gdb)
@@ -149,6 +151,7 @@ def make_modify_outline_section(db: Database, conversation_id: int) -> Callable:
     async def _modify_outline_section(
         section_id: int,
         query: str | None = None,
+        language: str = "简体中文",
     ) -> str:
         """Regenerate content for non-completed slides in a section.
 
@@ -158,6 +161,7 @@ def make_modify_outline_section(db: Database, conversation_id: int) -> Callable:
         Args:
             section_id: The section to regenerate.
             query: Optional specific requirements or instructions.
+            language: Output language, e.g. "简体中文", "繁體中文", "English".
         """
         _log.info("modify section: section_id=%d query=%s", section_id, query or "-")
         conv = await db.get_conversation(conversation_id)
@@ -169,6 +173,7 @@ def make_modify_outline_section(db: Database, conversation_id: int) -> Callable:
             db, conversation_id,
             section_id=section_id,
             query=query,
+            language=language,
         )
         await _finalize_special_slides(db, conv.current_outline_id)
         return result

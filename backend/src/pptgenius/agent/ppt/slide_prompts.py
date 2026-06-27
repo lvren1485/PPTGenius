@@ -152,6 +152,15 @@ def _build_style_section(data: dict) -> str:
             f"caption({_fs('caption')}pt)"
         )
 
+    # Text density
+    td = data.get("text_density", "moderate")
+    td_hints = {
+        "sparse": "稀疏: 1-2 个 textbox，内容精简",
+        "moderate": "适中: 3-5 个 textbox，正常内容量",
+        "dense": "密集: 6-8 个 textbox，可容纳较多文字",
+    }
+    parts.append(f"文本密度: {td} — {td_hints.get(td, td_hints['moderate'])}")
+
     # Background (full JSON, not summarized)
     bg = data.get("background_json", {})
     if bg:
