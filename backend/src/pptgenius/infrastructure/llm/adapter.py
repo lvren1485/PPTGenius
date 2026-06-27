@@ -64,6 +64,7 @@ def _patched_convert_message_to_dict(
 def _install_diagnostic_hook():
     """Wrap _agenerate to log message structure when 400 occurs."""
     from pptgenius.infrastructure.utils import get_logger
+    from langchain_core.messages import ToolMessage as TM
     _diag_log = get_logger("pptgenius.llm.diag")
 
     _original_agenerate = _base.BaseChatOpenAI._agenerate
@@ -73,14 +74,26 @@ def _install_diagnostic_hook():
             return await _original_agenerate(self, messages, stop, run_manager, **kwargs)
         except Exception as e:
             if "400" in str(e) or "insufficient tool messages" in str(e):
-                roles = []
+                # Count tool_calls vs ToolMessages by id
+                ai_ids: set[str] = set()
+                tool_ids: set[str] = set()
                 for m in messages:
-                    tc_count = len(m.tool_calls) if hasattr(m, "tool_calls") and m.tool_calls else 0
-                    tc_ids = [tc.get("id", "")[:8] for tc in (m.tool_calls or [])] if tc_count else []
-                    roles.append(f"{m.__class__.__name__}(tc={tc_count}{' ids='+','.join(tc_ids) if tc_ids else ''})")
+                    if hasattr(m, "tool_calls") and m.tool_calls:
+                        for tc in m.tool_calls:
+                            ai_ids.add(tc.get("id", ""))
+                    if isinstance(m, TM):
+                        tid = getattr(m, "tool_call_id", "")
+                        if tid:
+                            tool_ids.add(tid)
+
+                missing = ai_ids - tool_ids
+                orphans = tool_ids - ai_ids
+
                 _diag_log.warning(
-                    "400 diag: %d messages: %s",
-                    len(messages), " → ".join(roles[-8:])  # last 8
+                    "400: %d msgs, %d AI calls, %d tool results, missing_tool=%s, orphan_tool=%s",
+                    len(messages), len(ai_ids), len(tool_ids),
+                    [tid[-8:] for tid in missing][:5] or "NONE",
+                    [tid[-8:] for tid in orphans][:5] or "NONE",
                 )
             raise
 
