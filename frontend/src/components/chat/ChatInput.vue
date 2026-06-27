@@ -5,7 +5,7 @@ import { ElMessage } from 'element-plus'
 import type { UploadFile } from 'element-plus'
 import api from '../../api/client'
 
-defineProps<{ sending: boolean }>()
+defineProps<{ sending: boolean; uploading?: boolean }>()
 
 const emit = defineEmits<{
   send: [text: string]
@@ -16,7 +16,6 @@ const emit = defineEmits<{
 const text = ref('')
 const webSearchEnabled = ref(true)
 const ragMode = ref<'user' | 'conversation'>('user')
-const dragOver = ref(false)
 
 onMounted(async () => {
   try {
@@ -79,35 +78,10 @@ function handleUpload(file: UploadFile) {
   return false
 }
 
-// Drag-and-drop
-function onDragOver(e: DragEvent) {
-  e.preventDefault()
-  dragOver.value = true
-}
-function onDragLeave() {
-  dragOver.value = false
-}
-function onDrop(e: DragEvent) {
-  e.preventDefault()
-  dragOver.value = false
-  const files = e.dataTransfer?.files
-  if (files && files.length > 0) {
-    if (files.length > MAX_FILES) {
-      ElMessage.warning(`最多上传 ${MAX_FILES} 个文件，当前选择了 ${files.length} 个`)
-    }
-    emit('upload', Array.from(files).slice(0, MAX_FILES))
-  }
-}
 </script>
 
 <template>
-  <div
-    class="chat-input"
-    :class="{ 'drag-over': dragOver }"
-    @dragover="onDragOver"
-    @dragleave="onDragLeave"
-    @drop="onDrop"
-  >
+  <div class="chat-input">
     <div class="input-toolbar">
       <el-upload
         :show-file-list="false"
@@ -117,7 +91,7 @@ function onDrop(e: DragEvent) {
         accept="*"
         multiple
       >
-        <el-button :icon="UploadFilled" class="upload-btn">上传</el-button>
+        <el-button :icon="UploadFilled" class="upload-btn" :loading="uploading" :disabled="uploading">上传</el-button>
       </el-upload>
       <div class="toolbar-right">
         <el-switch
@@ -165,13 +139,11 @@ function onDrop(e: DragEvent) {
         发送
       </el-button>
     </div>
-    <div class="drag-hint" v-if="dragOver">释放文件以添加</div>
   </div>
 </template>
 
 <style scoped>
-.chat-input { border-top: 1px solid var(--border); padding: 12px 24px 16px; background: var(--bg-card); position: relative; transition: border-color .2s, background .2s; }
-.chat-input.drag-over { border-color: var(--primary); background: var(--primary-bg); }
+.chat-input { border-top: 1px solid var(--border); padding: 12px 24px 16px; background: var(--bg-card); }
 .input-toolbar {
   display: flex;
   align-items: center;
@@ -217,19 +189,5 @@ function onDrop(e: DragEvent) {
 }
 .input-row :deep(.el-textarea) {
   flex: 1;
-}
-.drag-hint {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  color: #409eff;
-  font-weight: 600;
-  background: rgba(236, 245, 255, 0.9);
-  pointer-events: none;
-  border-radius: 12px;
-  z-index: 1;
 }
 </style>

@@ -182,6 +182,7 @@ async def _get_slide(db: AsyncSession, presentation_id: int, slide_index: int):
         select(PresentationSlide)
         .where(PresentationSlide.presentation_id == presentation_id)
         .where(PresentationSlide.slide_index == slide_index)
+        .where(PresentationSlide.status != "deleted")
     )
     return stmt_result.scalar_one_or_none()
 
@@ -207,6 +208,7 @@ async def update_slides_style(
     stmt = (
         update(PresentationSlide)
         .where(PresentationSlide.presentation_id == presentation_id)
+        .where(PresentationSlide.status != "deleted")
         .values(style_id=style_id)
     )
     result = await db.execute(stmt)

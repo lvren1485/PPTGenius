@@ -90,7 +90,32 @@ async function loadConversation() {
 }
 
 const sending = ref(false)
+const uploading = ref(false)
 const aiReplied = ref(false)
+const dragOver = ref(false)
+
+function onDragOver(e: DragEvent) {
+  e.preventDefault()
+  dragOver.value = true
+}
+function onDragLeave(e: DragEvent) {
+  // Only clear if leaving the entire chat-main (not entering a child)
+  const target = e.currentTarget as HTMLElement
+  const related = e.relatedTarget as HTMLElement | null
+  if (!related || !target.contains(related)) {
+    dragOver.value = false
+  }
+}
+function onDrop(e: DragEvent) {
+  e.preventDefault()
+  dragOver.value = false
+  if (uploading.value) {
+    ElMessage.warning('文件正在上传中，请稍后再试')
+    return
+  }
+  const files = e.dataTransfer?.files
+  if (files && files.length > 0) handleUpload(Array.from(files).slice(0, 10))
+}
 
 function isAtBottom(): boolean {
   const el = document.getElementById('msg-container')
@@ -260,6 +285,8 @@ function toolCtype(name: string): string {
 }
 
 async function handleUpload(files: File[]) {
+  if (uploading.value) return
+  uploading.value = true
   const title = files.length > 0 ? files[0].name.slice(0, 20) : undefined
   const cid = await ensureConversation(title)
   const form = new FormData()
@@ -275,6 +302,8 @@ async function handleUpload(files: File[]) {
     }
   } catch {
     ElMessage.error('上传失败')
+  } finally {
+    uploading.value = false
   }
 }
 
@@ -333,7 +362,10 @@ function isToolBlock(item: MsgItem | ToolBlock): item is ToolBlock {
   <div class="chat-layout">
     <ConversationSidebar />
 
-    <div class="chat-main">
+    <div class="chat-main" @dragover="onDragOver" @dragleave="onDragLeave" @drop="onDrop">
+      <div v-if="dragOver" class="drag-overlay">
+        <div class="drag-hint-inner">{{ uploading ? '文件上传中，请稍候...' : '释放文件以上传至知识库' }}</div>
+      </div>
       <div class="chat-header" v-if="convId">
         <span class="chat-title">{{ convTitle || '新会话' }}</span>
       </div>
@@ -390,14 +422,45 @@ function isToolBlock(item: MsgItem | ToolBlock): item is ToolBlock {
         </div>
       </div>
 
-      <ChatInput :sending="sending" @send="sendMessage" @stop="handleStop" @upload="handleUpload" />
+      <ChatInput :sending="sending" :uploading="uploading" @send="sendMessage" @stop="handleStop" @upload="handleUpload" />
     </div>
   </div>
 </template>
 
 <style scoped>
 .chat-layout { display: flex; height: calc(100vh - 56px); }
-.chat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg); transition: background .3s; }
+.chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--bg);
+  transition: background .3s;
+  position: relative;
+}
+
+.drag-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(99, 102, 241, 0.08);
+  border: 2px dashed var(--primary);
+  border-radius: 12px;
+  margin: 8px;
+  pointer-events: none;
+}
+.drag-hint-inner {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--primary);
+  background: var(--bg-card);
+  padding: 24px 48px;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.15);
+}
 .chat-header { padding: 12px 24px; border-bottom: 1px solid var(--border); background: var(--bg-card); }
 .chat-title { font-weight: 600; font-size: 15px; color: var(--text); }
 .chat-empty { flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px; }

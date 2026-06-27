@@ -35,6 +35,7 @@ def create_llm(
         api_key=settings.llm.api_key,
         temperature=settings.llm.temperature,
         max_tokens=settings.llm.max_tokens,
+        model_kwargs={"parallel_tool_calls": False},
     )
 
     _log.debug("built llm conv=%d agent=%s model=%s", conversation_id, agent_id, settings.llm.model)

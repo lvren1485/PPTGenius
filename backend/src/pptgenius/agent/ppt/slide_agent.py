@@ -319,7 +319,7 @@ async def run_slide_agent(
         try:
             result = await ag.ainvoke(
                 {"messages": messages},
-                config={"recursion_limit": 200},
+                config={"recursion_limit": 150},
             )
         except Exception:
             _log.warning("slide_agent crashed slide=%d attempt=%d",
