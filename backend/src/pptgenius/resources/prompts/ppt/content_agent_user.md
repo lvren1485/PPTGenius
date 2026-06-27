@@ -11,7 +11,6 @@ has_image: {has_image}
 {existing_content_section}
 {color_scheme_section}
 {template_section}
-{neighbor_section}
 {status_section}
 {section_info}
 {plan_section}
@@ -44,3 +43,7 @@ has_image: {has_image}
 3. 对每个 part：**submit_element**(part="xxx") ×N → **check_parts**(part="xxx") 检查 → **check_parts**(part="xxx", complete=true) 标记
 4. **check_parts()** — 确认所有 part 均为 complete
 **如果 plan 中已有内容（修改模式），基于已有 plan 修改或追加 part，不要完全覆盖。**
+
+用户要求: {neighbor_section}
+
+如果用户要求不为空，请严格按照用户要求设计或者修改页面内容和视觉方案，确保满足用户需求。

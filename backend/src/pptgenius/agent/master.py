@@ -434,7 +434,7 @@ def _has_presentation_changed(state: dict, prev_count: int) -> bool:
     msgs = state.get("messages", [])
     for m in msgs[prev_count:]:
         name = getattr(m, "name", "")
-        if name in ("_slides_content", "_ppt_style", "_rearrange_presentation_slides"):
+        if name in ("_slides_content", "_modify_slides_content", "_ppt_style", "_rearrange_presentation_slides"):
             return True
     return False
 

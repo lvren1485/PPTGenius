@@ -182,10 +182,9 @@ def test_user_prompt_existing_outputs_raw_json():
         "notes": "design rationale: used gradient for tech atmosphere",
     }
     user = build_user_prompt(slide, style, template, existing_outputs=eo)
-    assert "abc12345" in user
-    assert "design rationale" in user
-    assert "gradient_angle" in user
-    assert "ff0000" in user
+    assert "abc12345" in user                             # element id
+    assert "修改模式" in user                              # modify mode label
+    assert "gradient" in user                             # background type summary
 
 
 def test_build_user_prompt_caches_are_independent():

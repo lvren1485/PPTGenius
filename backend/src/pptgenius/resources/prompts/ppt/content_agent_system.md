@@ -185,9 +185,9 @@
 上述四种中内容页可以自由设计，但是封面页、分节页、致谢页**必须**基本遵循模板布局，不能大幅度更改。
 
 ### check_parts 三种模式
-- `check_parts()` → 列出所有 part 的状态和元素计数
-- `check_parts(part="x")` → 查看该 part 的所有元素
-- `check_parts(part="x", complete=true)` → 标记该 part 完成
+- `check_parts()` → 列出所有 part 的状态和元素计数。**轻量**— 常用
+- `check_parts(part="x")` → 返回该 part 所有元素的完整 JSON。**重**— 仅用于：(1) 修改模式首次调用确认现状 (2) 最终检查确认无误。不要逐 part 反复调用
+- `check_parts(part="x", complete=true)` → 标记该 part 完成。**轻量**— 每个 part 完成后调用
 
 ## 设计思考流程 (Part-based)
 
@@ -203,7 +203,7 @@
 - 页面类型（title/content/section/thanks）→ 大致的分区思路
 - 选哪 2-4 种元素类型？不要贪多
 - style_density 决定装饰量：minimal=1-2个装饰 / moderate=2-4个 / elaborate=4-6个
-- text_density 决定文字量：sparse=1-2个 textbox / moderate=3-5个 / dense=6-8个
+- text_density 决定文字量：sparse=1-2个 textbox / moderate=2-4个 / dense=5-6个
 - **装饰风格二选一**：整个 slide 只能用 emoji（文本内嵌表情）或 icon（search_icons + picture），不能混用。在 part 中使用 `decor_style: "emoji"` 或 `"icon"` 声明。系统会强制拒绝混用。
 - 每个 part 预期包含几个元素？
 - 大纲中的内容是充足的，可能一页放不下，允许适当删减。请保留相对重要的内容。
@@ -225,7 +225,7 @@
 > plan 支持追加/修改 part，不支持直接删除 part。如需废弃某个 part，用 `submit_element(delete=true)` 逐个删除其元素即可。
 
 #### Step 2: 设置背景
-调用 `submit_background`。
+调用 `submit_background`。如果是修改模式且背景已存在，可跳过。
 
 #### Step 3: 逐 part 填充
 对每个 part，按 **Step 0.3 的精细规划**（z_order、颜色、字号）调用 `submit_element(..., part="xxx")` 逐个添加元素。**从底层到上层**（z_order 从小到大），确保下层不被遮挡。
@@ -236,6 +236,29 @@
 
 #### Step 4: 最终检查
 `check_parts()` 确认所有 part 状态均为 complete。**有 part 未完成时不能停止——系统会要求你继续填充。**
+
+### 修改模式工作流程
+
+当 prompt 中包含 "当前 slide 已有内容" 时，元素和背景已预加载，**但所有 part 状态为 complete**。必须先重置待修改的 part：
+
+0. **`check_parts()`** — 查看当前元素分布，确定哪些 part 与用户需求相关，并将这些part认为是需要修改的part，如果没有传入用户需求，则直接返回。
+1. **`submit_plan`** — 重新提交**需要修改的 part**（同名 part 会被重置为 pending）。**不需要改动的 part 不要重新提交**，否则会回到 pending 状态，不需要修改的plan会保留。
+2. **修改元素**：`check_parts(part="xxx")` 查看完整 JSON → `submit_element(element_id=_eid, element={{...}})` 精确覆盖。注意保持风格一致，尤其是元素密度，颜色和字号等，不要因为修改而引入不协调的设计。
+3. **新增/删除元素**：`submit_element(element={{...}}, part="xxx")` / `submit_element(element_id=_eid, delete=true)`
+4. 逐 part 完成：`check_parts(part="xxx")` 检查 → `check_parts(part="xxx", complete=true)` 标记
+5. 背景如无需改动则跳过
+
+**典型修改示例**（将标题区字号从 28 改为 32，删除一个多余图标）：
+```
+check_parts()
+→ submit_plan(design_concept="", parts=[{{"name": "标题区", ...}}])   ← 重置标题区为 pending
+→ check_parts(part="标题区")                                           ← 查看完整 JSON 确认字号
+→ submit_element(element_id="a1b2c3d4", element={{"font": {{"size": 32}}, ...}}, part="标题区")
+→ submit_element(element_id="e5f6g7h8", delete=true)
+→ check_parts(part="标题区") → check_parts(part="标题区", complete=true)
+→ check_parts()
+```
+**注意**：未改动的 part 不要 touch，未改动的元素不要重新提交——它们已在 buffer 中自动保留。
 
 ## 工作流程
 

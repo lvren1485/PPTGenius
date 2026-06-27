@@ -78,7 +78,7 @@ def build_user_prompt(
     existing_section = _build_existing_section(existing_outputs) if existing_outputs else ""
     color_section = _build_style_section(style) if style else "## 配色方案: 使用默认配色"
     template_section = _build_template_section(template) if template else ""
-    query_section = f"## 修改指令\n{query}" if query else ""
+    query_section = str(query) if query else ""
     status_hints = {
         "o_modified_modify": "用户要求修改本页内容",
         "o_modified_merge":  "本页内容来自被删除页面合并，需要重新组织",
@@ -115,7 +115,7 @@ def build_user_prompt(
         existing_content_section=existing_section,
         color_scheme_section=color_section,
         template_section=template_section,
-        neighbor_section=query_section,
+        neighbor_section=query_section,  # now at top of prompt as "⚡ 修改指令"
         status_section=status_section,
         plan_section=plan_section,
         section_info=section_info,
@@ -156,8 +156,8 @@ def _build_style_section(data: dict) -> str:
     td = data.get("text_density", "moderate")
     td_hints = {
         "sparse": "稀疏: 1-2 个 textbox，内容精简",
-        "moderate": "适中: 3-5 个 textbox，正常内容量",
-        "dense": "密集: 6-8 个 textbox，可容纳较多文字",
+        "moderate": "适中: 2-4 个 textbox，正常内容量",
+        "dense": "密集: 5-6 个 textbox，可容纳较多文字",
     }
     parts.append(f"文本密度: {td} — {td_hints.get(td, td_hints['moderate'])}")
 
@@ -171,14 +171,53 @@ def _build_style_section(data: dict) -> str:
 
 
 def _build_existing_section(outputs: dict) -> str:
-    """Pass existing slide state as raw JSON — do NOT parse or truncate."""
-    return (
-        "## 当前 slide 已有内容（修改模式，完整 JSON）\n"
-        "你可以保留、修改或删除已有元素。删除用 submit_element(element_id=..., delete=true)。\n"
-        "```json\n"
-        + json.dumps(outputs, ensure_ascii=False, indent=2)
-        + "\n```"
-    )
+    """Compact summary table — full details available via check_parts()."""
+    elements = outputs.get("elements", [])
+    if not elements:
+        return ""
+
+    lines = [
+        "## 当前 slide 已有元素（修改模式）",
+        f"共 {len(elements)} 个元素。使用 `_eid` 精确覆盖或删除。",
+        f"背景类型: {outputs.get('background', {}).get('type', '未设置')}",
+        "",
+        "| _eid | type | 子类型 | part | left | top | w×h | 内容摘要 |",
+        "|------|------|--------|------|------|-----|-----|---------|",
+    ]
+    for el in elements:
+        pos = el.get("position", {})
+        eid = (el.get("_eid") or el.get("id") or "-")[:8]
+        el_type = el.get("type", "?")
+        subtype = el.get("shape_type") or el.get("chart_type") or "-"
+        part = el.get("_part", "-")
+        left = pos.get("left", 0)
+        top = pos.get("top", 0)
+        w = pos.get("width", 0)
+        h = pos.get("height") or 0
+        # Content hint: first 30 chars of text
+        hint = ""
+        if el_type == "textbox":
+            for block in el.get("content", []):
+                for run in block.get("paragraph", {}).get("runs", []):
+                    hint = run.get("text", "")[:30]
+                    break
+                if hint:
+                    break
+        elif el_type == "chart":
+            hint = el.get("title", "")[:30] or el.get("chart_type", "")
+        elif el_type == "table":
+            hint = f"{el.get('rows', 0)}×{el.get('cols', 0)}"
+        elif el_type == "picture":
+            hint = el.get("name", "") or el.get("path", "") or ""
+            hint = hint[:30]
+        lines.append(
+            f"| {eid} | {el_type} | {subtype} | {part} "
+            f"| {left:.1f} | {top:.1f} | {w:.1f}×{h:.1f} | {hint} |"
+        )
+    lines.append("")
+    lines.append("**操作**: 覆盖=`submit_element(element_id=_eid, element={{...}}, part=...)`，删除=`submit_element(element_id=_eid, delete=true)`")
+    lines.append("详情用 `check_parts(part=\"xxx\")` 查看。")
+    return "\n".join(lines)
 
 
 def _build_template_section(template: dict) -> str:
@@ -210,13 +249,15 @@ def _build_plan_section(plan: dict) -> str:
     if not plan or not plan.get("parts"):
         return ""
     parts = plan["parts"]
+    decor = plan.get("decor_style", "")
     lines = [
         "## 设计计划 (Plan)",
         f"设计概念: {plan.get('design_concept', '')}",
-        "",
-        "| Part | 状态 | 描述 |",
-        "|------|------|------|",
     ]
+    if decor:
+        lines.append(f"装饰风格 (已锁定): **{decor}** — 不能再使用 {'icon' if decor == 'emoji' else 'emoji'}")
+    lines.append("")
+    lines.extend(["| Part | 状态 | 描述 |", "|------|------|------|"])
     for name, info in parts.items():
         status = info.get("status", "pending")
         desc = info.get("description", "")[:80]

@@ -155,6 +155,18 @@ def _calc_layer_area(buffer: dict, z_order: int) -> int:
     return int(used / slide_area * 100)
 
 
+def _el_label(eid: str, el: dict) -> str:
+    """Compact label: 'eid (type:subtype, z=N)'."""
+    el_type = el.get("type", "?")
+    subtype = el.get("shape_type") or el.get("chart_type") or ""
+    z = el.get("position", {}).get("z_order", "?")
+    parts = [f"{eid[:8]} ({el_type}"]
+    if subtype:
+        parts.append(f":{subtype}")
+    parts.append(f", z={z})")
+    return "".join(parts)
+
+
 # ── unified entry points ──────────────────────────────────────────────
 
 def check_element(element: dict, buffer: dict) -> str:
@@ -175,16 +187,17 @@ def check_element(element: dict, buffer: dict) -> str:
         ex_pos = ex.get("position", {})
         ex_z = ex_pos.get("z_order", 50)
         if abs(new_z - ex_z) <= 10 and _rects_overlap(pos, ex_pos):
-            ex_type = ex.get("type", "")
+            ex_type = ex.get("type", "?")
+            ex_label = _el_label(eid, ex)
             pct = _overlap_pct(pos, ex_pos)
             # Shape-shape overlap is often intentional (decorative layering)
             if el_type == "shape" and ex_type == "shape":
                 warnings.append(
-                    f"ℹ 形状叠加: 与 {eid}（{ex.get('shape_type', '-')}）重叠 {pct}%。"
+                    f"ℹ 形状叠加: 与 {ex_label} 重叠 {pct}%。"
                     f"如非设计意图，请调整位置或 z_order。"
                 )
             else:
-                warnings.append(f"⚠ 与元素 {eid} (z={ex_z}) 重叠 {pct}%，建议调整位置或 z_order")
+                warnings.append(f"⚠ 与 {ex_label} 重叠 {pct}%，建议调整位置或 z_order")
 
     # text overflow
     if el_type == "textbox":

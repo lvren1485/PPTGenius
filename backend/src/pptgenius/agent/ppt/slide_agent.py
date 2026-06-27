@@ -6,6 +6,7 @@ Part-based model: submit_plan (define regions) → submit_background → submit_
 
 from __future__ import annotations
 
+import json
 import secrets
 
 from langchain.agents import create_agent
@@ -52,10 +53,20 @@ async def run_slide_agent(
     slide_index = slide.get("slide_index", 0)
 
     # ── memory buffer (closure-captured mutable dict) ──
+    _elements: dict = {}
+    _bg: dict = {}
+    if existing_outputs:
+        _bg = dict(existing_outputs.get("background", {}) or {})
+        for el in (existing_outputs.get("elements") or []):
+            eid = el.get("_eid") or secrets.token_hex(4)
+            _elements[eid] = dict(el)
+    # Snapshots for crash recovery (deep copies, before any mutation)
+    _init_elements = dict(_elements)
+    _init_bg = dict(_bg)
     _buffer: dict = {
-        "plan": plan,            # pre-populated from existing_outputs in modify mode
-        "elements": {},          # {element_id: {..., "_part": "标题区"}}
-        "background": {},        # slide background
+        "plan": plan,
+        "elements": _elements,
+        "background": _bg,
     }
 
     # ── tools ──────────────────────────────────────────────────────────
@@ -154,9 +165,13 @@ async def run_slide_agent(
         if not element:
             return "错误: 非删除操作必须提供 element。"
 
-        # Attach part
+        # Attach part — if not explicit, inherit from old element on overwrite
         if part:
             element["_part"] = part
+        elif element_id and element_id in _buffer["elements"]:
+            old_part = _buffer["elements"][element_id].get("_part")
+            if old_part:
+                element["_part"] = old_part
 
         # Validate
         result = validate_elements([element])
@@ -174,8 +189,11 @@ async def run_slide_agent(
         if decor_note:
             return decor_note  # hard reject — conflicting decor style
 
-        # Spatial check (warning only, never blocks)
+        # Spatial check — temporarily remove self to avoid 100% overlap on overwrite
+        old_el = _buffer["elements"].pop(element_id, None) if element_id else None
         spatial_note = _check_spatial(element, _buffer)
+        if old_el is not None:
+            _buffer["elements"][element_id] = old_el  # restore (overwritten below)
 
         if element_id and element_id in _buffer["elements"]:
             _buffer["elements"][element_id] = element
@@ -217,12 +235,9 @@ async def run_slide_agent(
                 f"**{part}** ({info['status']}): {info['description']}",
                 "元素列表:",
             ]
-            for eid, el in _buffer["elements"].items():
+            for eid, el in list(_buffer["elements"].items()):
                 if el.get("_part") == part:
-                    items.append(
-                        f"  - {eid}: type={el.get('type')}, "
-                        f"shape_type={el.get('shape_type', '-')}"
-                    )
+                    items.append(f"  - {eid}: {json.dumps(el, ensure_ascii=False)}")
             return "\n".join(items)
 
         # View all parts
@@ -331,10 +346,10 @@ async def run_slide_agent(
         # ── retry: fresh conversation + state-aware prompt ─────────────
 
         if crashed:
-            # Reset buffer — partial state from crashed run is unreliable
-            _buffer["plan"] = plan           # original from args (modify mode)
-            _buffer["elements"] = {}
-            _buffer["background"] = {}
+            # Reset buffer — but preserve modify-mode existing state if available
+            _buffer["plan"] = plan
+            _buffer["elements"] = dict(_init_elements)  # restore from init snapshot
+            _buffer["background"] = dict(_init_bg)
 
         cur = _buffer.get("plan")
         num_el = len(_buffer["elements"])
@@ -384,7 +399,7 @@ async def run_slide_agent(
 
     return {
         "slide_index": slide_index,
-        "elements": list(_buffer["elements"].values()),
+        "elements": [{**el, "_eid": eid} for eid, el in _buffer["elements"].items()],
         "notes": notes,
         "background": _buffer["background"],
         "plan": plan,

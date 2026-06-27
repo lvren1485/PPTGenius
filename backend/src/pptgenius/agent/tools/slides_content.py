@@ -209,11 +209,13 @@ async def _write_slide_content(
         "notes": final_notes,
         "plan": result.get("plan", {}),
     }
-    await db.set_slide_agent_output(
+    ok = await db.set_slide_agent_output(
         presentation_id=pres_id,
         slide_index=idx,
         agent_outputs=agent_outputs,
     )
+    if not ok:
+        _log.error("set_slide_agent_output failed pres=%d slide=%d", pres_id, idx)
     await db.update_slide_status(pres_id, idx, "completed")
 
     _log.debug("slide %d written: %d elements, bg=%s",
