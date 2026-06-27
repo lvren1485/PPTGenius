@@ -23,6 +23,30 @@ mysql -u {YOUR_USERNAME} -p -e "CREATE DATABASE IF NOT EXISTS pptgenius_test CHA
 <enter password when prompted>
 ```
 
+### SearXNG（可选 — 网络搜索替代引擎）
+
+DuckDuckGo 在中国大陆可能不稳定。建议部署本地 SearXNG 实例替代。
+
+```bash
+# 1. 拉取并启动 SearXNG（需 Docker Desktop）
+docker run -d --name searxng -p 8080:8080 \
+  -e "SEARXNG_SECRET=pptgenius-local-dev-secret-key-2026" \
+  -v "$(pwd)/searxng-data/settings.yml:/etc/searxng/settings.yml:ro" \
+  searxng/searxng
+
+# 2. 验证
+curl "http://localhost:8080/search?q=test&format=json"
+```
+
+然后在 `config.local.yaml` 中切换引擎：
+```yaml
+web_search:
+  engine: "searxng"
+  searxng_base_url: "http://localhost:8080"
+```
+
+详细配置见 `backend/searxng-data/README.md`。
+
 ### 配置
 
 ```bash

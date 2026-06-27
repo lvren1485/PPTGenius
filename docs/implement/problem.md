@@ -22,6 +22,26 @@
 
 ---
 
+TODO: 
+1. [*] middleware 统一化
+2. [*] 数据结构缺失项目 
+3. [*] 标记系统
+4. [*] 版本号
+5. [*] 导出
+6. [*] 字体与z-order
+7. [*] generator/explore 拆分
+8. [*] agent/common 拆分
+9. [*] 数据库
+10. [*] repository
+> in improvement.md
+11. [*] 搜索网络开关
+12. [*] 对话总结
+13. [*] 前端改进
+14. [*] 真实API测试
+15. [*] 删除非必要的retry机制
+16. [*] 清除无用的配置、函数、字段等
+17. [ ] 打包部署
+
 ## 1. Generator/Explore 架构分离
 
 ### 1.1 Generator 搜索-写入失衡
