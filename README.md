@@ -100,29 +100,32 @@ uv run pytest src/tests/ -v
 
 ## Benchmark
 
-对已积累的 Outline / Presentation 数据进行离线评估，输出 HTML 报告到 `docs/benchmark_report.html`。
+对已积累的 Outline / Presentation 数据进行离线评估，输出报告到 `docs/benchmark/`。
 
-**前置条件：**
+**三个评估模块：**
 
-- 数据库中已有至少一条 Conversation，且至少有一个 Outline（通过正常使用产品生成）
-- 如需测量 Traceability（大纲内容可追溯至知识库），需先上传知识文件
-
-**评估维度：**
-
-| 维度 | 说明 | 依赖 |
-|---|---|---|
-| Token 开销 | 按 Outline-only / PPT 会话分类统计 `message.estimated_cost` | `messages` 表 |
-| Outline 分数 | 所有 Outline 的 `eval_score` 均值、标准差、最值 | `outlines` 表 |
-| Traceability | 将 Outline 每句话作为查询搜索 BM25 知识库，统计可追溯句子占比 | `knowledge_files` 表 + BM25 索引 |
+| 模块 | 说明 | 数据来源 |
+|------|------|---------|
+| B1 生成时间与成本 | 大纲/PPT 生成耗时、per-slide 成本、retry 次数 | `messages` 表 |
+| B2 大纲质量 | LLM Judge 量化评分 (结构/连贯/充实/视觉，1-10) | DeepSeek V4 Pro |
+| B3 PPT 视觉质量 | 越界、重叠、溢出、样式一致性等 9 项自动检查 | `agent_outputs` JSON |
 
 **运行：**
 
 ```bash
 cd backend
-uv run python src/benchmark.py
+
+# 完整评估（含 LLM Judge，会产生 API 费用）
+uv run python -m tests.benchmark.run
+
+# 跳过 LLM Judge（仅统计成本/时间 + 视觉检查，无 API 费用）
+uv run python -m tests.benchmark.run --skip-judge
+
+# 指定 Judge 模型
+uv run python -m tests.benchmark.run --judge-model deepseek-chat
 ```
 
-报告生成后浏览器打开 `docs/benchmark_report.html` 查看图表和逐会话明细。
+报告输出到 `docs/benchmark/benchmark_report.md`。
 
 ## 前端
 
