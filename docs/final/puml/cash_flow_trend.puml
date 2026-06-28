@@ -1,0 +1,39 @@
+@startuml cash_flow_trend
+!theme cerulean-outline
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Microsoft YaHei"
+
+title PPTGenius 项目投资净现金流量趋势 (5年)
+
+robust "净现金流量 (元)" as NCF
+robust "累计净现金流量" as CNCF
+
+@0
+NCF is "-29,640"
+CNCF is "-29,640"
+
+@1
+NCF is "-6,929"
+CNCF is "-36,569"
+
+@2
+NCF is "+15,758"
+CNCF is "-20,811"
+
+@3
+NCF is "+66,269"
+CNCF is "+45,458"
+
+@4
+NCF is "+111,886"
+CNCF is "+157,344"
+
+@5
+NCF is "+177,138"
+CNCF is "+334,482"
+
+highlight 0 to 1 #FFCDD2 : 投资回收期
+highlight 2 to 3 #C8E6C9 : 盈亏平衡
+highlight 3 to 5 #A5D6A7 : 盈利期
+
+@enduml

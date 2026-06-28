@@ -98,7 +98,7 @@ Coordinator (意图分类 → 分发)
 - PPT Graph 的 StateGraph 导致 context window 累积（前一轮的 tool_call/result 全保留）
 - 三种 PPT 管线 (sub_agent/freedom/super_freedom) 维护成本高
 
-**保留代码**: `agent_old/` 目录 (~5,300 行, 35 文件)
+**保留经验**：旧架构代码已在 Phase 3 重构后清理，其设计思路记录于本文档。
 
 **参考文件**: `docs/implement/coordinator_agent.md`, `docs/implement/outline_agent.md`, `docs/implement/ppt_agent.md`
 
@@ -130,7 +130,7 @@ Coordinator (意图分类 → 分发)
 
 ## 5. PPT 生成管线演进
 
-### 5.1 Sub-Agent 管线 (`agent_old/ppt/phase2_sub_agent/`)
+### 5.1 Sub-Agent 管线（Phase 2 早期）
 
 每页 slide 由 Supervisor 分派给专门化的 Agent：
 - TextAgent: 纯文本元素
@@ -139,13 +139,13 @@ Coordinator (意图分类 → 分发)
 
 **放弃原因**: 分派逻辑复杂，LLM 难以决定"这段内容用 chart 还是 table"，且多个 Agent 之间无协调导致元素位置冲突。
 
-### 5.2 Freedom 管线 (`agent_old/ppt/phase2_freedom/`)
+### 5.2 Freedom 管线（Phase 2 中期）
 
 单个 Agent 生成整页所有元素，但仍在 PPT Graph 的 StateGraph 中运行。
 
 **放弃原因**: StateGraph 的 context 累积问题——前一页的工具调用历史对后一页无用但占用 window。
 
-### 5.3 Super Freedom 管线 (`agent_old/ppt/phase2_super_freedom/`)
+### 5.3 Super Freedom 管线（Phase 2 后期）
 
 单个 Agent，完全独立的 LLM 调用（不走 StateGraph），但仍使用旧的 `submit_element` 单工具模型。
 
@@ -199,7 +199,7 @@ Phase 2 同时实现了 sub_agent、freedom、super_freedom 三种管线，通�
 
 ### 7.5 当前代码中仍存在的过度设计倾向
 
-- `agent_old/` 保留了 ~5,300 行旧代码，应评估是否可以彻底删除
+- Phase 2 的旧架构代码（~5,300 行）已在 Phase 3 重构完成后清理删除
 - `perception.py` (362 行) 的 9 个只读工具中部分使用频率极低
 - `spatial_check.py` 的文字溢出估算逻辑较复杂，实际 LLM 很少依据此信息调整
 
@@ -236,4 +236,4 @@ Phase 2 同时实现了 sub_agent、freedom、super_freedom 三种管线，通�
 | **合计 (不含旧代码)** | **~112** | **~14,200** | |
 | 前端 (Vue3) | ~30 | ~4,000 | views + components + stores |
 
-平均文件 ~130 行，中位数 < 100 行。超 300 行文件 10 个，超 500 行文件 2 个（`agent_old/coordinator.py`, `ppt_engine/parser/base.py`）。
+平均文件 ~130 行，中位数 < 100 行。超 300 行文件 8 个，超 500 行文件 1 个（`ppt_engine/parser/base.py`）。

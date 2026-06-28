@@ -6,13 +6,15 @@
 
 ## 目录
 
-1. [文件组织规范](#1-文件组织规范)
-2. [命名规范](#2-命名规范)
-3. [架构模式规范](#3-架构模式规范)
-4. [数据库操作规范](#4-数据库操作规范)
-5. [Agent 开发规范](#5-agent-开发规范)
-6. [代码整洁度审查结果](#6-代码整洁度审查结果)
-7. [已知技术债](#7-已知技术债)
+- [PPTGenius 代码规范与整洁度审查](#pptgenius-代码规范与整洁度审查)
+  - [目录](#目录)
+  - [1. 文件组织规范](#1-文件组织规范)
+  - [2. 命名规范](#2-命名规范)
+  - [3. 架构模式规范](#3-架构模式规范)
+  - [4. 数据库操作规范](#4-数据库操作规范)
+  - [5. Agent 开发规范](#5-agent-开发规范)
+  - [6. 代码整洁度审查结果](#6-代码整洁度审查结果)
+  - [7. 已知技术债](#7-已知技术债)
 
 ---
 
@@ -203,7 +205,6 @@ PresentationSlide 无唯一约束但沿用同样模式保持一致性。
 
 | 文件 | 行数 | 状态 | 建议 |
 |------|------|------|------|
-| `agent_old/coordinator.py` | 648 | 旧代码 | 仅保留参考，不再维护 |
 | `infrastructure/ppt_engine/parser/base.py` | 501 | 需拆分 | 提取公共渲染函数到独立模块 |
 | `agent/master.py` | 490 | 接近阈值 | 工具组装部分可提取 |
 | `agent/tools/structure.py` | 471 | 接近阈值 | 每个工具本身不大，整体可接受 |
@@ -229,7 +230,6 @@ PresentationSlide 无唯一约束但沿用同样模式保持一致性。
 **需改进**:
 - `structure.py` 中 `_cascade_pres_status` 使用 `db.db.execute` 绕过 facade
 - 部分 repository 函数缺少 soft-delete 过滤（已修复）
-- `agent_old/` 目录 35 个文件无人维护
 
 ---
 
@@ -238,7 +238,6 @@ PresentationSlide 无唯一约束但沿用同样模式保持一致性。
 | 优先级 | 债务 | 影响 | 建议 |
 |--------|------|------|------|
 | P0 | `ppt_engine/parser/base.py` 超 500 行 | 难以维护 | 拆分公共渲染逻辑 |
-| P1 | `agent_old/` 5,300 行旧代码 | 混淆项目结构 | 评估后删除或归档 |
 | P1 | `master.py` 490 行接近阈值 | 后续新增工具会突破 | 工具组装提取到 `tools/__init__.py` |
 | P2 | `_cascade_pres_status` 绕过 Database facade | 架构一致性 | 封装为 Database 方法 |
 | P2 | 无 `(presentation_id, slide_index)` 唯一约束 | 潜在重复 slide_index | 评估是否可加 UNIQUE KEY |

@@ -1,0 +1,116 @@
+@startuml system_architecture
+!theme cerulean-outline
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Microsoft YaHei"
+skinparam packageStyle rectangle
+skinparam roundcorner 10
+
+title PPTGenius 系统技术架构
+
+package "前端层 (Vue 3 + Element Plus)" as FE #E3F2FD {
+    [ChatView\n(SSE 实时流)] as chat
+    [OutlineView\n(大纲编辑)] as outline_v
+    [PptView\n(PPT 预览)] as ppt_v
+    [KnowledgeView\n(知识库管理)] as know_v
+}
+
+package "API 层 (FastAPI)" as API #FFF3E0 {
+    [POST /api/chat/send\n(SSE 入口)] as sse
+    [RESTful CRUD\n(13 个路由文件)] as rest
+}
+
+package "Agent 层 (LangChain ReAct)" as AGENT #F3E5F5 {
+    [Unified Master Agent\n(19 个工具)] as master
+    [Explore Agent\n(知识搜索)] as explore
+    [Generator\n(大纲写入)] as gen
+    [Slide Agent × N\n(Part-Based 模型)] as slide
+    [Style Agent\n(样式选择)] as style
+}
+
+package "基础设施层" as INFRA #E8F5E9 {
+    database "MySQL\n(asyncmy)" as db
+    [BM25 检索引擎] as bm25
+    [PPT 渲染引擎\n(python-pptx)] as pptx
+    [DeepSeek API\n(V4 Flash)] as llm
+    [Web Search\n(SearXNG)] as ws
+}
+
+FE -down-> API : HTTP/SSE
+API -down-> AGENT@startuml
+!theme cerulean-outline
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Microsoft YaHei"
+skinparam packageStyle rectangle
+skinparam roundcorner 10
+skinparam linetype ortho   ' 正交线确保垂直对齐
+
+title PPTGenius 系统技术架构
+
+package "前端层 (Vue 3 + Element Plus)" as FE #E3F2FD {
+    [ChatView\n(SSE 实时流)] as chat
+    [OutlineView\n(大纲编辑)] as outline_v
+    [PptView\n(PPT 预览)] as ppt_v
+    [KnowledgeView\n(知识库管理)] as know_v
+    chat -[hidden]right-> outline_v
+    outline_v -[hidden]right-> ppt_v
+    ppt_v -[hidden]right-> know_v
+}
+
+package "API 层 (FastAPI)" as API #FFF3E0 {
+    [POST /api/chat/send\n(SSE 入口)] as sse
+    [RESTful CRUD\n(13 个路由文件)] as rest
+    sse -[hidden]right-> rest
+}
+
+package "Agent 层 (LangChain ReAct)" as AGENT #F3E5F5 {
+    [Explore Agent\n(知识搜索)] as explore
+    [Unified Master Agent\n(19个工具, 协调者)] as master
+    [Generator\n(大纲写入)] as gen
+    [Slide Agent × N\n(Part-Based 模型)] as slide
+    [Style Agent\n(样式选择)] as style
+    explore -[hidden]right-> master
+    master -[hidden]right-> gen
+    gen -[hidden]right-> slide
+    slide -[hidden]right-> style
+}
+
+package "基础设施层" as INFRA #E8F5E9 {
+    [BM25 检索引擎] as bm25
+    [Web Search\n(SearXNG)] as ws
+    database "MySQL\n(asyncmy)" as db
+    [DeepSeek API\n(V4 Flash)] as llm
+    [PPT 渲染引擎\n(python-pptx)] as pptx
+    bm25 -[hidden]right-> ws
+    ws -[hidden]right-> db
+    db -[hidden]right-> llm
+    llm -[hidden]right-> pptx
+}
+
+' 包间箭头（自动居中）
+FE -down-> API : HTTP/SSE
+API -down-> AGENT
+AGENT -down-> INFRA
+
+' 专用依赖（垂直对应，居中）
+explore -down-> bm25
+explore -down-> ws
+slide -down-> pptx
+
+' 共享依赖（从 Agent 包中部指向 Infra 中部组件）
+AGENT -down-> llm
+AGENT -down-> db
+
+@enduml
+AGENT -down-> INFRA
+master -right-> explore
+master -right-> gen
+master -right-> slide
+master -right-> style
+explore -down-> bm25
+explore -down-> ws
+gen -down-> db
+slide -down-> llm
+slide -down-> pptx
+style -down-> db
+
+@enduml

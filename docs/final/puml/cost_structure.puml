@@ -1,0 +1,38 @@
+@startuml cost_structure
+!theme cerulean-outline
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Microsoft YaHei"
+
+title PPTGenius 成本结构分解 (Cost Breakdown Structure)
+
+map "**项目总投资 ≈ 29,840 元**" as total {
+}
+
+map "**一、开发期投资 ≈ 29,640 元**" as dev {
+  人力成本 => 28,557 元 (368h × 77.6元/h)
+  AI辅助开发工具 => 168.52 元
+  LLM API 测试调试 => 29.78 元
+  开发设备 => 0 元 (使用个人电脑)
+  开源软件许可 => 0 元 (MIT/Apache)
+  办公场地 => 0 元 (校内/远程)
+}
+
+map "**二、部署期投资 ≈ 200 元**" as deploy {
+  应用服务器首月 => 176.57 元
+  数据库首月 => 8.25 元 (99元/年)
+  域名注册 => ~50 元/年
+}
+
+map "**三、年运营成本 (以Y3为例)**" as ops {
+  LLM_API按量 => 22,500 元 (300用户×6.25元/月×12)
+  云基础设施 => 4,487 元
+  运维人力 => 54,000 元 (0.3 FTE)
+  市场推广 => 10,000 元
+  软件摊销 => 5,928 元
+}
+
+total --> dev
+total --> deploy
+dev --> ops : 投产后转为\n年运营成本
+
+@enduml
