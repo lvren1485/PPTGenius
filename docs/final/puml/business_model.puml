@@ -16,7 +16,7 @@ rectangle "**客户关系**\n· 自助 SaaS\n· 免费增值模式\n· 社区 + 
 rectangle "**渠道**\n· Web 应用 (Vue3)\n· API 开放平台\n· 开源社区推广" as CH #E0F7FA
 rectangle "**客户细分**\n· 高校师生\n· 企业行政/市场\n· 咨询/培训机构\n· 个人知识工作者" as CS #FFF9C4
 
-rectangle "**成本结构**\n· LLM API 按量计费 (~1.25元/PPT)\n· 云服务器 (~185元/月)\n· 开发人力 (主要成本)\n· AI 辅助开发工具" as C #FFEBEE
+rectangle "**成本结构**\n· LLM API 按量计费 (¥0.047/页)\n· 云服务器 (~185元/月)\n· 开发人力 (主要成本)\n· AI 辅助开发工具" as C #FFEBEE
 rectangle "**收入来源**\n· SaaS 订阅 (标准版39元/月, 专业版99元/月)\n· API 调用计费\n· 企业定制部署" as R #E8EAF6
 
 KP -right-> KA
