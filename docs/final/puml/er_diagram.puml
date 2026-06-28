@@ -1,0 +1,222 @@
+@startuml ER
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Microsoft YaHei"
+
+title PPTGenius ER Diagram
+
+entity "users" as U {
+  * id : INT <<PK>>
+  --
+  name : VARCHAR(64)
+  password : VARCHAR(256)
+  other : JSON
+  created_at : DATETIME
+}
+
+entity "conversations" as Conv {
+  * id : INT <<PK>>
+  --
+  * user_id : INT <<FK>>
+  title : VARCHAR(256)
+  status : VARCHAR(32)
+  current_outline_id : INT <<FK>>
+  workspace_path : VARCHAR(512)
+  estimated_cost : DOUBLE
+  context_usage : DOUBLE
+  created_at : DATETIME
+  updated_at : DATETIME
+}
+
+entity "messages" as Msg {
+  * id : INT <<PK>>
+  --
+  * conversation_id : INT <<FK>>
+  idx : INT
+  role : VARCHAR(16)
+  content : TEXT
+  content_type : VARCHAR(32)
+  estimated_cost : DOUBLE
+  token_cost_json : JSON
+  metadata_json : JSON
+  created_at : DATETIME
+}
+
+entity "outlines" as O {
+  * id : INT <<PK>>
+  --
+  * user_id : INT <<FK>>
+  * conversation_id : INT <<FK>>
+  title : VARCHAR(256)
+  status : VARCHAR(32)
+  eval_score : DOUBLE
+  eval_detail : JSON
+  version : INT
+  explore_result_json : JSON
+  slide_count : INT
+  created_at : DATETIME
+  updated_at : DATETIME
+}
+
+entity "outline_sections" as OSec {
+  * id : INT <<PK>>
+  --
+  * outline_id : INT <<FK>>
+  section_index : INT
+  title : VARCHAR(256)
+  description : TEXT
+  slide_count : INT
+  citations : JSON
+  created_at : DATETIME
+}
+
+entity "outline_slides" as OSl {
+  * id : INT <<PK>>
+  --
+  * outline_id : INT <<FK>>
+  section_id : INT <<FK>>
+  slide_index : INT
+  title : VARCHAR(256)
+  content_json : JSON
+  layout_type : VARCHAR(32)
+  has_image : BOOL
+  has_chart : BOOL
+  notes : TEXT
+  citations : JSON
+  status : VARCHAR(32)
+  created_at : DATETIME
+}
+
+entity "outline_snapshots" as OSnap {
+  * id : INT <<PK>>
+  --
+  * outline_id : INT <<FK>>
+  * user_id : INT <<FK>>
+  * conversation_id : INT <<FK>>
+  version : INT
+  outline_json : JSON
+  created_at : DATETIME
+}
+
+entity "styles" as S {
+  * id : INT <<PK>>
+  --
+  name : VARCHAR(50) <<UNIQUE>>
+  label : VARCHAR(100)
+  colors_json : JSON
+  chart_colors_json : JSON
+  fonts_json : JSON
+  style_density : VARCHAR(16)
+  text_density : VARCHAR(16)
+  decoration_json : JSON
+  background_json : JSON
+  is_active : BOOLEAN
+  created_at : DATETIME
+  updated_at : DATETIME
+}
+
+entity "presentations" as P {
+  * id : INT <<PK>>
+  --
+  * user_id : INT <<FK>>
+  * conversation_id : INT <<FK>>
+  outline_id : INT <<FK>>
+  style_id : INT <<FK>>
+  slide_count : INT
+  version : INT
+  outline_version : INT
+  status : VARCHAR(32)
+  created_at : DATETIME
+  updated_at : DATETIME
+}
+
+entity "presentation_slides" as PSl {
+  * id : INT <<PK>>
+  --
+  * presentation_id : INT <<FK>>
+  outline_slide_id : INT <<FK>>
+  slide_index : INT
+  style_id : INT <<FK>>
+  layout_name : VARCHAR(50)
+  agent_outputs : JSON
+  status : VARCHAR(20)
+  created_at : DATETIME
+  updated_at : DATETIME
+}
+
+entity "presentation_snapshots" as PSnap {
+  * id : INT <<PK>>
+  --
+  * presentation_id : INT <<FK>>
+  * user_id : INT <<FK>>
+  * conversation_id : INT <<FK>>
+  outline_version : INT
+  presentation_json : JSON
+  version : INT
+  created_at : DATETIME
+}
+
+entity "knowledge_files" as KF {
+  * id : INT <<PK>>
+  --
+  * user_id : INT <<FK>>
+  conversation_id : INT <<FK>>
+  filename : VARCHAR(256)
+  file_path : VARCHAR(512)
+  file_type : VARCHAR(16)
+  file_size : INT
+  chunk_count : INT
+  source_type : VARCHAR(16)
+  web_url : VARCHAR(2048)
+  summary_json : JSON
+  status : VARCHAR(32)
+  created_at : DATETIME
+}
+
+entity "knowledge_chunks" as KC {
+  * id : INT <<PK>>
+  --
+  * file_id : INT <<FK>>
+  chunk_index : INT
+  chunk_text : TEXT
+  token_count : INT
+  created_at : DATETIME
+}
+
+' ── Relationships ──
+
+U ||--o{ Conv : "1:N"
+U ||--o{ O : "1:N"
+U ||--o{ P : "1:N"
+U ||--o{ KF : "1:N"
+
+Conv ||--o{ Msg : "1:N"
+Conv ||--o{ O : "1:N"
+Conv ||--o{ P : "1:N"
+Conv ||--o{ KF : "1:N"
+Conv }o--o| O : "current_outline"
+
+O ||--o{ OSec : "1:N  CASCADE"
+O ||--o{ OSl : "1:N"
+O ||--o{ OSnap : "1:N  CASCADE"
+O ||--o{ P : "1:N"
+
+OSec ||--o{ OSl : "1:N"
+
+OSl||--o{ PSl : "outline_slide"
+
+P ||--o{ PSl : "1:N  CASCADE"
+P ||--o{ PSnap : "1:N  CASCADE"
+P }o--o| S : "style"
+
+PSl }o--o| S : "style_override"
+
+KF ||--o{ KC : "1:N  CASCADE"
+
+' ---- 关键：强制布局控制（让 O, P, S, PSnap 水平排列） ----
+O --left[hidden]-- PSl
+
+
+
+
+@enduml
