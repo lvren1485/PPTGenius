@@ -133,7 +133,7 @@ Coordinator (意图分类 → 分发)
 
 **动机**:
 1. Coordinator 意图分类成为瓶颈——误分类无法恢复
-2. LangGraph StateGraph 的 context 累积导致 token 爆炸（单次 PPT 生成 ~40K tokens → 重构后 ~14K）
+2. LangGraph StateGraph 的 context 累积导致 PPT 生成 token 浪费严重——每生成下一页时前面所有页的 tool history 都保留在 context 中。大纲生成受此影响较小（旧架构 503K tokens vs 新架构 464K tokens，按 blended rate ¥0.263/M tokens 从旧 benchmark 成本 ¥0.1324 反推），因为大纲流程本身是按 section 并行的独立调用
 3. Sub-agent 以独立 LLM 调用运行，context 完全隔离
 
 **设计原则**:

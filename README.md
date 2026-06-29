@@ -1,8 +1,31 @@
 # PPTGenius
 
-单人 AI PPT 生成网站。BM25 检索 + LangGraph Agent + FastAPI + MySQL。
+基于 LLM + RAG 的 PPT 智能生成系统。输入主题或上传文档，自动生成结构化大纲并渲染为可编辑的 `.pptx` 文件。
 
-预留有用户系统和多会话设计，待后期迭代。
+### 核心能力
+
+- **从主题到 PPT 一键生成** — 输入一句话主题，系统完成大纲规划 → 知识检索 → 内容填充 → PPT 渲染全流程
+- **RAG 知识增强** — BM25 检索用户上传的文档（PDF/DOCX/XLSX）和网络搜索结果，为每页 PPT 注入可溯源的专业内容
+- **原生 .pptx 输出** — 生成的 PPT 可直接在 PowerPoint/WPS 中编辑，支持图表、表格、形状、图标等 6 种元素类型
+- **多轮对话修改** — 支持"把第 5 页改成柱状图"、"全部背景改为深色"等自然语言修改指令
+- **Benchmark 实测** — 大纲生成 2m25s / ¥0.007 每页，PPT 生成 4m39s / ¥0.043 每页（DeepSeek V4 Flash）
+
+### 技术架构
+
+```
+前端 (Vue 3 + Element Plus)
+  → API (FastAPI + SSE 流式通信)
+    → Unified Master Agent (19 个工具, ReAct 模式)
+      ├─ Explore Agent (BM25 + 网络搜索 → section 规划)
+      ├─ Generator × N (每 section 并发填充内容)
+      ├─ Style Agent (配色/字号方案选择)
+      └─ Slide Agent × M (Part-Based 模型, 每页独立生成)
+    → Infrastructure (MySQL + BM25 + python-pptx + DeepSeek API)
+```
+
+### 技术栈
+
+Python 3.12 · FastAPI · LangChain/LangGraph · DeepSeek V4 Flash · BM25 (rank-bm25) · MySQL (asyncmy) · python-pptx · Vue 3 · Element Plus · TypeScript
 
 ## 环境准备
 
