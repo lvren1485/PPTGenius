@@ -4,7 +4,7 @@
 
 ### 在线访问
 
-- **在线演示**：项目已部署到华为云 ECS，可通过公网访问 http://113.44.39.109/
+- **在线演示**：项目已部署到华为云 ECS，可通过公网访问 <http://113.44.39.109/>
 - **部署说明**：查看 [PPTGenius 部署与使用报告](docs/08_deployment/deployment_usage_report.md)
 
 ### 核心能力
@@ -67,6 +67,7 @@ curl "http://localhost:8080/search?q=test&format=json"
 ```
 
 然后在 `config.local.yaml` 中切换引擎：
+
 ```yaml
 web_search:
   engine: "searxng"
@@ -110,7 +111,6 @@ cp package/icons/outline/*.svg svg/
 # 4. 清理
 rm -rf package tabler-icons-*.tgz
 ```
-
 
 ## 运行
 
