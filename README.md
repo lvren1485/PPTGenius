@@ -133,7 +133,7 @@ uv run pytest src/tests/ -v
 **三个评估模块：**
 
 | 模块 | 说明 | 数据来源 |
-|------|------|---------|
+| ------ | ------ | --------- |
 | B1 生成时间与成本 | 大纲/PPT 生成耗时、per-slide 成本、retry 次数 | `messages` 表 |
 | B2 大纲质量 | LLM Judge 量化评分 (结构/连贯/充实/视觉，1-10) | DeepSeek V4 Pro |
 | B3 PPT 视觉质量 | 越界、重叠、溢出、样式一致性等 9 项自动检查 | `agent_outputs` JSON |
