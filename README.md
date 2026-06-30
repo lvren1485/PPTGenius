@@ -17,7 +17,7 @@
 
 ### 技术架构
 
-```
+```plaintext
 前端 (Vue 3 + Element Plus)
   → API (FastAPI + SSE 流式通信)
     → Unified Master Agent (19 个工具, ReAct 模式)
